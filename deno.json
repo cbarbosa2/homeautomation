@@ -1,12 +1,15 @@
 {
   "tasks": {
     "dev": "deno run --allow-net --allow-read --allow-env --watch src/main.ts",
-    "start": "deno run --allow-net --allow-read --allow-env src/main.ts"
+    "start": "deno run --allow-net --allow-read --allow-env src/main.ts",
+    "check": "deno check src/*.ts",
+    "lint": "deno lint src/",
+    "fmt": "deno fmt src/",
+    "analyze": "deno task check && deno task lint"
   },
   "imports": {
-    "@std/http": "jsr:@std/http@^1.0.0",
     "@std/dotenv": "jsr:@std/dotenv@^0.225.0",
-    "mqtt": "https://deno.land/x/mqtt@0.2.6/deno/mod.ts",
+    "mqtt": "npm:mqtt@^5.10.1",
     "prom-client": "npm:prom-client@^15.1.0"
   },
   "compilerOptions": {

@@ -1,7 +1,7 @@
 import { load } from "@std/dotenv";
 import { MqttClient } from "./mqtt.ts";
 import { HttpClient } from "./http.ts";
-import { PrometheusMetrics } from "./prometheus.ts";
+import { PrometheusMetrics, METRICS } from "./prometheus.ts";
 
 class HomeAutomationApp {
   private mqttClient: MqttClient;
@@ -18,7 +18,7 @@ class HomeAutomationApp {
   async start(): Promise<void> {
     try {
       await load({ export: true });
-      
+  
       console.log("🏠 Starting Home Automation System...");
       
       await this.mqttClient.connect();
@@ -32,7 +32,7 @@ class HomeAutomationApp {
       
     } catch (error) {
       console.error("❌ Failed to start Home Automation System:", error);
-      process.exit(1);
+      Deno.exit(1);
     }
   }
 
@@ -49,7 +49,7 @@ class HomeAutomationApp {
   }
 
   private async processAutomationTasks(): Promise<void> {
-    this.metrics.incrementCounter("automation_cycle");
+    this.metrics.incrementCounter(METRICS.COUNTERS.AUTOMATION_CYCLES);
   }
 
   private setupGracefulShutdown(): void {

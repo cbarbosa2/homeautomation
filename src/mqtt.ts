@@ -1,4 +1,5 @@
-import { connect, MqttClient as MqttClientType } from "mqtt";
+import mqtt from "mqtt";
+import type { MqttClient as MqttClientType } from "mqtt";
 
 export class MqttClient {
   private client: MqttClientType | null = null;
@@ -6,15 +7,15 @@ export class MqttClient {
 
   async connect(): Promise<void> {
     const brokerUrl = Deno.env.get("MQTT_BROKER_URL") || "mqtt://localhost:1883";
-    const username = Deno.env.get("MQTT_USERNAME");
-    const password = Deno.env.get("MQTT_PASSWORD");
+    const username = Deno.env.get("MQTT_USERNAME") || "";
+    const password = Deno.env.get("MQTT_PASSWORD") || "";
     const clientId = Deno.env.get("MQTT_CLIENT_ID") || `homeautomation-${Date.now()}`;
 
     console.log(`🔌 Connecting to MQTT broker: ${brokerUrl}`);
 
     return new Promise((resolve, reject) => {
       try {
-        this.client = connect(brokerUrl, {
+        this.client = mqtt.connect(brokerUrl, {
           clientId,
           username,
           password,

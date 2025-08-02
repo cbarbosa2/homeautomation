@@ -34,8 +34,6 @@ A background service for home automation built with Deno, featuring MQTT communi
 ### Environment Variables
 
 - `MQTT_BROKER_URL`: MQTT broker connection string (default: mqtt://localhost:1883)
-- `MQTT_USERNAME`: MQTT username (optional)
-- `MQTT_PASSWORD`: MQTT password (optional)
 - `MQTT_CLIENT_ID`: MQTT client identifier (default: auto-generated)
 - `HTTP_TIMEOUT`: HTTP request timeout in milliseconds (default: 30000)
 - `PROMETHEUS_PORT`: Prometheus metrics server port (default: 9090)
