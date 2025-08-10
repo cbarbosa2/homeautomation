@@ -1,24 +1,20 @@
 import mqtt from "mqtt";
 import type { MqttClient as MqttClientType } from "mqtt";
+import { MQTT_BROKER_URL, MQTT_USERNAME, MQTT_PASSWORD, MQTT_CLIENT_ID } from "./constants.ts";
 
 export class MqttClient {
   private client: MqttClientType | null = null;
   private isConnected = false;
 
   async connect(): Promise<void> {
-    const brokerUrl = Deno.env.get("MQTT_BROKER_URL") || "mqtt://localhost:1883";
-    const username = Deno.env.get("MQTT_USERNAME") || "";
-    const password = Deno.env.get("MQTT_PASSWORD") || "";
-    const clientId = Deno.env.get("MQTT_CLIENT_ID") || `homeautomation-${Date.now()}`;
-
-    console.log(`🔌 Connecting to MQTT broker: ${brokerUrl}`);
+    console.log(`🔌 Connecting to MQTT broker: ${MQTT_BROKER_URL}`);
 
     return new Promise((resolve, reject) => {
       try {
-        this.client = mqtt.connect(brokerUrl, {
-          clientId,
-          username,
-          password,
+        this.client = mqtt.connect(MQTT_BROKER_URL, {
+          clientId: MQTT_CLIENT_ID,
+          username: MQTT_USERNAME,
+          password: MQTT_PASSWORD,
           reconnectPeriod: 5000,
           connectTimeout: 30000,
         });
@@ -83,7 +79,7 @@ export class MqttClient {
     });
   }
 
-  async publish(topic: string, message: string, retain = false): Promise<void> {
+  async publish(topic: string, message: string, retain = false, log = false): Promise<void> {
     if (!this.client || !this.isConnected) {
       throw new Error("MQTT client not connected");
     }
@@ -94,7 +90,9 @@ export class MqttClient {
           console.error(`❌ Failed to publish to ${topic}:`, error);
           reject(error);
         } else {
-          console.log(`📤 Published to ${topic}: ${message}`);
+          if (log) {
+            console.log(`📤 Published to ${topic}: ${message}`);
+          }
           resolve();
         }
       });

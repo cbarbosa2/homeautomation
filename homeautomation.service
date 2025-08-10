@@ -1,0 +1,29 @@
+[Unit]
+Description=Home Automation Service
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=carlos
+Group=carlos
+WorkingDirectory=/home/carlos/homeautomation
+ExecStart=/usr/bin/deno task start
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=homeautomation
+
+# Environment
+Environment=DENO_DIR=/home/carlos/.cache/deno
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/carlos/homeautomation
+
+[Install]
+WantedBy=multi-user.target

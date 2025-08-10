@@ -1,3 +1,5 @@
+import { HTTP_TIMEOUT } from "./constants.ts";
+
 export interface HttpResponse<T = unknown> {
   status: number;
   statusText: string;
@@ -10,7 +12,7 @@ export class HttpClient {
   private defaultHeaders: Record<string, string>;
 
   constructor() {
-    this.baseTimeout = parseInt(Deno.env.get("HTTP_TIMEOUT") || "30000");
+    this.baseTimeout = HTTP_TIMEOUT;
     this.defaultHeaders = {
       "User-Agent": "HomeAutomation/1.0.0",
       "Content-Type": "application/json",

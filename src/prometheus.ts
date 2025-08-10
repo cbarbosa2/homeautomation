@@ -1,4 +1,5 @@
 import * as client from "prom-client";
+import { PROMETHEUS_PORT } from "./constants.ts";
 // Using Deno's built-in HTTP server
 
 // Metric name constants
@@ -68,10 +69,9 @@ export class PrometheusMetrics {
       return new Response("Not Found", { status: 404 });
     };
 
-    const port = parseInt(Deno.env.get("PROMETHEUS_PORT") || "9090");
-    console.log(`📊 Prometheus metrics server starting on port ${port}`);
-    this.server = Deno.serve({ port: port }, handler);
-    console.log(`📊 Metrics available at: http://localhost:${port}/metrics`);
+    console.log(`📊 Prometheus metrics server starting on port ${PROMETHEUS_PORT}`);
+    this.server = Deno.serve({ port: PROMETHEUS_PORT }, handler);
+    console.log(`📊 Metrics available at: http://localhost:${PROMETHEUS_PORT}/metrics`);
   }
 
   async stop(): Promise<void> {

@@ -1,32 +1,33 @@
-import { load } from "@std/dotenv";
 import { MqttClient } from "./mqtt.ts";
 import { HttpClient } from "./http.ts";
 import { PrometheusMetrics, METRICS } from "./prometheus.ts";
+import { MqttAwake } from "./tasks/mqttAwake.ts";
 
 class HomeAutomationApp {
   private mqttClient: MqttClient;
   private httpClient: HttpClient;
   private metrics: PrometheusMetrics;
+  private mqttAwake: MqttAwake;
   private isRunning = false;
 
   constructor() {
     this.mqttClient = new MqttClient();
     this.httpClient = new HttpClient();
     this.metrics = new PrometheusMetrics();
+    this.mqttAwake = new MqttAwake(this.mqttClient);
   }
 
   async start(): Promise<void> {
     try {
-      await load({ export: true });
-  
       console.log("🏠 Starting Home Automation System...");
       
       await this.mqttClient.connect();
       await this.metrics.start();
-      
+
       this.isRunning = true;
       console.log("✅ Home Automation System started successfully");
       
+      this.mqttAwake.start();
       this.setupGracefulShutdown();
       await this.runMainLoop();
       
@@ -48,7 +49,7 @@ class HomeAutomationApp {
     }
   }
 
-  private async processAutomationTasks(): Promise<void> {
+  private processAutomationTasks(): void {
     this.metrics.incrementCounter(METRICS.COUNTERS.AUTOMATION_CYCLES);
   }
 
@@ -56,6 +57,9 @@ class HomeAutomationApp {
     const shutdown = async () => {
       console.log("🛑 Shutting down Home Automation System...");
       this.isRunning = false;
+      
+      // Stop MQTT awake service
+      this.mqttAwake.stop();
       
       try {
         await this.mqttClient.disconnect();

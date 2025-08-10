@@ -29,6 +29,28 @@ A background service for home automation built with Deno, featuring MQTT communi
    deno task start
    ```
 
+## Installation and Management
+
+### Install the service
+sudo cp homeautomation.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable homeautomation
+sudo systemctl start homeautomation
+
+### Check status
+sudo systemctl status homeautomation
+
+#### View logs
+sudo journalctl -u homeautomation -f
+
+### Stop/start/restart
+sudo systemctl stop homeautomation
+sudo systemctl start homeautomation
+sudo systemctl restart homeautomation
+
+### Disable auto-start
+sudo systemctl disable homeautomation
+
 ## Configuration
 
 ### Environment Variables
@@ -81,8 +103,8 @@ endTimer();
 
 ## Monitoring
 
-- **Health check**: `http://localhost:9090/health`
-- **Metrics endpoint**: `http://localhost:9090/metrics`
+- **Health check**: `http://localhost:1881/health`
+- **Metrics endpoint**: `http://localhost:1881/metrics`
 
 ### Default Metrics
 
