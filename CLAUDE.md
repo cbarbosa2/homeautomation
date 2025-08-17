@@ -58,7 +58,7 @@ The `HomeAutomationApp` class (`src/main.ts`) orchestrates the three core servic
 
 **Prometheus Metrics** (`src/prometheus.ts`):
 - Uses Deno's built-in HTTP server (`Deno.serve`)
-- Serves metrics on `/metrics` endpoint (default port 9090)
+- Serves metrics on `/metrics` endpoint (default port 1881)
 - Health check available at `/health`
 - Pre-configured counters, gauges, and histograms for automation cycles, MQTT messages, HTTP requests, and errors
 - All metrics prefixed with `homeautomation_`
@@ -73,7 +73,7 @@ Environment variables (see `.env.example`):
 
 ## Monitoring
 
-- Metrics: `http://localhost:9090/metrics`
-- Health: `http://localhost:9090/health`
+- Metrics: `http://localhost:1881/metrics`
+- Health: `http://localhost:1881/health`
 
 Default metrics include automation cycles, MQTT message counts, HTTP request stats, error counts, and connection status.

@@ -58,7 +58,7 @@ sudo systemctl disable homeautomation
 - `MQTT_BROKER_URL`: MQTT broker connection string (default: mqtt://localhost:1883)
 - `MQTT_CLIENT_ID`: MQTT client identifier (default: auto-generated)
 - `HTTP_TIMEOUT`: HTTP request timeout in milliseconds (default: 30000)
-- `PROMETHEUS_PORT`: Prometheus metrics server port (default: 9090)
+- `PROMETHEUS_PORT`: Prometheus metrics server port (default: 1881)
 
 ## Usage Examples
 

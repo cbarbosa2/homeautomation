@@ -1,6 +1,6 @@
 import { load } from "@std/dotenv";
 
-// Environment variable constants for the home automation system
+// Load environment variables from .env file
 await load({ export: true });
   
 // MQTT Configuration
@@ -16,4 +16,4 @@ export const HTTP_TIMEOUT = parseInt(Deno.env.get("HTTP_TIMEOUT") || "30000");
 export const FORECAST_SOLAR_URL = Deno.env.get("FORECAST_SOLAR_URL") || "https://api.forecast.solar/estimate/";
 
 // Prometheus Configuration
-export const PROMETHEUS_PORT = parseInt(Deno.env.get("PROMETHEUS_PORT") || "9090");
+export const PROMETHEUS_PORT = parseInt(Deno.env.get("PROMETHEUS_PORT") || "1881");
