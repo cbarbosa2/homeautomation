@@ -1,6 +1,6 @@
 import { MqttClient } from "../mqtt.ts";
 
-export class MqttAwake {
+export class MqttAwakeTask {
   private mqttClient: MqttClient;
   private awakeInterval: number | null = null;
   private readonly topic = "R/102c6b9cfab9/system/0/Serial";

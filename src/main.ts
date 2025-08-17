@@ -1,20 +1,20 @@
 import { MqttClient } from "./mqtt.ts";
 import { HttpClient } from "./http.ts";
 import { PrometheusMetrics, METRICS } from "./prometheus.ts";
-import { MqttAwake } from "./tasks/mqttAwake.ts";
+import { MqttAwakeTask } from "./tasks/mqttAwake.ts";
 
 class HomeAutomationApp {
   private mqttClient: MqttClient;
   private httpClient: HttpClient;
   private metrics: PrometheusMetrics;
-  private mqttAwake: MqttAwake;
+  private mqttAwakeTask: MqttAwakeTask;
   private isRunning = false;
 
   constructor() {
     this.mqttClient = new MqttClient();
     this.httpClient = new HttpClient();
     this.metrics = new PrometheusMetrics();
-    this.mqttAwake = new MqttAwake(this.mqttClient);
+    this.mqttAwakeTask = new MqttAwakeTask(this.mqttClient);
   }
 
   async start(): Promise<void> {
@@ -27,7 +27,7 @@ class HomeAutomationApp {
       this.isRunning = true;
       console.log("✅ Home Automation System started successfully");
       
-      this.mqttAwake.start();
+      this.mqttAwakeTask.start();
       this.setupGracefulShutdown();
       await this.runMainLoop();
       
@@ -59,7 +59,7 @@ class HomeAutomationApp {
       this.isRunning = false;
       
       // Stop MQTT awake service
-      this.mqttAwake.stop();
+      this.mqttAwakeTask.stop();
       
       try {
         await this.mqttClient.disconnect();
