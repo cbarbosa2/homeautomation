@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { MqttClient } from "../mqtt.ts";
 
 export class MqttAwakeTask {
@@ -14,7 +15,7 @@ export class MqttAwakeTask {
     this.awakeInterval = setInterval(() => {
       this.sendAwakeMessage();
     }, this.intervalMs);
-    
+
     // Send initial message immediately
     this.sendAwakeMessage();
   }
@@ -27,6 +28,6 @@ export class MqttAwakeTask {
   }
 
   private async sendAwakeMessage(): Promise<void> {
-      await this.mqttClient.publish(this.topic, "1234567890");
+    await this.mqttClient.publish(this.topic, randomInt(10000000).toString());
   }
 }

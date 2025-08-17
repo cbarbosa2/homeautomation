@@ -2,6 +2,7 @@
   "version": "5",
   "specifiers": {
     "jsr:@std/dotenv@0.225": "0.225.5",
+    "npm:@types/node@*": "22.15.15",
     "npm:mqtt@^5.10.1": "5.14.0",
     "npm:prom-client@^15.1.0": "15.1.3"
   },

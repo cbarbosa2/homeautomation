@@ -14,12 +14,14 @@ A background service for home automation built with Deno, featuring MQTT communi
 ## Quick Start
 
 1. **Setup environment**:
+
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
    ```
 
 2. **Development mode** (with auto-reload):
+
    ```bash
    deno task dev
    ```
@@ -31,24 +33,31 @@ A background service for home automation built with Deno, featuring MQTT communi
 
 ## Installation and Management
 
+Inside the bee.local server
+
 ### Install the service
+
 sudo cp homeautomation.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable homeautomation
 sudo systemctl start homeautomation
 
 ### Check status
+
 sudo systemctl status homeautomation
 
 #### View logs
+
 sudo journalctl -u homeautomation -f
 
 ### Stop/start/restart
+
 sudo systemctl stop homeautomation
 sudo systemctl start homeautomation
 sudo systemctl restart homeautomation
 
 ### Disable auto-start
+
 sudo systemctl disable homeautomation
 
 ## Configuration
@@ -60,6 +69,13 @@ sudo systemctl disable homeautomation
 - `HTTP_TIMEOUT`: HTTP request timeout in milliseconds (default: 30000)
 - `PROMETHEUS_PORT`: Prometheus metrics server port (default: 1881)
 
+## Deploy changes
+
+Make sure you first commit and push your changes to Git then run the `deploy.sh` file.
+
+But if you just want to do a quick test you may skip Git and run `deploy-dev.sh` which will
+copy your local files directly to the server but always guarantee to commit your changes when you're done.
+
 ## Usage Examples
 
 ### MQTT Operations
@@ -67,7 +83,10 @@ sudo systemctl disable homeautomation
 ```typescript
 // Publishing to MQTT
 await mqttClient.publish("home/lights/living-room", "on");
-await mqttClient.publishJson("home/sensors/temperature", { value: 22.5, unit: "C" });
+await mqttClient.publishJson("home/sensors/temperature", {
+  value: 22.5,
+  unit: "C",
+});
 
 // Subscribing to topics
 await mqttClient.subscribe("home/sensors/+");
@@ -82,7 +101,7 @@ const response = await httpClient.get("https://api.weather.com/current");
 // POST with JSON data
 await httpClient.post("https://api.home.local/devices", {
   device: "light",
-  action: "toggle"
+  action: "toggle",
 });
 ```
 
@@ -90,7 +109,10 @@ await httpClient.post("https://api.home.local/devices", {
 
 ```typescript
 // Increment counters
-metrics.incrementCounter("device_actions_total", { device: "light", action: "on" });
+metrics.incrementCounter("device_actions_total", {
+  device: "light",
+  action: "on",
+});
 
 // Set gauge values
 metrics.setGauge("temperature_celsius", 22.5, { location: "living_room" });
@@ -133,6 +155,7 @@ The application runs with auto-reload in development mode. Any changes to TypeSc
 ## Graceful Shutdown
 
 The application handles SIGINT and SIGTERM signals for graceful shutdown, ensuring:
+
 - MQTT connections are properly closed
 - Prometheus server is stopped
 - All resources are cleaned up
