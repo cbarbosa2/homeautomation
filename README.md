@@ -76,6 +76,15 @@ Make sure you first commit and push your changes to Git then run the `deploy.sh`
 But if you just want to do a quick test you may skip Git and run `deploy-dev.sh` which will
 copy your local files directly to the server but always guarantee to commit your changes when you're done.
 
+NOTE: Make sure you have passwordless sudo configured. If not configure like this:
+
+```
+ssh carlos@bee.local
+sudo visudo
+```
+
+Add the line: `carlos ALL=(ALL) NOPASSWD: /bin/systemctl`
+
 ## Usage Examples
 
 ### MQTT Operations

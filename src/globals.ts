@@ -1,8 +1,10 @@
 export const globals: {
   // holds the value in kWh per day, index 0 is current day, index 1 is tomorrow, plus index 2 and 3
-  forecastNextDays: number[];
+  solarForecastNextDays: number[];
+  victronNextDays: number[];
 } = {
-  forecastNextDays: [],
+  solarForecastNextDays: [],
+  victronNextDays: [],
 };
 
 export function logGlobals() {

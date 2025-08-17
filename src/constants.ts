@@ -21,3 +21,5 @@ export const PROMETHEUS_PORT = parseInt(
 
 export const FORECAST_SOLAR_API_KEY =
   Deno.env.get("FORECAST_SOLAR_API_KEY") || "";
+
+export const VICTRON_API_KEY = Deno.env.get("VICTRON_API_KEY") || "";
