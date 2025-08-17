@@ -130,12 +130,12 @@ endTimer();
 
 ### Default Metrics
 
-- `homeautomation_automation_cycles_total`: Total automation cycles
-- `homeautomation_mqtt_messages_received_total`: MQTT messages received
-- `homeautomation_mqtt_messages_sent_total`: MQTT messages sent
-- `homeautomation_http_requests_total`: HTTP requests made
-- `homeautomation_errors_total`: Total errors by type
-- `homeautomation_mqtt_connection_status`: MQTT connection status
+- `automation_cycles_total`: Total automation cycles
+- `mqtt_messages_received_total`: MQTT messages received
+- `mqtt_messages_sent_total`: MQTT messages sent
+- `http_requests_total`: HTTP requests made
+- `errors_total`: Total errors by type
+- `mqtt_connection_status`: MQTT connection status
 - Plus standard Node.js metrics (memory, CPU, etc.)
 
 ## Project Structure

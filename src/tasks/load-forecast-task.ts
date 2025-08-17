@@ -1,9 +1,15 @@
 import { FORECAST_SOLAR_API_KEY } from "../constants.ts";
 import { globals, logGlobals } from "../globals.ts";
+import { PrometheusMetrics, METRICS } from "../prometheus.ts";
 
 export class LoadForecastTask {
   private forecastInterval: number | null = null;
   private readonly apiUrl = `https://api.forecast.solar/${FORECAST_SOLAR_API_KEY}/estimate/watthours/day/41.081591/-8.643748/13/12/8.2`;
+  private metrics: PrometheusMetrics;
+
+  constructor(metrics: PrometheusMetrics) {
+    this.metrics = metrics;
+  }
 
   start(): void {
     const now = new Date();
@@ -46,17 +52,11 @@ export class LoadForecastTask {
       return response.result[day.toISOString().substring(0, 10)] || 0;
     });
 
-    const msgs = values.map((value, index) => {
-      return {
-        payload: {
-          op: "set",
-          val: value,
-          labels: {
-            day: index,
-            source: "solarForecast",
-          },
-        },
-      };
+    values.forEach((value, index) => {
+      this.metrics.setGauge(METRICS.GAUGES.ESS_SOLAR_FORECAST, value, {
+        day: index.toString(),
+        source: "solarForecast",
+      });
     });
 
     globals.forecastNextDays = values;

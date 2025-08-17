@@ -6,7 +6,7 @@ import { PROMETHEUS_PORT } from "./constants.ts";
 export const METRICS = {
   COUNTERS: {
     AUTOMATION_CYCLES: "automation_cycles_total",
-    MQTT_MESSAGES_RECEIVED: "mqtt_messages_received_total", 
+    MQTT_MESSAGES_RECEIVED: "mqtt_messages_received_total",
     MQTT_MESSAGES_SENT: "mqtt_messages_sent_total",
     HTTP_REQUESTS: "http_requests_total",
     ERRORS: "errors_total",
@@ -14,6 +14,7 @@ export const METRICS = {
   GAUGES: {
     MQTT_CONNECTION_STATUS: "mqtt_connection_status",
     ACTIVE_DEVICES: "active_devices",
+    ESS_SOLAR_FORECAST: "ess_solar_forecast",
   },
   HISTOGRAMS: {
     HTTP_REQUEST_DURATION: "http_request_duration_seconds",
@@ -37,20 +38,49 @@ export class PrometheusMetrics {
   private setupDefaultMetrics(): void {
     client.collectDefaultMetrics({
       register: this.register,
-      prefix: "homeautomation_",
+      prefix: "",
     });
 
-    this.createCounter(METRICS.COUNTERS.AUTOMATION_CYCLES, "Total number of automation cycles");
-    this.createCounter(METRICS.COUNTERS.MQTT_MESSAGES_RECEIVED, "Total MQTT messages received");
-    this.createCounter(METRICS.COUNTERS.MQTT_MESSAGES_SENT, "Total MQTT messages sent");
-    this.createCounter(METRICS.COUNTERS.HTTP_REQUESTS, "Total HTTP requests made", ["method", "status"]);
-    this.createCounter(METRICS.COUNTERS.ERRORS, "Total errors encountered", ["type"]);
-    
-    this.createGauge(METRICS.GAUGES.MQTT_CONNECTION_STATUS, "MQTT connection status (1=connected, 0=disconnected)");
+    this.createCounter(
+      METRICS.COUNTERS.AUTOMATION_CYCLES,
+      "Total number of automation cycles"
+    );
+    this.createCounter(
+      METRICS.COUNTERS.MQTT_MESSAGES_RECEIVED,
+      "Total MQTT messages received"
+    );
+    this.createCounter(
+      METRICS.COUNTERS.MQTT_MESSAGES_SENT,
+      "Total MQTT messages sent"
+    );
+    this.createCounter(
+      METRICS.COUNTERS.HTTP_REQUESTS,
+      "Total HTTP requests made",
+      ["method", "status"]
+    );
+    this.createCounter(METRICS.COUNTERS.ERRORS, "Total errors encountered", [
+      "type",
+    ]);
+
+    this.createGauge(
+      METRICS.GAUGES.MQTT_CONNECTION_STATUS,
+      "MQTT connection status (1=connected, 0=disconnected)"
+    );
     this.createGauge(METRICS.GAUGES.ACTIVE_DEVICES, "Number of active devices");
-    
-    this.createHistogram(METRICS.HISTOGRAMS.HTTP_REQUEST_DURATION, "HTTP request duration in seconds");
-    this.createHistogram(METRICS.HISTOGRAMS.AUTOMATION_CYCLE_DURATION, "Automation cycle duration in seconds");
+    this.createGauge(
+      METRICS.GAUGES.ESS_SOLAR_FORECAST,
+      "Solar forecast in watt-hours",
+      ["day", "source"]
+    );
+
+    this.createHistogram(
+      METRICS.HISTOGRAMS.HTTP_REQUEST_DURATION,
+      "HTTP request duration in seconds"
+    );
+    this.createHistogram(
+      METRICS.HISTOGRAMS.AUTOMATION_CYCLE_DURATION,
+      "Automation cycle duration in seconds"
+    );
   }
 
   async start(): Promise<void> {
@@ -61,7 +91,7 @@ export class PrometheusMetrics {
           headers: { "Content-Type": this.register.contentType },
         });
       }
-      
+
       if (new URL(request.url).pathname === "/health") {
         return new Response("OK", { status: 200 });
       }
@@ -69,9 +99,13 @@ export class PrometheusMetrics {
       return new Response("Not Found", { status: 404 });
     };
 
-    console.log(`📊 Prometheus metrics server starting on port ${PROMETHEUS_PORT}`);
+    console.log(
+      `📊 Prometheus metrics server starting on port ${PROMETHEUS_PORT}`
+    );
     this.server = Deno.serve({ port: PROMETHEUS_PORT }, handler);
-    console.log(`📊 Metrics available at: http://localhost:${PROMETHEUS_PORT}/metrics`);
+    console.log(
+      `📊 Metrics available at: http://localhost:${PROMETHEUS_PORT}/metrics`
+    );
   }
 
   async stop(): Promise<void> {
@@ -81,46 +115,62 @@ export class PrometheusMetrics {
     }
   }
 
-  createCounter(name: string, help: string, labelNames: string[] = []): client.Counter {
+  createCounter(
+    name: string,
+    help: string,
+    labelNames: string[] = []
+  ): client.Counter {
     const counter = new client.Counter({
-      name: `homeautomation_${name}`,
+      name: name,
       help,
       labelNames,
       registers: [this.register],
     });
-    
+
     this.counters.set(name, counter);
     return counter;
   }
 
-  createGauge(name: string, help: string, labelNames: string[] = []): client.Gauge {
+  createGauge(
+    name: string,
+    help: string,
+    labelNames: string[] = []
+  ): client.Gauge {
     const gauge = new client.Gauge({
-      name: `homeautomation_${name}`,
+      name: name,
       help,
       labelNames,
       registers: [this.register],
     });
-    
+
     this.gauges.set(name, gauge);
     return gauge;
   }
 
-  createHistogram(name: string, help: string, labelNames: string[] = [], buckets?: number[]): client.Histogram {
+  createHistogram(
+    name: string,
+    help: string,
+    labelNames: string[] = [],
+    buckets?: number[]
+  ): client.Histogram {
     const histogramConfig = {
-      name: `homeautomation_${name}`,
+      name: name,
       help,
       labelNames,
       registers: [this.register],
       ...(buckets && { buckets }),
     };
-    
+
     const histogram = new client.Histogram(histogramConfig);
-    
+
     this.histograms.set(name, histogram);
     return histogram;
   }
 
-  incrementCounter(name: string, labels?: Record<string, string | number>): void {
+  incrementCounter(
+    name: string,
+    labels?: Record<string, string | number>
+  ): void {
     const counter = this.counters.get(name);
     if (counter) {
       if (labels) {
@@ -137,7 +187,11 @@ export class PrometheusMetrics {
     this.incrementCounter(METRICS.COUNTERS.ERRORS, { type: errorType });
   }
 
-  setGauge(name: string, value: number, labels?: Record<string, string | number>): void {
+  setGauge(
+    name: string,
+    value: number,
+    labels?: Record<string, string | number>
+  ): void {
     const gauge = this.gauges.get(name);
     if (gauge) {
       if (labels) {
@@ -150,7 +204,11 @@ export class PrometheusMetrics {
     }
   }
 
-  observeHistogram(name: string, value: number, labels?: Record<string, string | number>): void {
+  observeHistogram(
+    name: string,
+    value: number,
+    labels?: Record<string, string | number>
+  ): void {
     const histogram = this.histograms.get(name);
     if (histogram) {
       if (labels) {
@@ -178,19 +236,29 @@ export class PrometheusMetrics {
   }
 
   recordMqttMessage(direction: "received" | "sent"): void {
-    const metricName = direction === "received" 
-      ? METRICS.COUNTERS.MQTT_MESSAGES_RECEIVED 
-      : METRICS.COUNTERS.MQTT_MESSAGES_SENT;
+    const metricName =
+      direction === "received"
+        ? METRICS.COUNTERS.MQTT_MESSAGES_RECEIVED
+        : METRICS.COUNTERS.MQTT_MESSAGES_SENT;
     this.incrementCounter(metricName);
   }
 
   recordHttpRequest(method: string, status: number, duration: number): void {
-    this.incrementCounter(METRICS.COUNTERS.HTTP_REQUESTS, { method, status: status.toString() });
-    this.observeHistogram(METRICS.HISTOGRAMS.HTTP_REQUEST_DURATION, duration / 1000);
+    this.incrementCounter(METRICS.COUNTERS.HTTP_REQUESTS, {
+      method,
+      status: status.toString(),
+    });
+    this.observeHistogram(
+      METRICS.HISTOGRAMS.HTTP_REQUEST_DURATION,
+      duration / 1000
+    );
   }
 
   recordAutomationCycle(duration: number): void {
     this.incrementCounter(METRICS.COUNTERS.AUTOMATION_CYCLES);
-    this.observeHistogram(METRICS.HISTOGRAMS.AUTOMATION_CYCLE_DURATION, duration / 1000);
+    this.observeHistogram(
+      METRICS.HISTOGRAMS.AUTOMATION_CYCLE_DURATION,
+      duration / 1000
+    );
   }
 }

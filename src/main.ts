@@ -14,7 +14,7 @@ class HomeAutomationApp {
     this.mqttClient = new MqttClient();
     this.metrics = new PrometheusMetrics();
     this.mqttAwakeTask = new MqttAwakeTask(this.mqttClient);
-    this.loadForecastTask = new LoadForecastTask();
+    this.loadForecastTask = new LoadForecastTask(this.metrics);
   }
 
   async start(): Promise<void> {
@@ -58,11 +58,11 @@ class HomeAutomationApp {
       console.log("🛑 Shutting down Home Automation System...");
       this.isRunning = false;
 
-      // Stop tasks
-      this.mqttAwakeTask.stop();
-      this.loadForecastTask.stop();
-
       try {
+        // Stop tasks
+        this.mqttAwakeTask.stop();
+        this.loadForecastTask.stop();
+
         await this.mqttClient.disconnect();
         await this.metrics.stop();
         console.log("✅ Shutdown complete");

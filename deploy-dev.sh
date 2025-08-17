@@ -8,15 +8,15 @@ set -e
 echo "🚀 Starting development deployment to bee.local..."
 
 echo "📋 Stopping homeautomation service..."
-ssh carlos@bee.local "sudo -n systemctl stop homeautomation 2>/dev/null || echo 'Service stop completed'"
+ssh carlos@bee.local "sudo -n systemctl stop homeautomation"
 
 echo "📁 Copying files to bee.local..."
-rsync -av --exclude='.git' --exclude='node_modules' --exclude='.env' --exclude='deploy*.sh' . carlos@bee.local:/home/carlos/homeautomation/
+rsync -av --exclude='.git' --exclude='node_modules' --exclude='deploy*.sh' . carlos@bee.local:/home/carlos/homeautomation/
 
 echo "🔄 Restarting homeautomation service..."
-ssh carlos@bee.local "sudo -n systemctl start homeautomation 2>/dev/null || echo 'Service start completed'"
+ssh carlos@bee.local "sudo -n systemctl start homeautomation"
 
 echo "✅ Checking service status..."
-ssh carlos@bee.local "sudo -n systemctl status homeautomation --no-pager 2>/dev/null || echo 'Service is running'"
+ssh carlos@bee.local "sudo -n systemctl status homeautomation"
 
 echo "✅ Development deployment completed successfully!"
