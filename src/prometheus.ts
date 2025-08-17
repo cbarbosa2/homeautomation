@@ -110,8 +110,19 @@ export class PrometheusMetrics {
 
   async stop(): Promise<void> {
     if (this.server) {
-      await this.server.shutdown();
-      console.log("📊 Prometheus metrics server stopped");
+      try {
+        // Force shutdown after 5 seconds
+        const shutdownPromise = this.server.shutdown();
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Shutdown timeout")), 5000)
+        );
+
+        await Promise.race([shutdownPromise, timeoutPromise]);
+        console.log("📊 Prometheus metrics server stopped");
+      } catch (_) {
+        console.log("📊 Prometheus metrics server force stopped");
+        // Force exit if graceful shutdown fails
+      }
     }
   }
 
