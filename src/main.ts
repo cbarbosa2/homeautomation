@@ -1,36 +1,36 @@
 import { MqttClient } from "./mqtt.ts";
-import { HttpClient } from "./http.ts";
 import { PrometheusMetrics, METRICS } from "./prometheus.ts";
-import { MqttAwakeTask } from "./tasks/mqttAwake.ts";
+import { MqttAwakeTask } from "./tasks/mqtt-awake-task.ts";
+import { LoadForecastTask } from "./tasks/load-forecast-task.ts";
 
 class HomeAutomationApp {
   private mqttClient: MqttClient;
-  private httpClient: HttpClient;
   private metrics: PrometheusMetrics;
   private mqttAwakeTask: MqttAwakeTask;
+  private loadForecastTask: LoadForecastTask;
   private isRunning = false;
 
   constructor() {
     this.mqttClient = new MqttClient();
-    this.httpClient = new HttpClient();
     this.metrics = new PrometheusMetrics();
     this.mqttAwakeTask = new MqttAwakeTask(this.mqttClient);
+    this.loadForecastTask = new LoadForecastTask();
   }
 
   async start(): Promise<void> {
     try {
       console.log("🏠 Starting Home Automation System...");
-      
+
       await this.mqttClient.connect();
       await this.metrics.start();
 
       this.isRunning = true;
       console.log("✅ Home Automation System started successfully");
-      
+
       this.mqttAwakeTask.start();
+      this.loadForecastTask.start();
       this.setupGracefulShutdown();
       await this.runMainLoop();
-      
     } catch (error) {
       console.error("❌ Failed to start Home Automation System:", error);
       Deno.exit(1);
@@ -41,7 +41,7 @@ class HomeAutomationApp {
     while (this.isRunning) {
       try {
         await this.processAutomationTasks();
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        await new Promise((resolve) => setTimeout(resolve, 5000));
       } catch (error) {
         console.error("Error in main loop:", error);
         this.metrics.incrementErrorCounter("main_loop_error");
@@ -57,10 +57,11 @@ class HomeAutomationApp {
     const shutdown = async () => {
       console.log("🛑 Shutting down Home Automation System...");
       this.isRunning = false;
-      
-      // Stop MQTT awake service
+
+      // Stop tasks
       this.mqttAwakeTask.stop();
-      
+      this.loadForecastTask.stop();
+
       try {
         await this.mqttClient.disconnect();
         await this.metrics.stop();
