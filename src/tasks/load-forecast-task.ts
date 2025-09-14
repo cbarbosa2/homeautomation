@@ -1,46 +1,19 @@
 import { FORECAST_SOLAR_API_KEY, VICTRON_API_KEY } from "../constants.ts";
 import { globals, logGlobals } from "../globals.ts";
 import { PrometheusMetrics, METRICS } from "../prometheus.ts";
+import { HourlyTask } from "./hourly-task.ts";
 
-export class LoadForecastTask {
-  private forecastInterval: number | null = null;
+export class LoadForecastTask extends HourlyTask {
   private readonly forecastSolarApiUrl = `https://api.forecast.solar/${FORECAST_SOLAR_API_KEY}/estimate/watthours/day/41.081591/-8.643748/13/12/8.2`;
   private readonly victronApiUrl = `https://vrmapi.victronenergy.com/v2/installations/176724/stats?type=custom&attributeCodes[]=vrm_pv_charger_yield_fc&interval=days`;
   private metrics: PrometheusMetrics;
 
   constructor(metrics: PrometheusMetrics) {
+    super();
     this.metrics = metrics;
   }
 
-  start(): void {
-    const now = new Date();
-    const nextHour = new Date(now);
-    nextHour.setHours(now.getHours() + 1, 0, 0, 0);
-
-    const timeToNextHour = nextHour.getTime() - now.getTime();
-
-    // Fetch immediately on startup
-    this.loadForecast();
-
-    // Schedule to run at the next hour
-    setTimeout(() => {
-      this.loadForecast();
-
-      // Then run every hour
-      this.forecastInterval = setInterval(() => {
-        this.loadForecast();
-      }, 60 * 60 * 1000); // 1 hour in milliseconds
-    }, timeToNextHour);
-  }
-
-  stop(): void {
-    if (this.forecastInterval) {
-      clearInterval(this.forecastInterval);
-      this.forecastInterval = null;
-    }
-  }
-
-  private async loadForecast(): Promise<void> {
+  protected async execute(): Promise<void> {
     const forecastSolarValues = await this.fetchSolarForecast();
     this.setMetrics(forecastSolarValues, "solarForecast");
     globals.solarForecastNextDays = forecastSolarValues;

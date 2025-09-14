@@ -15,6 +15,7 @@ export const METRICS = {
     MQTT_CONNECTION_STATUS: "mqtt_connection_status",
     ACTIVE_DEVICES: "active_devices",
     ESS_SOLAR_FORECAST: "ess_solar_forecast",
+    ESS_OMIE_PRICE: "ess_omie_price",
   },
   HISTOGRAMS: {
     HTTP_REQUEST_DURATION: "http_request_duration_seconds",

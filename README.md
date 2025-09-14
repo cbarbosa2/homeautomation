@@ -37,28 +37,38 @@ Inside the bee.local server
 
 ### Install the service
 
+```
 sudo cp homeautomation.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable homeautomation
 sudo systemctl start homeautomation
+```
 
 ### Check status
 
+```
 sudo systemctl status homeautomation
+```
 
 #### View logs
 
+```
 sudo journalctl -u homeautomation -f
+```
 
 ### Stop/start/restart
 
+```
 sudo systemctl stop homeautomation
 sudo systemctl start homeautomation
 sudo systemctl restart homeautomation
+```
 
 ### Disable auto-start
 
+```
 sudo systemctl disable homeautomation
+```
 
 ## Configuration
 
@@ -74,7 +84,7 @@ sudo systemctl disable homeautomation
 Make sure you first commit and push your changes to Git then run the `deploy.sh` file.
 
 But if you just want to do a quick test you may skip Git and run `deploy-dev.sh` which will
-copy your local files directly to the server but always guarantee to commit your changes when you're done.
+copy your local files directly to the server.
 
 NOTE: Make sure you have passwordless sudo configured. If not configure like this:
 

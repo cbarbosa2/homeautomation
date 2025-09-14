@@ -2,12 +2,14 @@ import { MqttClient } from "./mqtt.ts";
 import { PrometheusMetrics, METRICS } from "./prometheus.ts";
 import { MqttAwakeTask } from "./tasks/mqtt-awake-task.ts";
 import { LoadForecastTask } from "./tasks/load-forecast-task.ts";
+import { LoadOmieTask } from "./tasks/load-omie-task.ts";
 
 class HomeAutomationApp {
   private mqttClient: MqttClient;
   private metrics: PrometheusMetrics;
   private mqttAwakeTask: MqttAwakeTask;
   private loadForecastTask: LoadForecastTask;
+  private loadOmieTask: LoadOmieTask;
   private isRunning = false;
 
   constructor() {
@@ -15,6 +17,7 @@ class HomeAutomationApp {
     this.metrics = new PrometheusMetrics();
     this.mqttAwakeTask = new MqttAwakeTask(this.mqttClient);
     this.loadForecastTask = new LoadForecastTask(this.metrics);
+    this.loadOmieTask = new LoadOmieTask(this.metrics);
   }
 
   async start(): Promise<void> {
@@ -29,6 +32,7 @@ class HomeAutomationApp {
 
       this.mqttAwakeTask.start();
       this.loadForecastTask.start();
+      // this.loadOmieTask.start();
       this.setupGracefulShutdown();
       await this.runMainLoop();
     } catch (error) {
@@ -62,6 +66,7 @@ class HomeAutomationApp {
         // Stop tasks
         this.mqttAwakeTask.stop();
         this.loadForecastTask.stop();
+        this.loadOmieTask.stop();
 
         await this.mqttClient.disconnect();
         await this.metrics.stop();
