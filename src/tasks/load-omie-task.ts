@@ -1,12 +1,7 @@
-import { globals, logGlobals } from "../globals.ts";
+import { globals, logGlobals, OmieEntry } from "../globals.ts";
 import { PrometheusMetrics, METRICS } from "../prometheus.ts";
 import { HourlyTask } from "./hourly-task.ts";
-import {
-  fetchOmieEntries,
-  getStartOfToday,
-  getStartOfTomorrow,
-  OmieEntry,
-} from "./omie-proxy.ts";
+import { fetchOmie, parseOmieResponse } from "./omie-proxy.ts";
 
 export class LoadOmieTask extends HourlyTask {
   private metrics: PrometheusMetrics;
@@ -17,7 +12,10 @@ export class LoadOmieTask extends HourlyTask {
   }
 
   protected async execute(): Promise<void> {
-    const omieEntries = await fetchOmieEntries();
+    const omieEntries = parseOmieResponse(
+      await fetchOmie(),
+      this.getStartOfToday()
+    );
     globals.omieEntries = omieEntries;
 
     this.setMetrics(omieEntries);
@@ -26,8 +24,8 @@ export class LoadOmieTask extends HourlyTask {
   }
 
   private setMetrics(entries: OmieEntry[]) {
-    const startOfToday = getStartOfToday();
-    const startOfTomorrow = getStartOfTomorrow();
+    const startOfToday = this.getStartOfToday();
+    const startOfTomorrow = this.getStartOfTomorrow();
 
     [startOfToday, startOfTomorrow].forEach((day) => {
       Array.from({ length: 24 }, (_, i) => i).forEach((hour) => {
@@ -38,16 +36,33 @@ export class LoadOmieTask extends HourlyTask {
           date: entryDate,
         };
 
-        this.metrics.setGauge(
-          METRICS.GAUGES.ESS_OMIE_PRICE,
-          // in cents per kwh
-          Math.round(entry.price / 10),
-          {
-            day: entry.date < startOfTomorrow ? "today" : "tomorrow",
-            hour: String(entry.date.hour).padStart(2, "0"),
-          }
-        );
+        const dayStr =
+          Temporal.PlainDateTime.compare(entry.date, startOfTomorrow) < 0
+            ? "today"
+            : "tomorrow";
+        const hourStr = String(entry.date.hour).padStart(2, "0");
+
+        this.metrics.setGauge(METRICS.GAUGES.ESS_OMIE_PRICE, entry.price, {
+          day: dayStr,
+          hour: hourStr,
+        });
       });
     });
+  }
+
+  private getStartOfToday(): Temporal.PlainDateTime {
+    const now = Temporal.Now.plainDateTimeISO();
+    return now.with({
+      hour: 0,
+      minute: 0,
+      second: 0,
+      microsecond: 0,
+      millisecond: 0,
+      nanosecond: 0,
+    });
+  }
+
+  private getStartOfTomorrow(): Temporal.PlainDateTime {
+    return this.getStartOfToday().add({ days: 1 });
   }
 }

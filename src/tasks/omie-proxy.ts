@@ -1,13 +1,10 @@
+import { OmieEntry } from "../globals.ts";
+
 const OMIE_API_URL = `https://www.omie.es/sites/default/files/dados/NUEVA_SECCION/INT_PBC_EV_H_ACUM.TXT`;
 const TAR_NIGHT = 1.57;
 const TAR_DAY = 8.6;
 
-export interface OmieEntry {
-  date: Temporal.PlainDateTime;
-  price: number;
-}
-
-export async function fetchOmieEntries(): Promise<OmieEntry[]> {
+export async function fetchOmie(): Promise<string> {
   try {
     const response = await fetch(OMIE_API_URL);
 
@@ -15,22 +12,26 @@ export async function fetchOmieEntries(): Promise<OmieEntry[]> {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    return parseOmie(await response.text());
+    return await response.text();
   } catch (error) {
     console.error("Error fetching/parsing OMIE:", error);
     throw error;
   }
 }
 
-function parseOmie(response: string): OmieEntry[] {
+export function parseOmieResponse(
+  response: string,
+  startOfToday: Temporal.PlainDateTime
+): OmieEntry[] {
   const entries: OmieEntry[] = [];
   const lines = response.split("\n");
 
-  const startOfToday = getStartOfToday();
-
-  for (const line in lines) {
+  for (const line of lines) {
     const parsedLine = parseLine(line);
-    if (parsedLine && parsedLine.date >= startOfToday) {
+    if (
+      parsedLine &&
+      Temporal.PlainDateTime.compare(parsedLine.date, startOfToday) >= 0
+    ) {
       entries.push(parsedLine);
     }
   }
@@ -47,10 +48,13 @@ function parseOmie(response: string): OmieEntry[] {
       tarCents = TAR_DAY;
     }
     // ((OMIE + CGS + TSE + k) x (1+FP) + TAR) x IVA
-    entry.price =
+    const formulaResult =
       ((entry.price + 0.4 + 0.2893 + 1) * 1.16 + tarCents * 10) * 1.23;
+    // convert to cents per kWh
+    entry.price = Math.round(formulaResult / 10);
   });
 
+  console.log(JSON.stringify(entries));
   return entries;
 }
 
@@ -60,7 +64,7 @@ function parseDate(input: string): Temporal.PlainDate | undefined {
     if (parts.length == 3) {
       return new Temporal.PlainDate(
         parseInt(parts[2]!),
-        parseInt(parts[1]!) - 1,
+        parseInt(parts[1]!),
         parseInt(parts[0]!)
       );
     }
@@ -77,23 +81,13 @@ function parseLine(line: string): OmieEntry | undefined {
   const date = parseDate(parts[0]!);
   if (!date) return undefined;
 
-  const dateTime = date.toPlainDateTime({ hour: parseInt(parts[1]!) - 2 });
+  const dateTime = date
+    .toPlainDateTime({ hour: parseInt(parts[1]!) - 1 })
+    // offset spain to portugal
+    .add({ hours: -1 });
 
-  return { date: dateTime, price: parseFloat(parts[3]!.replace(",", ".")) };
-}
-
-export function getStartOfToday(): Temporal.PlainDateTime {
-  const now = Temporal.Now.plainDateTimeISO();
-  return now.with({
-    hour: 0,
-    minute: 0,
-    second: 0,
-    microsecond: 0,
-    millisecond: 0,
-    nanosecond: 0,
-  });
-}
-
-export function getStartOfTomorrow(): Temporal.PlainDateTime {
-  return getStartOfToday().add({ days: 1 });
+  return {
+    date: dateTime,
+    price: parseFloat(parts[3]!.replace(",", ".")),
+  };
 }

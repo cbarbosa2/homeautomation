@@ -32,7 +32,7 @@ class HomeAutomationApp {
 
       this.mqttAwakeTask.start();
       this.loadForecastTask.start();
-      // this.loadOmieTask.start();
+      this.loadOmieTask.start();
       this.setupGracefulShutdown();
       await this.runMainLoop();
     } catch (error) {

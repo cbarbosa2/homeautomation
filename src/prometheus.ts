@@ -73,6 +73,10 @@ export class PrometheusMetrics {
       "Solar forecast in watt-hours",
       ["day", "source"]
     );
+    this.createGauge(METRICS.GAUGES.ESS_OMIE_PRICE, "Omie price in cents", [
+      "day",
+      "hour",
+    ]);
 
     this.createHistogram(
       METRICS.HISTOGRAMS.HTTP_REQUEST_DURATION,
