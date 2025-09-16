@@ -3,21 +3,17 @@ import { PrometheusMetrics, METRICS } from "./prometheus.ts";
 import { MqttAwakeTask } from "./tasks/mqtt-awake-task.ts";
 import { LoadForecastTask } from "./tasks/load-forecast-task.ts";
 import { LoadOmieTask } from "./tasks/load-omie-task.ts";
+import { scheduler } from "./task-scheduler.ts";
+import { ReadMqttTask } from "./tasks/read-mqtt-task.ts";
 
 class HomeAutomationApp {
   private mqttClient: MqttClient;
   private metrics: PrometheusMetrics;
-  private mqttAwakeTask: MqttAwakeTask;
-  private loadForecastTask: LoadForecastTask;
-  private loadOmieTask: LoadOmieTask;
   private isRunning = false;
 
   constructor() {
     this.mqttClient = new MqttClient();
     this.metrics = new PrometheusMetrics();
-    this.mqttAwakeTask = new MqttAwakeTask(this.mqttClient);
-    this.loadForecastTask = new LoadForecastTask(this.metrics);
-    this.loadOmieTask = new LoadOmieTask(this.metrics);
   }
 
   async start(): Promise<void> {
@@ -27,12 +23,24 @@ class HomeAutomationApp {
       await this.mqttClient.connect();
       await this.metrics.start();
 
+      const mqttAwakeTask = new MqttAwakeTask(this.mqttClient);
+      scheduler.interval("Awake MQTT", 30, mqttAwakeTask.execute);
+
+      const loadForecastTask = new LoadForecastTask(this.metrics);
+      scheduler.cron(
+        "Load forecast solar",
+        "0 * * * *",
+        loadForecastTask.execute
+      );
+
+      const loadOmieTask = new LoadOmieTask(this.metrics);
+      scheduler.cron("Load omie", "0 * * * *", loadOmieTask.execute);
+
+      const readMqttTask = new ReadMqttTask(this.mqttClient);
+      readMqttTask.subscribeTopics();
+
       this.isRunning = true;
       console.log("✅ Home Automation System started successfully");
-
-      this.mqttAwakeTask.start();
-      this.loadForecastTask.start();
-      this.loadOmieTask.start();
       this.setupGracefulShutdown();
       await this.runMainLoop();
     } catch (error) {
@@ -63,11 +71,6 @@ class HomeAutomationApp {
       this.isRunning = false;
 
       try {
-        // Stop tasks
-        this.mqttAwakeTask.stop();
-        this.loadForecastTask.stop();
-        this.loadOmieTask.stop();
-
         await this.mqttClient.disconnect();
         await this.metrics.stop();
         console.log("✅ Shutdown complete");

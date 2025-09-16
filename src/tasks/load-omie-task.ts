@@ -1,17 +1,17 @@
 import { globals, logGlobals, OmieEntry } from "../globals.ts";
 import { PrometheusMetrics, METRICS } from "../prometheus.ts";
-import { HourlyTask } from "./hourly-task.ts";
-import { fetchOmie, parseOmieResponse } from "./omie-proxy.ts";
+import { fetchOmie, parseOmieResponse } from "../omie/omie-proxy.ts";
 
-export class LoadOmieTask extends HourlyTask {
+export class LoadOmieTask {
   private metrics: PrometheusMetrics;
 
   constructor(metrics: PrometheusMetrics) {
-    super();
     this.metrics = metrics;
+
+    this.execute();
   }
 
-  protected async execute(): Promise<void> {
+  public async execute(): Promise<void> {
     const omieEntries = parseOmieResponse(
       await fetchOmie(),
       this.getStartOfToday()
@@ -19,8 +19,6 @@ export class LoadOmieTask extends HourlyTask {
     globals.omieEntries = omieEntries;
 
     this.setMetrics(omieEntries);
-
-    logGlobals();
   }
 
   private setMetrics(entries: OmieEntry[]) {

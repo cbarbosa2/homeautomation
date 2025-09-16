@@ -1,19 +1,19 @@
 import { FORECAST_SOLAR_API_KEY, VICTRON_API_KEY } from "../constants.ts";
 import { globals, logGlobals } from "../globals.ts";
 import { PrometheusMetrics, METRICS } from "../prometheus.ts";
-import { HourlyTask } from "./hourly-task.ts";
 
-export class LoadForecastTask extends HourlyTask {
+export class LoadForecastTask {
   private readonly forecastSolarApiUrl = `https://api.forecast.solar/${FORECAST_SOLAR_API_KEY}/estimate/watthours/day/41.081591/-8.643748/13/12/8.2`;
   private readonly victronApiUrl = `https://vrmapi.victronenergy.com/v2/installations/176724/stats?type=custom&attributeCodes[]=vrm_pv_charger_yield_fc&interval=days`;
   private metrics: PrometheusMetrics;
 
   constructor(metrics: PrometheusMetrics) {
-    super();
     this.metrics = metrics;
+
+    this.execute();
   }
 
-  protected async execute(): Promise<void> {
+  public async execute(): Promise<void> {
     const forecastSolarValues = await this.fetchSolarForecast();
     this.setMetrics(forecastSolarValues, "solarForecast");
     globals.solarForecastNextDays = forecastSolarValues;
@@ -21,8 +21,6 @@ export class LoadForecastTask extends HourlyTask {
     const victronValues = await this.fetchVictron();
     this.setMetrics(victronValues, "victron");
     globals.victronNextDays = victronValues;
-
-    logGlobals();
   }
 
   private setMetrics(values: number[], source: string) {
