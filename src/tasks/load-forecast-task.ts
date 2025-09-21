@@ -1,5 +1,5 @@
 import { FORECAST_SOLAR_API_KEY, VICTRON_API_KEY } from "../constants.ts";
-import { globals, logGlobals } from "../globals.ts";
+import { globals } from "../globals.ts";
 import { PrometheusMetrics, METRICS } from "../prometheus.ts";
 
 export class LoadForecastTask {

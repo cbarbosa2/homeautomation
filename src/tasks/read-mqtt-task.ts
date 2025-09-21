@@ -1,11 +1,14 @@
 import { globals } from "../globals.ts";
 import { MqttClient } from "../mqtt.ts";
+import { METRICS, PrometheusMetrics } from "../prometheus.ts";
 
 export class ReadMqttTask {
+  private metrics: PrometheusMetrics;
   private mqttClient: MqttClient;
 
-  constructor(mqttClient: MqttClient) {
+  constructor(mqttClient: MqttClient, metrics: PrometheusMetrics) {
     this.mqttClient = mqttClient;
+    this.metrics = metrics;
   }
 
   subscribeTopics(): void {
@@ -14,6 +17,17 @@ export class ReadMqttTask {
       (_, data) => {
         const batteryData = data as { value: Array<{ soc: number }> };
         globals.batterySOC = batteryData.value[0]!.soc;
+      }
+    );
+
+    this.mqttClient.subscribeWithHandler(
+      "N/102c6b9cfab9/battery/512/System/MaxCellVoltage",
+      (_, data) => {
+        const payload = data as { value: number };
+        this.metrics.setGauge(
+          METRICS.GAUGES.ESS_BATTERY_MAX_CELL_VOLTAGE,
+          payload.value
+        );
       }
     );
   }

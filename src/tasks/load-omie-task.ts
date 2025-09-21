@@ -1,4 +1,4 @@
-import { globals, logGlobals, OmieEntry } from "../globals.ts";
+import { globals, OmieEntry } from "../globals.ts";
 import { PrometheusMetrics, METRICS } from "../prometheus.ts";
 import { fetchOmie, parseOmieResponse } from "../omie/omie-proxy.ts";
 
