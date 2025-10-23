@@ -1,5 +1,5 @@
 import { MqttClient } from "./mqtt.ts";
-import { PrometheusMetrics, METRICS } from "./prometheus.ts";
+import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { MqttAwakeTask } from "./tasks/mqtt-awake-task.ts";
 import { LoadForecastTask } from "./tasks/load-forecast-task.ts";
 import { LoadOmieTask } from "./tasks/load-omie-task.ts";
@@ -12,8 +12,8 @@ class HomeAutomationApp {
   private isRunning = false;
 
   constructor() {
-    this.mqttClient = new MqttClient();
     this.metrics = new PrometheusMetrics();
+    this.mqttClient = new MqttClient(this.metrics);
   }
 
   async start(): Promise<void> {
@@ -24,7 +24,9 @@ class HomeAutomationApp {
       await this.metrics.start();
 
       const mqttAwakeTask = new MqttAwakeTask(this.mqttClient);
-      scheduler.interval("Awake MQTT", 30, mqttAwakeTask.execute);
+      scheduler.interval("Awake MQTT", 30, () => {
+        mqttAwakeTask.execute;
+      });
 
       const loadForecastTask = new LoadForecastTask(this.metrics);
       scheduler.cron(
@@ -36,7 +38,7 @@ class HomeAutomationApp {
       const loadOmieTask = new LoadOmieTask(this.metrics);
       scheduler.cron("Load omie", "0 * * * *", loadOmieTask.execute);
 
-      const readMqttTask = new ReadMqttTask(this.mqttClient);
+      const readMqttTask = new ReadMqttTask(this.mqttClient, this.metrics);
       readMqttTask.subscribeTopics();
 
       this.isRunning = true;
@@ -62,7 +64,7 @@ class HomeAutomationApp {
   }
 
   private processAutomationTasks(): void {
-    this.metrics.incrementCounter(METRICS.COUNTERS.AUTOMATION_CYCLES);
+    this.metrics.incrementCounter("AUTOMATION_CYCLES");
   }
 
   private setupGracefulShutdown(): void {

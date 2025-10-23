@@ -6,6 +6,7 @@ import {
   MQTT_PASSWORD,
   MQTT_CLIENT_ID,
 } from "./constants.ts";
+import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 
 export class MqttClient {
   private client: MqttClientType | null = null;
@@ -14,6 +15,11 @@ export class MqttClient {
     string,
     (topic: string, data: unknown) => void
   >();
+  private metrics: PrometheusMetrics;
+
+  constructor(metrics: PrometheusMetrics) {
+    this.metrics = metrics;
+  }
 
   async connect(): Promise<void> {
     console.log(`🔌 Connecting to MQTT broker: ${MQTT_BROKER_URL}`);
@@ -31,6 +37,7 @@ export class MqttClient {
         this.client.on("connect", () => {
           console.log("✅ Connected to MQTT broker");
           this.isConnected = true;
+          this.metrics.recordMqttConnection(true);
           resolve();
         });
 
@@ -42,6 +49,7 @@ export class MqttClient {
         this.client.on("offline", () => {
           console.warn("⚠️ MQTT client offline");
           this.isConnected = false;
+          this.metrics.recordMqttConnection(false);
         });
 
         this.client.on("reconnect", () => {
@@ -103,6 +111,7 @@ export class MqttClient {
           console.error(`❌ Failed to publish to ${topic}:`, error);
           reject(error);
         } else {
+          this.metrics.recordMqttMessage("sent");
           if (log) {
             console.log(`📤 Published to ${topic}: ${message}`);
           }
@@ -127,6 +136,7 @@ export class MqttClient {
     // Check for exact topic match first
     const exactHandler = this.topicHandlers.get(topic);
     if (exactHandler) {
+      this.metrics.recordMqttMessage("received");
       exactHandler(topic, data);
       return;
     }
@@ -134,6 +144,7 @@ export class MqttClient {
     // Check for wildcard matches
     for (const [pattern, handler] of this.topicHandlers) {
       if (this.matchesTopic(pattern, topic)) {
+        this.metrics.recordMqttMessage("received");
         handler(topic, data);
         return;
       }

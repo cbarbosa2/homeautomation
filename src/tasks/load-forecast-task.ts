@@ -1,6 +1,7 @@
 import { FORECAST_SOLAR_API_KEY, VICTRON_API_KEY } from "../constants.ts";
 import { globals } from "../globals.ts";
-import { PrometheusMetrics, METRICS } from "../prometheus.ts";
+import { METRICS } from "../prometheus/metrics.ts";
+import { PrometheusMetrics } from "../prometheus/prometheus.ts";
 
 export class LoadForecastTask {
   private readonly forecastSolarApiUrl = `https://api.forecast.solar/${FORECAST_SOLAR_API_KEY}/estimate/watthours/day/41.081591/-8.643748/13/12/8.2`;

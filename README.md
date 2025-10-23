@@ -144,8 +144,8 @@ endTimer();
 
 ## Monitoring
 
-- **Health check**: `http://localhost:1881/health`
-- **Metrics endpoint**: `http://localhost:1881/metrics`
+- **Health check**: `http://localhost:1881/health` (local) / `http://bee.local:1881/health` (server)
+- **Metrics endpoint**: `http://localhost:1881/metrics` (local) / `http://bee.local:1881/metrics` (server)
 
 ### Default Metrics
 

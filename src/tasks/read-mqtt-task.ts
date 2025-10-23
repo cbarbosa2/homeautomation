@@ -1,6 +1,7 @@
 import { globals } from "../globals.ts";
 import { MqttClient } from "../mqtt.ts";
-import { METRICS, PrometheusMetrics } from "../prometheus.ts";
+import { METRICS } from "../prometheus/metrics.ts";
+import { PrometheusMetrics } from "../prometheus/prometheus.ts";
 
 export class ReadMqttTask {
   private metrics: PrometheusMetrics;
