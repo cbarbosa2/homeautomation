@@ -18,6 +18,10 @@ export class ReadMqttTask {
       (_, data) => {
         const batteryData = data as { value: Array<{ soc: number }> };
         globals.batterySOC = batteryData.value[0]!.soc;
+        this.metrics.setGauge(
+          METRICS.GAUGES.ESS_BATTERY_SOC,
+          globals.batterySOC
+        );
       }
     );
 

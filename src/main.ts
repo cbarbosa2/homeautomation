@@ -25,7 +25,7 @@ class HomeAutomationApp {
 
       const mqttAwakeTask = new MqttAwakeTask(this.mqttClient);
       scheduler.interval("Awake MQTT", 30, () => {
-        mqttAwakeTask.execute;
+        mqttAwakeTask.execute();
       });
 
       const loadForecastTask = new LoadForecastTask(this.metrics);
