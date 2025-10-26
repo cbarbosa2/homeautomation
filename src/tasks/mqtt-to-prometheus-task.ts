@@ -3,7 +3,7 @@ import { MqttClient } from "../mqtt-client.ts";
 import { MetricInfo, METRICS } from "../prometheus/metrics.ts";
 import { PrometheusMetrics } from "../prometheus/prometheus.ts";
 
-export class ReadMqttTask {
+export class MqttToPrometheusTask {
   private metrics: PrometheusMetrics;
   private mqttClient: MqttClient;
 

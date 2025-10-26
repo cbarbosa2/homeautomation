@@ -4,7 +4,8 @@ import { MqttAwakeTask } from "./tasks/mqtt-awake-task.ts";
 import { LoadForecastTask } from "./tasks/load-forecast-task.ts";
 import { LoadOmieTask } from "./tasks/load-omie-task.ts";
 import { scheduler } from "./task-scheduler.ts";
-import { ReadMqttTask } from "./tasks/read-mqtt-task.ts";
+import { MqttToPrometheusTask } from "./tasks/mqtt-to-prometheus-task.ts";
+import { SetSocLimitTask } from "./tasks/set-soc-limit-task.ts";
 
 class HomeAutomationApp {
   private mqttClient: MqttClient;
@@ -38,8 +39,23 @@ class HomeAutomationApp {
       const loadOmieTask = new LoadOmieTask(this.metrics);
       scheduler.cron("Load omie", "0 * * * *", loadOmieTask.execute);
 
-      const readMqttTask = new ReadMqttTask(this.mqttClient, this.metrics);
+      const readMqttTask = new MqttToPrometheusTask(
+        this.mqttClient,
+        this.metrics
+      );
       readMqttTask.subscribeTopics();
+
+      const setSocLimitTask = new SetSocLimitTask(this.mqttClient);
+      scheduler.cron(
+        "Set SOC limit in morning",
+        "0 8 * * *",
+        setSocLimitTask.executeInMorning
+      );
+      scheduler.cron(
+        "Set SOC limit in evenint",
+        "1 22 * * *",
+        setSocLimitTask.executeInEvening
+      );
 
       this.isRunning = true;
       console.log("✅ Home Automation System started successfully");
