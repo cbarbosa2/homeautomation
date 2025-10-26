@@ -1,5 +1,5 @@
 import * as client from "prom-client";
-import { PROMETHEUS_PORT } from "./constants.ts";
+import { HTTP_PORT } from "./constants.ts";
 import { scheduler } from "./task-scheduler.ts";
 
 export class HttpServer {
@@ -41,16 +41,12 @@ export class HttpServer {
       return new Response("Not Found", { status: 404 });
     };
 
+    console.log(`🌐 HTTP server starting on port ${HTTP_PORT}`);
+    this.server = Deno.serve({ port: HTTP_PORT }, handler);
     console.log(
-      `🌐 HTTP server starting on port ${PROMETHEUS_PORT}`
+      `📊 Metrics available at: http://localhost:${HTTP_PORT}/metrics`
     );
-    this.server = Deno.serve({ port: PROMETHEUS_PORT }, handler);
-    console.log(
-      `📊 Metrics available at: http://localhost:${PROMETHEUS_PORT}/metrics`
-    );
-    console.log(
-      `📋 Task dashboard at: http://localhost:${PROMETHEUS_PORT}/`
-    );
+    console.log(`📋 Task dashboard at: http://localhost:${HTTP_PORT}/`);
   }
 
   async stop(): Promise<void> {

@@ -76,7 +76,7 @@ Environment variables (see `.env.example`):
 - `MQTT_BROKER_URL`: MQTT broker connection string
 - `MQTT_USERNAME`/`MQTT_PASSWORD`: MQTT credentials
 - `HTTP_TIMEOUT`: HTTP request timeout in milliseconds
-- `PROMETHEUS_PORT`: Metrics server port
+- `HTTP_PORT`: HTTP server port
 
 ## Monitoring
 

@@ -40,7 +40,9 @@ class HomeAutomationApp {
       );
 
       const loadOmieTask = new LoadOmieTask(this.metrics);
-      scheduler.cron("Load omie", "0 * * * *", loadOmieTask.execute);
+      scheduler.cron("Load omie", "0 * * * *", () => {
+        loadOmieTask.execute();
+      });
 
       const readMqttTask = new MqttToPrometheusTask(
         this.mqttClient,
@@ -49,16 +51,12 @@ class HomeAutomationApp {
       readMqttTask.subscribeTopics();
 
       const setSocLimitTask = new SetSocLimitTask(this.mqttClient);
-      scheduler.cron(
-        "Set SOC limit in morning",
-        "0 8 * * *",
-        setSocLimitTask.executeInMorning
-      );
-      scheduler.cron(
-        "Set SOC limit in evening",
-        "1 22 * * *",
-        setSocLimitTask.executeInEvening
-      );
+      scheduler.cron("Set SOC limit in morning", "0 8 * * *", () => {
+        setSocLimitTask.executeInMorning();
+      });
+      scheduler.cron("Set SOC limit in evening", "1 22 * * *", () => {
+        setSocLimitTask.executeInEvening();
+      });
 
       this.isRunning = true;
       console.log("✅ Home Automation System started successfully");
@@ -95,10 +93,8 @@ class HomeAutomationApp {
         await this.mqttClient.disconnect();
         await this.httpServer.stop();
         console.log("✅ Shutdown complete");
-        Deno.exit(0);
       } catch (error) {
         console.error("❌ Error during shutdown:", error);
-        Deno.exit(1);
       }
     };
 

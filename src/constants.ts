@@ -14,10 +14,8 @@ export const MQTT_CLIENT_ID =
 // HTTP Configuration
 export const HTTP_TIMEOUT = parseInt(Deno.env.get("HTTP_TIMEOUT") || "30000");
 
-// Prometheus Configuration
-export const PROMETHEUS_PORT = parseInt(
-  Deno.env.get("PROMETHEUS_PORT") || "1881"
-);
+// HTTP / Prometheus Configuration
+export const HTTP_PORT = parseInt(Deno.env.get("HTTP_PORT") || "1881");
 
 export const FORECAST_SOLAR_API_KEY =
   Deno.env.get("FORECAST_SOLAR_API_KEY") || "";

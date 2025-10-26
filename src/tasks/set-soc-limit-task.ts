@@ -15,7 +15,9 @@ export class SetSocLimitTask {
   }
 
   public executeInEvening(): Promise<void> {
-    return this.publishValue(this.calculateEveningValue().value);
+    const calcResults = this.calculateEveningValue();
+    console.log("Evening SOC results: " + JSON.stringify(calcResults));
+    return this.publishValue(calcResults.value);
   }
 
   private async publishValue(value: number): Promise<void> {
@@ -32,8 +34,7 @@ export class SetSocLimitTask {
     const chargeEfficiency = 0.95;
     const minDaylightConsumptionKwh = 2;
     const maxDaylightConsumptionKwh = 15;
-    // in summer use 8, winter do 30
-    const minSOCPercent = 30;
+    const minSOCPercent = this.isWinterSeason() ? 30 : 5;
     const maxSOCPercent = 85;
     const batteryCapacityKwh = 40;
 
@@ -68,5 +69,24 @@ export class SetSocLimitTask {
       rangeMin,
       currentSOC,
     };
+  }
+
+  private isWinterSeason(): boolean {
+    const today = Temporal.Now.plainDateISO();
+    const startSeason = Temporal.PlainDate.from({
+      year: today.year,
+      month: 10,
+      day: 15,
+    });
+    const endSeason = Temporal.PlainDate.from({
+      year: today.year,
+      month: 3,
+      day: 1,
+    });
+
+    // Check if today is between November 1st and March 1st
+    const isAfterStart = Temporal.PlainDate.compare(today, startSeason) >= 0;
+    const isBeforeEnd = Temporal.PlainDate.compare(today, endSeason) < 0;
+    return isAfterStart || isBeforeEnd;
   }
 }
