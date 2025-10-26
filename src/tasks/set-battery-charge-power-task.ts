@@ -22,6 +22,6 @@ export class SetBatteryChargePowerTask {
   }
 
   private async publishValue(value: number): Promise<void> {
-    await this.mqttClient.publish(this.topic, JSON.stringify({ value: value }));
+    await this.mqttClient.publishJson(this.topic, { value: value });
   }
 }

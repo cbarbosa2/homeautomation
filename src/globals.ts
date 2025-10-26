@@ -58,10 +58,6 @@ export const globals: {
   ]),
 };
 
-export function logGlobals() {
-  console.log(`Globals=${JSON.stringify(globals)}`);
-}
-
 export interface OmieEntry {
   date: Temporal.PlainDateTime;
   // in cents per kwh

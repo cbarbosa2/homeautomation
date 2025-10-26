@@ -81,30 +81,6 @@ export class TaskScheduler {
   }
 
   /**
-   * Schedule a task to run at a specific time daily
-   * @param name - Unique name for the task
-   * @param hour - Hour (0-23)
-   * @param minute - Minute (0-59)
-   * @param handler - Function to execute
-   */
-  scheduleDaily(
-    name: string,
-    hour: number,
-    minute: number,
-    handler: () => Promise<void> | void
-  ): void {
-    const cronExpression = `${minute} ${hour} * * *`;
-    this.cron(name, cronExpression, handler);
-  }
-
-  /**
-   * Get list of scheduled task names
-   */
-  getScheduledTasks(): string[] {
-    return Array.from(this.scheduledTasks.keys());
-  }
-
-  /**
    * Get all task information
    */
   getAllTaskInfo(): TaskInfo[] {

@@ -25,9 +25,9 @@ export class DynamicPowerHandler {
       //   wallboxLocation == WallboxLocation.Inside
       //     ? "W/102c6b9cfab9/evcharger/40/SetCurrent"
       //     : "W/102c6b9cfab9/evcharger/41/SetCurrent";
-      // this.mqttClient.publish(
+      // this.mqttClient.publishJson(
       //   topic,
-      //   JSON.stringify({ value: outputParams.current })
+      //   { value: outputParams.current }
       // );
     }
 
@@ -39,9 +39,9 @@ export class DynamicPowerHandler {
       //   wallboxLocation == WallboxLocation.Inside
       //     ? "W/102c6b9cfab9/evcharger/40/StartStop"
       //     : "W/102c6b9cfab9/evcharger/41/StartStop";
-      // this.mqttClient.publish(
+      // this.mqttClient.publishJson(
       //   topic,
-      //   JSON.stringify({ value: outputParams.current })
+      //   { value: outputParams.current }
       // );
     }
   }

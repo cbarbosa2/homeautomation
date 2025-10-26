@@ -182,39 +182,4 @@ export class PrometheusMetrics {
         : "MQTT_MESSAGES_SENT";
     this.incrementCounter(metricKey);
   }
-
-  // Utility methods for working with METRICS
-  // getGaugeInfo(gaugeKey: keyof typeof METRICS.GAUGES): MetricInfo {
-  //   return METRICS.GAUGES[gaugeKey]!;
-  // }
-
-  // getCounterInfo(counterKey: keyof typeof METRICS.COUNTERS): MetricInfo {
-  //   return METRICS.COUNTERS[counterKey]!;
-  // }
-
-  // getHistogramInfo(histogramKey: keyof typeof METRICS.HISTOGRAMS): MetricInfo {
-  //   return METRICS.HISTOGRAMS[histogramKey]!;
-  // }
-
-  // Get all metric information as arrays
-  // getAllGaugeInfo() {
-  //   return Object.entries(METRICS.GAUGES).map(([key, gauge]) => ({
-  //     key,
-  //     ...gauge,
-  //   }));
-  // }
-
-  // getAllCounterInfo() {
-  //   return Object.entries(METRICS.COUNTERS).map(([key, counter]) => ({
-  //     key,
-  //     ...counter,
-  //   }));
-  // }
-
-  // getAllHistogramInfo() {
-  //   return Object.entries(METRICS.HISTOGRAMS).map(([key, histogram]) => ({
-  //     key,
-  //     ...histogram,
-  //   }));
-  // }
 }
