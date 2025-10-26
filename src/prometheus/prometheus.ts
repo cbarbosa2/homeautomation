@@ -1,11 +1,9 @@
 import * as client from "prom-client";
-import { PROMETHEUS_PORT } from "../constants.ts";
 import { MetricInfo, METRICS } from "./metrics.ts";
 // Using Deno's built-in HTTP server
 
 export class PrometheusMetrics {
   private register: client.Registry;
-  private server: Deno.HttpServer | null = null;
 
   private counters: Map<string, client.Counter> = new Map();
   private gauges: Map<string, client.Gauge> = new Map();
@@ -50,47 +48,8 @@ export class PrometheusMetrics {
     });
   }
 
-  start(): void {
-    const handler = async (request: Request): Promise<Response> => {
-      if (new URL(request.url).pathname === "/metrics") {
-        const metrics = await this.register.metrics();
-        return new Response(metrics, {
-          headers: { "Content-Type": this.register.contentType },
-        });
-      }
-
-      if (new URL(request.url).pathname === "/health") {
-        return new Response("OK", { status: 200 });
-      }
-
-      return new Response("Not Found", { status: 404 });
-    };
-
-    console.log(
-      `📊 Prometheus metrics server starting on port ${PROMETHEUS_PORT}`
-    );
-    this.server = Deno.serve({ port: PROMETHEUS_PORT }, handler);
-    console.log(
-      `📊 Metrics available at: http://localhost:${PROMETHEUS_PORT}/metrics`
-    );
-  }
-
-  async stop(): Promise<void> {
-    if (this.server) {
-      try {
-        // Force shutdown after 5 seconds
-        const shutdownPromise = this.server.shutdown();
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Shutdown timeout")), 5000)
-        );
-
-        await Promise.race([shutdownPromise, timeoutPromise]);
-        console.log("📊 Prometheus metrics server stopped");
-      } catch (_) {
-        console.log("📊 Prometheus metrics server force stopped");
-        // Force exit if graceful shutdown fails
-      }
-    }
+  getRegister(): client.Registry {
+    return this.register;
   }
 
   createCounter(

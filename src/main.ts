@@ -1,5 +1,6 @@
 import { MqttClient } from "./mqtt-client.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
+import { HttpServer } from "./http-server.ts";
 import { MqttAwakeTask } from "./tasks/mqtt-awake-task.ts";
 import { LoadForecastTask } from "./tasks/load-forecast-task.ts";
 import { LoadOmieTask } from "./tasks/load-omie-task.ts";
@@ -10,11 +11,13 @@ import { SetSocLimitTask } from "./tasks/set-soc-limit-task.ts";
 class HomeAutomationApp {
   private mqttClient: MqttClient;
   private metrics: PrometheusMetrics;
+  private httpServer: HttpServer;
   private isRunning = false;
 
   constructor() {
     this.metrics = new PrometheusMetrics();
     this.mqttClient = new MqttClient(this.metrics);
+    this.httpServer = new HttpServer(this.metrics.getRegister());
   }
 
   async start(): Promise<void> {
@@ -22,7 +25,7 @@ class HomeAutomationApp {
       console.log("🏠 Starting Home Automation System...");
 
       await this.mqttClient.connect();
-      await this.metrics.start();
+      this.httpServer.start();
 
       const mqttAwakeTask = new MqttAwakeTask(this.mqttClient);
       scheduler.interval("Awake MQTT", 30, () => {
@@ -52,7 +55,7 @@ class HomeAutomationApp {
         setSocLimitTask.executeInMorning
       );
       scheduler.cron(
-        "Set SOC limit in evenint",
+        "Set SOC limit in evening",
         "1 22 * * *",
         setSocLimitTask.executeInEvening
       );
@@ -90,7 +93,7 @@ class HomeAutomationApp {
 
       try {
         await this.mqttClient.disconnect();
-        await this.metrics.stop();
+        await this.httpServer.stop();
         console.log("✅ Shutdown complete");
         Deno.exit(0);
       } catch (error) {

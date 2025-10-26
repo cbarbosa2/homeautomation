@@ -1,8 +1,13 @@
+export interface TaskInfo {
+  name: string;
+  type: "cron" | "interval";
+  schedule: string;
+  handler: () => void | Promise<void>;
+  intervalId?: number;
+}
+
 export class TaskScheduler {
-  private scheduledTasks = new Map<
-    string,
-    { type: "cron" | "interval"; handler: () => void; intervalId?: number }
-  >();
+  private scheduledTasks = new Map<string, TaskInfo>();
 
   /**
    * Schedule a task using cron expression
@@ -28,7 +33,12 @@ export class TaskScheduler {
     };
 
     Deno.cron(name, cronExpression, cronHandler);
-    this.scheduledTasks.set(name, { type: "cron", handler: cronHandler });
+    this.scheduledTasks.set(name, {
+      name,
+      type: "cron",
+      schedule: cronExpression,
+      handler: cronHandler,
+    });
   }
 
   /**
@@ -62,7 +72,9 @@ export class TaskScheduler {
     // Then schedule recurring
     const intervalId = setInterval(intervalHandler, intervalSeconds * 1000);
     this.scheduledTasks.set(name, {
+      name,
       type: "interval",
+      schedule: `Every ${intervalSeconds}s`,
       handler: intervalHandler,
       intervalId,
     });
@@ -90,6 +102,32 @@ export class TaskScheduler {
    */
   getScheduledTasks(): string[] {
     return Array.from(this.scheduledTasks.keys());
+  }
+
+  /**
+   * Get all task information
+   */
+  getAllTaskInfo(): TaskInfo[] {
+    return Array.from(this.scheduledTasks.values());
+  }
+
+  /**
+   * Manually trigger a task by name
+   */
+  async triggerTask(name: string): Promise<boolean> {
+    const task = this.scheduledTasks.get(name);
+    if (task) {
+      console.log(`🔄 Manually triggering task: ${name}`);
+      try {
+        await task.handler();
+        console.log(`✅ Manually triggered task completed: ${name}`);
+        return true;
+      } catch (error) {
+        console.error(`❌ Error manually triggering task "${name}":`, error);
+        return false;
+      }
+    }
+    return false;
   }
 
   /**

@@ -143,8 +143,20 @@ endTimer();
 
 ## Monitoring
 
+- **Task Dashboard**: `http://localhost:1881/` (local) / `http://bee.local:1881/` (server)
 - **Health check**: `http://localhost:1881/health` (local) / `http://bee.local:1881/health` (server)
 - **Metrics endpoint**: `http://localhost:1881/metrics` (local) / `http://bee.local:1881/metrics` (server)
+
+### Task Dashboard
+
+The task dashboard provides a web interface to view and manage scheduled tasks:
+
+- View all scheduled tasks (cron and interval-based)
+- See task schedules at a glance
+- Manually trigger any task with a single click
+- Real-time feedback on task execution status
+
+Access the dashboard at `http://localhost:1881/` during development or `http://bee.local:1881/` on the server.
 
 ### Default Metrics
 
