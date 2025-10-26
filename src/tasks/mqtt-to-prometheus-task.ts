@@ -13,101 +13,115 @@ export class MqttToPrometheusTask {
   }
 
   subscribeTopics(): void {
-    this.subscribeToGauge(
+    this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/battery/512/System/MaxCellVoltage",
       METRICS.GAUGES.ESS_BATTERY_MAX_CELL_VOLTAGE
     );
-    this.subscribeToGauge(
+    this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/battery/512/System/MinCellVoltage",
       METRICS.GAUGES.ESS_BATTERY_MIN_CELL_VOLTAGE
     );
-    this.subscribeToGauge(
+    this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/battery/512/Dc/0/Current",
       METRICS.GAUGES.ESS_BATTERY_CURRENT
     );
-    this.subscribeToGauge(
+    this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/battery/512/Dc/0/Power",
       METRICS.GAUGES.ESS_BATTERY_POWER,
       (value) => {
         globals.batteryPower = value ?? 0;
       }
     );
-    this.subscribeToGauge(
+    this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/battery/512/Dc/0/Voltage",
       METRICS.GAUGES.ESS_BATTERY_VOLTAGE
     );
-    this.subscribeToGauge(
+    this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/battery/512/Dc/0/Temperature",
       METRICS.GAUGES.ESS_BATTERY_TEMPERATURE
     );
-    this.subscribeToGauge(
+    this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/battery/512/Soc",
       METRICS.GAUGES.ESS_BATTERY_SOC,
       (value) => {
         globals.batterySOC = value ?? 0;
       }
     );
-    this.subscribeToGauge(
+    this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/system/0/Ac/Grid/L1/Power",
       METRICS.GAUGES.ESS_GRID_POWER,
       (value) => {
         globals.gridPower = value ?? 0;
       }
     );
-    this.subscribeToGauge(
+    this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/system/0/Ac/Consumption/L1/Power",
       METRICS.GAUGES.ESS_CONSUMPTION_POWER
     );
-    this.subscribeToGauge(
+    this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/settings/0/Settings/CGwacs/BatteryLife/MinimumSocLimit",
       METRICS.GAUGES.ESS_BATTERY_MIN_SOC,
       (value) => {
         globals.batteryMinSOC = value ?? 0;
       }
     );
-    this.subscribeToGauge(
+    this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/system/0/Ac/PvOnGrid/L1/Power",
       METRICS.GAUGES.ESS_PV_INVERTER_POWER
     );
-    this.subscribeToGauge(
+    this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/system/0/Dc/Pv/Power",
       METRICS.GAUGES.ESS_PV_CHARGER_POWER
     );
-    this.subscribeToGauge(
+    this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/40/Ac/Power",
       METRICS.GAUGES.ESS_WALLBOX_INSIDE_POWER,
       (value) => {
         globals.wallboxPowerInside = value ?? 0;
       }
     );
-    this.subscribeToGauge(
+    this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/41/Ac/Power",
       METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_POWER,
       (value) => {
         globals.wallboxPowerOutside = value ?? 0;
       }
     );
-    this.subscribeToGauge(
+    this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/40/Status",
       METRICS.GAUGES.ESS_WALLBOX_INSIDE_STATUS,
       (value) => {
         globals.wallboxStatusInside = value ?? 0;
       }
     );
-    this.subscribeToGauge(
-      "N/102c6b9cfab9/evcharger/40/Status",
+    this.subscribeAndAssignToGauge(
+      "N/102c6b9cfab9/evcharger/41/Status",
       METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_STATUS,
       (value) => {
         globals.wallboxStatusOutside = value ?? 0;
       }
     );
-    this.subscribeToGauge(
+    this.subscribeAndAssignToGauge(
+      "N/102c6b9cfab9/evcharger/40/SetCurrent",
+      METRICS.GAUGES.ESS_WALLBOX_INSIDE_CURRENT,
+      (value) => {
+        globals.wallboxCurrentInside = value ?? 0;
+      }
+    );
+    this.subscribeAndAssignToGauge(
+      "N/102c6b9cfab9/evcharger/41/SetCurrent",
+      METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_CURRENT,
+      (value) => {
+        globals.wallboxCurrentOutside = value ?? 0;
+      }
+    );
+    this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/temperature/24/Temperature",
       METRICS.GAUGES.ESS_SHED_TEMPERATURE
     );
   }
 
-  private subscribeToGauge(
+  private subscribeAndAssignToGauge(
     topic: string,
     gaugeInfo: MetricInfo,
     handler?: (payloadValue: number | undefined) => void

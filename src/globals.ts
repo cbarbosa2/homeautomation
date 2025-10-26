@@ -9,8 +9,10 @@ export const globals: {
   batteryPower: number;
   wallboxPowerInside: number;
   wallboxStatusInside: number;
+  wallboxCurrentInside: number;
   wallboxPowerOutside: number;
   wallboxStatusOutside: number;
+  wallboxCurrentOutside: number;
 } = {
   solarForecastNextDays: [],
   victronNextDays: [],
@@ -21,8 +23,10 @@ export const globals: {
   batteryPower: 0,
   wallboxPowerInside: -1,
   wallboxStatusInside: -1,
+  wallboxCurrentInside: -1,
   wallboxPowerOutside: -1,
   wallboxStatusOutside: -1,
+  wallboxCurrentOutside: -1,
 };
 
 export function logGlobals() {

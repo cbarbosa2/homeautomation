@@ -191,11 +191,6 @@ export class PrometheusMetrics {
     this.observeHistogram("HTTP_REQUEST_DURATION", duration / 1000);
   }
 
-  recordAutomationCycle(duration: number): void {
-    this.incrementCounter("AUTOMATION_CYCLES");
-    this.observeHistogram("AUTOMATION_CYCLE_DURATION", duration / 1000);
-  }
-
   // Utility methods for working with METRICS
   // getGaugeInfo(gaugeKey: keyof typeof METRICS.GAUGES): MetricInfo {
   //   return METRICS.GAUGES[gaugeKey]!;

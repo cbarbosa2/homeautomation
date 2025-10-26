@@ -7,11 +7,6 @@ export interface MetricInfo {
 
 export const METRICS = {
   COUNTERS: {
-    AUTOMATION_CYCLES: {
-      name: "automation_cycles_total",
-      title: "Automation Cycles",
-      description: "Total number of automation cycles",
-    },
     MQTT_MESSAGES_RECEIVED: {
       name: "mqtt_messages_received_total",
       title: "MQTT Messages Received",
@@ -129,14 +124,24 @@ export const METRICS = {
       description: "Outside wallbox power in watts",
     },
     ESS_WALLBOX_INSIDE_STATUS: {
-      name: "ess_car_charge_inside_status",
+      name: "ess_wallbox_inside_status",
       title: "Inside Wallbox Status",
       description: "Inside wallbox status",
     },
     ESS_WALLBOX_OUTSIDE_STATUS: {
-      name: "ess_car_charge_outside_status",
+      name: "ess_wallbox_outside_status",
       title: "Outside Wallbox Status",
       description: "Outside wallbox status",
+    },
+    ESS_WALLBOX_INSIDE_CURRENT: {
+      name: "ess_wallbox_inside_current",
+      title: "Inside Wallbox Current",
+      description: "Inside wallbox current (A)",
+    },
+    ESS_WALLBOX_OUTSIDE_CURRENT: {
+      name: "ess_wallbox_outside_current",
+      title: "Outside Wallbox Current",
+      description: "Outside wallbox current (A)",
     },
     ESS_SHED_TEMPERATURE: {
       name: "ess_shed_temperature",
@@ -149,11 +154,6 @@ export const METRICS = {
       name: "http_request_duration_seconds",
       title: "HTTP Request Duration",
       description: "HTTP request duration in seconds",
-    },
-    AUTOMATION_CYCLE_DURATION: {
-      name: "automation_cycle_duration_seconds",
-      title: "Automation Cycle Duration",
-      description: "Automation cycle duration in seconds",
     },
   },
 } as const;

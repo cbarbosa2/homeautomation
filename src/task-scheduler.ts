@@ -144,6 +144,23 @@ export class TaskScheduler {
     }
     return false;
   }
+
+  /**
+   * Terminate all scheduled tasks
+   */
+  terminateAll(): void {
+    console.log("🛑 Terminating all scheduled tasks...");
+    for (const [name, task] of this.scheduledTasks.entries()) {
+      if (task.type === "interval" && task.intervalId) {
+        clearInterval(task.intervalId);
+        console.log(`🛑 Stopped interval task: ${name}`);
+      } else if (task.type === "cron") {
+        console.log(`🛑 Stopped cron task: ${name}`);
+      }
+    }
+    this.scheduledTasks.clear();
+    console.log("✅ All scheduled tasks terminated");
+  }
 }
 
 // Export a singleton instance

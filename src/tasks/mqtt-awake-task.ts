@@ -7,8 +7,6 @@ export class MqttAwakeTask {
 
   constructor(mqttClient: MqttClient) {
     this.mqttClient = mqttClient;
-
-    this.execute();
   }
 
   public async execute(): Promise<void> {

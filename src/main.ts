@@ -13,7 +13,6 @@ class HomeAutomationApp {
   private mqttClient: MqttClient;
   private metrics: PrometheusMetrics;
   private httpServer: HttpServer;
-  private isRunning = false;
 
   constructor() {
     this.metrics = new PrometheusMetrics();
@@ -28,95 +27,83 @@ class HomeAutomationApp {
       await this.mqttClient.connect();
       this.httpServer.start();
 
-      const mqttAwakeTask = new MqttAwakeTask(this.mqttClient);
-      scheduler.interval("Awake MQTT", 30, () => {
-        mqttAwakeTask.execute();
-      });
+      this.setupScheduledTasks();
 
-      const loadForecastTask = new LoadForecastTask(this.metrics);
-      scheduler.cron(
-        "Load forecast solar",
-        "0 * * * *",
-        loadForecastTask.execute
-      );
-
-      const loadOmieTask = new LoadOmieTask(this.metrics);
-      scheduler.cron("Load omie", "0 * * * *", () => {
-        loadOmieTask.execute();
-      });
-
-      const readMqttTask = new MqttToPrometheusTask(
-        this.mqttClient,
-        this.metrics
-      );
-      readMqttTask.subscribeTopics();
-
-      const setSocLimitTask = new SetSocLimitTask(this.mqttClient);
-      scheduler.cron("Set SOC limit in morning", "0 8 * * *", () => {
-        setSocLimitTask.executeInMorning();
-      });
-      scheduler.cron("Set SOC limit in evening", "1 22 * * *", () => {
-        setSocLimitTask.executeInEvening();
-      });
-
-      const setBatteryChargePowerTask = new SetBatteryChargePowerTask(
-        this.mqttClient
-      );
-      scheduler.cron("Set Battery Charge Power in morning", "0 8 * * *", () => {
-        setBatteryChargePowerTask.executeInMorning();
-      });
-      scheduler.cron(
-        "Set Battery Charge Power in early evening",
-        "0 22 * * *",
-        () => {
-          setBatteryChargePowerTask.executeInEarlyEvening();
-        }
-      );
-      scheduler.cron(
-        "Set Battery Charge Power in late evening",
-        "0 3 * * *",
-        () => {
-          setBatteryChargePowerTask.executeInLateEvening();
-        }
-      );
-
-      this.isRunning = true;
       console.log("✅ Home Automation System started successfully");
       this.setupGracefulShutdown();
-      await this.runMainLoop();
     } catch (error) {
       console.error("❌ Failed to start Home Automation System:", error);
       Deno.exit(1);
     }
   }
 
-  private async runMainLoop(): Promise<void> {
-    while (this.isRunning) {
-      try {
-        await this.processAutomationTasks();
-        await new Promise((resolve) => setTimeout(resolve, 5000));
-      } catch (error) {
-        console.error("Error in main loop:", error);
-        this.metrics.incrementErrorCounter("main_loop_error");
-      }
-    }
-  }
+  private setupScheduledTasks() {
+    const mqttAwakeTask = new MqttAwakeTask(this.mqttClient);
+    scheduler.interval("Awake MQTT", 30, () => {
+      mqttAwakeTask.execute();
+    });
 
-  private processAutomationTasks(): void {
-    this.metrics.incrementCounter("AUTOMATION_CYCLES");
+    const loadForecastTask = new LoadForecastTask(this.metrics);
+    scheduler.cron(
+      "Load forecast solar",
+      "0 * * * *",
+      loadForecastTask.execute
+    );
+
+    const loadOmieTask = new LoadOmieTask(this.metrics);
+    scheduler.cron("Load omie", "0 * * * *", () => {
+      loadOmieTask.execute();
+    });
+
+    const readMqttTask = new MqttToPrometheusTask(
+      this.mqttClient,
+      this.metrics
+    );
+    readMqttTask.subscribeTopics();
+
+    const setSocLimitTask = new SetSocLimitTask(this.mqttClient);
+    scheduler.cron("Set SOC limit in morning", "0 8 * * *", () => {
+      setSocLimitTask.executeInMorning();
+    });
+    scheduler.cron("Set SOC limit in evening", "1 22 * * *", () => {
+      setSocLimitTask.executeInEvening();
+    });
+
+    const setBatteryChargePowerTask = new SetBatteryChargePowerTask(
+      this.mqttClient
+    );
+    scheduler.cron("Set Battery Charge Power in morning", "0 8 * * *", () => {
+      setBatteryChargePowerTask.executeInMorning();
+    });
+    scheduler.cron(
+      "Set Battery Charge Power in early evening",
+      "0 22 * * *",
+      () => {
+        setBatteryChargePowerTask.executeInEarlyEvening();
+      }
+    );
+    scheduler.cron(
+      "Set Battery Charge Power in late evening",
+      "0 3 * * *",
+      () => {
+        setBatteryChargePowerTask.executeInLateEvening();
+      }
+    );
   }
 
   private setupGracefulShutdown(): void {
     const shutdown = async () => {
       console.log("🛑 Shutting down Home Automation System...");
-      this.isRunning = false;
 
       try {
+        scheduler.terminateAll();
         await this.mqttClient.disconnect();
         await this.httpServer.stop();
         console.log("✅ Shutdown complete");
+        Deno.exit(0);
       } catch (error) {
         console.error("❌ Error during shutdown:", error);
+        Deno.exit(1);
       }
     };
 

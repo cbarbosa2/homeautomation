@@ -160,7 +160,6 @@ Access the dashboard at `http://localhost:1881/` during development or `http://b
 
 ### Default Metrics
 
-- `automation_cycles_total`: Total automation cycles
 - `mqtt_messages_received_total`: MQTT messages received
 - `mqtt_messages_sent_total`: MQTT messages sent
 - `http_requests_total`: HTTP requests made
