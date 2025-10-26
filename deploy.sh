@@ -13,9 +13,8 @@ ssh carlos@bee.local << 'EOF'
 
     echo "📁 Navigating to project directory..."
     cd /home/carlos/homeautomation
-
-    echo "🔄 Cloning latest code from git..."
-    git clone https://github.com/your-username/homeautomation.git /home/carlos/homeautomation
+    echo "🔄 Pulling latest code from git..."
+    git pull origin main
 
     echo "🔄 Restarting homeautomation service..."
     sudo -n systemctl start homeautomation

@@ -3,12 +3,26 @@ export const globals: {
   solarForecastNextDays: number[];
   victronNextDays: number[];
   omieEntries: OmieEntry[];
+  gridPower: number;
+  batteryMinSOC: number;
   batterySOC: number;
+  batteryPower: number;
+  wallboxPowerInside: number;
+  wallboxStatusInside: number;
+  wallboxPowerOutside: number;
+  wallboxStatusOutside: number;
 } = {
   solarForecastNextDays: [],
   victronNextDays: [],
   omieEntries: [],
+  gridPower: -1,
+  batteryMinSOC: 0,
   batterySOC: 0,
+  batteryPower: 0,
+  wallboxPowerInside: -1,
+  wallboxStatusInside: -1,
+  wallboxPowerOutside: -1,
+  wallboxStatusOutside: -1,
 };
 
 export function logGlobals() {

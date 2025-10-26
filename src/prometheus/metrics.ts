@@ -118,15 +118,25 @@ export const METRICS = {
       title: "PV Charger Power",
       description: "PV charger power in watts",
     },
-    ESS_CAR_CHARGE_INSIDE_POWER: {
-      name: "ess_car_charge_inside_power",
-      title: "Inside Car Charge Power",
-      description: "Inside car charging power in watts",
+    ESS_WALLBOX_INSIDE_POWER: {
+      name: "ess_wallbox_inside_power",
+      title: "Inside Wallbox Power",
+      description: "Inside wallbox power in watts",
     },
-    ESS_CAR_CHARGE_OUTSIDE_POWER: {
-      name: "ess_car_charge_outside_power",
-      title: "Outside Car Charge Power",
-      description: "Outside car charging power in watts",
+    ESS_WALLBOX_OUTSIDE_POWER: {
+      name: "ess_wallbox_outside_power",
+      title: "Outside Wallbox Power",
+      description: "Outside wallbox power in watts",
+    },
+    ESS_WALLBOX_INSIDE_STATUS: {
+      name: "ess_car_charge_inside_status",
+      title: "Inside Wallbox Status",
+      description: "Inside wallbox status",
+    },
+    ESS_WALLBOX_OUTSIDE_STATUS: {
+      name: "ess_car_charge_outside_status",
+      title: "Outside Wallbox Status",
+      description: "Outside wallbox status",
     },
     ESS_SHED_TEMPERATURE: {
       name: "ess_shed_temperature",
