@@ -54,7 +54,6 @@ export function parseOmieResponse(
     entry.price = Math.round(formulaResult / 10);
   });
 
-  console.log(JSON.stringify(entries));
   return entries;
 }
 

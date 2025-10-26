@@ -122,8 +122,6 @@ export class MqttClient {
   }
 
   private handleMessage(topic: string, message: string): void {
-    console.log(`📨 Received message on ${topic}: ${message}`);
-
     try {
       const data = JSON.parse(message);
       this.processMessage(topic, data);

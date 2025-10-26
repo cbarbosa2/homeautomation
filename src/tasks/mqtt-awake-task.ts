@@ -1,5 +1,5 @@
 import { randomInt } from "node:crypto";
-import { MqttClient } from "../mqtt.ts";
+import { MqttClient } from "../mqtt-client.ts";
 
 export class MqttAwakeTask {
   private mqttClient: MqttClient;

@@ -9,7 +9,7 @@ export const MQTT_BROKER_URL =
 export const MQTT_USERNAME = Deno.env.get("MQTT_USERNAME") || "";
 export const MQTT_PASSWORD = Deno.env.get("MQTT_PASSWORD") || "";
 export const MQTT_CLIENT_ID =
-  Deno.env.get("MQTT_CLIENT_ID") || `homeautomation-${Date.now()}`;
+  (Deno.env.get("MQTT_CLIENT_ID") || `homeautomation`) + `-${Date.now()}`;
 
 // HTTP Configuration
 export const HTTP_TIMEOUT = parseInt(Deno.env.get("HTTP_TIMEOUT") || "30000");
