@@ -20,6 +20,11 @@ export enum WallboxChargeMode {
   Manual = 6,
 }
 
+export enum WallboxLocation {
+  Inside,
+  Outside,
+}
+
 /**
  * Most values are read from MQTT, but not all.
  */
@@ -32,14 +37,10 @@ export const globals: {
   batteryMinSOC: number;
   batterySOC: number;
   batteryPower: number;
-  wallboxPowerInside: number;
-  wallboxStatusInside: number;
-  wallboxCurrentInside: number;
-  wallboxPowerOutside: number;
-  wallboxStatusOutside: number;
-  wallboxCurrentOutside: number;
-  wallboxChargeModeInside: WallboxChargeMode;
-  wallboxChargeModeOutside: WallboxChargeMode;
+  wallboxPower: Map<WallboxLocation, number>;
+  wallboxStatus: Map<WallboxLocation, number>;
+  wallboxCurrent: Map<WallboxLocation, number>;
+  wallboxChargeMode: Map<WallboxLocation, WallboxChargeMode>;
 } = {
   solarForecastNextDays: [],
   victronNextDays: [],
@@ -48,14 +49,13 @@ export const globals: {
   batteryMinSOC: 0,
   batterySOC: 0,
   batteryPower: 0,
-  wallboxPowerInside: -1,
-  wallboxStatusInside: -1,
-  wallboxCurrentInside: -1,
-  wallboxPowerOutside: -1,
-  wallboxStatusOutside: -1,
-  wallboxCurrentOutside: -1,
-  wallboxChargeModeInside: WallboxChargeMode.SunOnly,
-  wallboxChargeModeOutside: WallboxChargeMode.SunOnly,
+  wallboxPower: new Map(),
+  wallboxStatus: new Map(),
+  wallboxCurrent: new Map(),
+  wallboxChargeMode: new Map([
+    [WallboxLocation.Inside, WallboxChargeMode.SunOnly],
+    [WallboxLocation.Outside, WallboxChargeMode.SunOnly],
+  ]),
 };
 
 export function logGlobals() {

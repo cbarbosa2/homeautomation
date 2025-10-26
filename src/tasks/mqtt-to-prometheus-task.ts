@@ -1,4 +1,4 @@
-import { events, globals } from "../globals.ts";
+import { events, globals, WallboxLocation } from "../globals.ts";
 import { MqttClient } from "../mqtt-client.ts";
 import { MetricInfo, METRICS } from "../prometheus/metrics.ts";
 import { PrometheusMetrics } from "../prometheus/prometheus.ts";
@@ -77,35 +77,35 @@ export class MqttToPrometheusTask {
       "N/102c6b9cfab9/evcharger/40/Ac/Power",
       METRICS.GAUGES.ESS_WALLBOX_INSIDE_POWER,
       (value) => {
-        globals.wallboxPowerInside = value ?? 0;
+        globals.wallboxPower.set(WallboxLocation.Inside, value ?? 0);
       }
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/41/Ac/Power",
       METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_POWER,
       (value) => {
-        globals.wallboxPowerOutside = value ?? 0;
+        globals.wallboxPower.set(WallboxLocation.Outside, value ?? 0);
       }
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/40/Status",
       METRICS.GAUGES.ESS_WALLBOX_INSIDE_STATUS,
       (value) => {
-        globals.wallboxStatusInside = value ?? 0;
+        globals.wallboxStatus.set(WallboxLocation.Inside, value ?? 0);
       }
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/41/Status",
       METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_STATUS,
       (value) => {
-        globals.wallboxStatusOutside = value ?? 0;
+        globals.wallboxStatus.set(WallboxLocation.Outside, value ?? 0);
       }
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/40/SetCurrent",
       METRICS.GAUGES.ESS_WALLBOX_INSIDE_CURRENT,
       (value) => {
-        globals.wallboxCurrentInside = value ?? 0;
+        globals.wallboxCurrent.set(WallboxLocation.Inside, value ?? 0);
         events.wallboxCurrentInsideUpdated.emit(value ?? 0);
       }
     );
@@ -113,7 +113,7 @@ export class MqttToPrometheusTask {
       "N/102c6b9cfab9/evcharger/41/SetCurrent",
       METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_CURRENT,
       (value) => {
-        globals.wallboxCurrentOutside = value ?? 0;
+        globals.wallboxCurrent.set(WallboxLocation.Outside, value ?? 0);
         events.wallboxCurrentOutsideUpdated.emit(value ?? 0);
       }
     );

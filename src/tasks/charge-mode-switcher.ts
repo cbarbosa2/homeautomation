@@ -1,4 +1,9 @@
-import { events, globals, WallboxChargeMode } from "../globals.ts";
+import {
+  events,
+  globals,
+  WallboxChargeMode,
+  WallboxLocation,
+} from "../globals.ts";
 import { METRICS } from "../prometheus/metrics.ts";
 import { PrometheusMetrics } from "../prometheus/prometheus.ts";
 
@@ -73,10 +78,10 @@ export class ChargeModeSwitcher {
 
     let gauge;
     if (inside) {
-      globals.wallboxChargeModeInside = mode;
+      globals.wallboxChargeMode.set(WallboxLocation.Inside, mode);
       gauge = METRICS.GAUGES.ESS_WALLBOX_INSIDE_CHARGE_MODE;
     } else {
-      globals.wallboxChargeModeOutside = mode;
+      globals.wallboxChargeMode.set(WallboxLocation.Outside, mode);
       gauge = METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_CHARGE_MODE;
     }
     this.metrics.setGauge(gauge, mode);
