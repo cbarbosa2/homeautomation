@@ -1,4 +1,4 @@
-import { globals } from "../globals.ts";
+import { events, globals } from "../globals.ts";
 import { MqttClient } from "../mqtt-client.ts";
 import { MetricInfo, METRICS } from "../prometheus/metrics.ts";
 import { PrometheusMetrics } from "../prometheus/prometheus.ts";
@@ -106,6 +106,7 @@ export class MqttToPrometheusTask {
       METRICS.GAUGES.ESS_WALLBOX_INSIDE_CURRENT,
       (value) => {
         globals.wallboxCurrentInside = value ?? 0;
+        events.wallboxCurrentInsideUpdated.emit(value ?? 0);
       }
     );
     this.subscribeAndAssignToGauge(
@@ -113,11 +114,22 @@ export class MqttToPrometheusTask {
       METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_CURRENT,
       (value) => {
         globals.wallboxCurrentOutside = value ?? 0;
+        events.wallboxCurrentOutsideUpdated.emit(value ?? 0);
       }
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/temperature/24/Temperature",
       METRICS.GAUGES.ESS_SHED_TEMPERATURE
+    );
+    this.mqttClient.subscribeWithHandler(
+      "shellyplusi4-083af2013a04/events/rpc",
+      (_, data) => {
+        events.wallSwitchUpdated.emit(
+          data as {
+            params: { events: { id: number; event: string }[] };
+          }
+        );
+      }
     );
   }
 

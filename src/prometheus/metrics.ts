@@ -123,15 +123,16 @@ export const METRICS = {
       title: "Outside Wallbox Power",
       description: "Outside wallbox power in watts",
     },
+    // status of wallboxes
     ESS_WALLBOX_INSIDE_STATUS: {
       name: "ess_wallbox_inside_status",
-      title: "Inside Wallbox Status",
-      description: "Inside wallbox status",
+      title: "Inside Victron Wallbox Status",
+      description: "Inside victron wallbox status",
     },
     ESS_WALLBOX_OUTSIDE_STATUS: {
       name: "ess_wallbox_outside_status",
-      title: "Outside Wallbox Status",
-      description: "Outside wallbox status",
+      title: "Outside Victron Wallbox Status",
+      description: "Outside victron wallbox status",
     },
     ESS_WALLBOX_INSIDE_CURRENT: {
       name: "ess_wallbox_inside_current",
@@ -143,17 +144,21 @@ export const METRICS = {
       title: "Outside Wallbox Current",
       description: "Outside wallbox current (A)",
     },
+    ESS_WALLBOX_INSIDE_CHARGE_MODE: {
+      name: "ess_wallbox_inside_charge_mode",
+      title: "Inside Wallbox Charge Mode",
+      description: "Inside wallbox charge mode (1..6)",
+    },
+    ESS_WALLBOX_OUTSIDE_CHARGE_MODE: {
+      name: "ess_wallbox_outside_charge_mode",
+      title: "Outside Wallbox Charge Mode",
+      description: "Outside wallbox charge mode (1..6)",
+    },
     ESS_SHED_TEMPERATURE: {
       name: "ess_shed_temperature",
       title: "Shed Temperature",
       description: "Shed temperature in celsius",
     },
   },
-  HISTOGRAMS: {
-    HTTP_REQUEST_DURATION: {
-      name: "http_request_duration_seconds",
-      title: "HTTP Request Duration",
-      description: "HTTP request duration in seconds",
-    },
-  },
+  HISTOGRAMS: {},
 } as const;

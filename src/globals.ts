@@ -1,3 +1,28 @@
+import { EventEmitter } from "./event-emitter.ts";
+
+/**
+ * These values are read from MQTT and trigger the respective event
+ */
+export const events = {
+  wallboxCurrentInsideUpdated: new EventEmitter<number>(),
+  wallboxCurrentOutsideUpdated: new EventEmitter<number>(),
+  wallSwitchUpdated: new EventEmitter<{
+    params: { events: { id: number; event: string }[] };
+  }>(),
+};
+
+export enum WallboxChargeMode {
+  Off = 1,
+  SunOnly = 2,
+  ESSOnly = 3,
+  Night = 4,
+  On = 5,
+  Manual = 6,
+}
+
+/**
+ * Most values are read from MQTT, but not all.
+ */
 export const globals: {
   // holds the value in kWh per day, index 0 is current day, index 1 is tomorrow, plus index 2 and 3
   solarForecastNextDays: number[];
@@ -13,6 +38,8 @@ export const globals: {
   wallboxPowerOutside: number;
   wallboxStatusOutside: number;
   wallboxCurrentOutside: number;
+  wallboxChargeModeInside: WallboxChargeMode;
+  wallboxChargeModeOutside: WallboxChargeMode;
 } = {
   solarForecastNextDays: [],
   victronNextDays: [],
@@ -27,6 +54,8 @@ export const globals: {
   wallboxPowerOutside: -1,
   wallboxStatusOutside: -1,
   wallboxCurrentOutside: -1,
+  wallboxChargeModeInside: WallboxChargeMode.SunOnly,
+  wallboxChargeModeOutside: WallboxChargeMode.SunOnly,
 };
 
 export function logGlobals() {

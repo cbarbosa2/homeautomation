@@ -183,14 +183,6 @@ export class PrometheusMetrics {
     this.incrementCounter(metricKey);
   }
 
-  recordHttpRequest(method: string, status: number, duration: number): void {
-    this.incrementCounter("HTTP_REQUESTS", {
-      method,
-      status: status.toString(),
-    });
-    this.observeHistogram("HTTP_REQUEST_DURATION", duration / 1000);
-  }
-
   // Utility methods for working with METRICS
   // getGaugeInfo(gaugeKey: keyof typeof METRICS.GAUGES): MetricInfo {
   //   return METRICS.GAUGES[gaugeKey]!;

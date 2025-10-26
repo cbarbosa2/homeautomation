@@ -8,6 +8,7 @@ import { scheduler } from "./task-scheduler.ts";
 import { MqttToPrometheusTask } from "./tasks/mqtt-to-prometheus-task.ts";
 import { SetSocLimitTask } from "./tasks/set-soc-limit-task.ts";
 import { SetBatteryChargePowerTask } from "./tasks/set-battery-charge-power-task.ts";
+import { ChargeModeSwitcher } from "./tasks/charge-mode-switcher.ts";
 
 class HomeAutomationApp {
   private mqttClient: MqttClient;
@@ -28,6 +29,8 @@ class HomeAutomationApp {
       this.httpServer.start();
 
       this.setupScheduledTasks();
+
+      new ChargeModeSwitcher(this.metrics).setupHandlers();
 
       console.log("✅ Home Automation System started successfully");
       this.setupGracefulShutdown();
