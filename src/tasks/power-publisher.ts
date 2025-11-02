@@ -1,7 +1,7 @@
 import { WallboxLocation, WallboxStatus } from "../globals.ts";
 import { MqttClient } from "../mqtt-client.ts";
 
-export class DynamicPowerHandler {
+export class PowerPublisher {
   private mqttClient: MqttClient;
 
   constructor(mqttClient: MqttClient) {
@@ -52,7 +52,7 @@ export class DynamicPowerHandler {
   ) {
     if (current != undefined) {
       console.log(
-        `(bogus) Current of ${WallboxLocation[location]} to ${current}`
+        `Current of ${WallboxLocation[location]} to ${current}`
       );
       const topic =
         location == WallboxLocation.Inside
@@ -68,7 +68,7 @@ export class DynamicPowerHandler {
   ) {
     if (startStop != undefined) {
       console.log(
-        `(bogus) Start/stop of ${WallboxLocation[location]}: ${startStop}`
+        `Start/stop of ${WallboxLocation[location]}: ${startStop}`
       );
       const topic =
         location == WallboxLocation.Inside
@@ -80,4 +80,4 @@ export class DynamicPowerHandler {
 }
 
 const TARGET_AMPS_MIN_STOP = 7;
-const TARGET_AMPS_MIN_START = 8;
+export const TARGET_AMPS_MIN_START = 8;

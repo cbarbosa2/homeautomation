@@ -1,24 +1,32 @@
 import {
-  GlobalState,
   WallboxChargeMode,
   WallboxLocation,
   WallboxStatus,
 } from "../globals.ts";
+import { TARGET_AMPS_MIN_START } from "./power-publisher.ts";
 
-interface CalculatedTargetResults {
-  insideCurrent: number | undefined;
-  outsideCurrent: number | undefined;
+export interface CalculatedTargetResults {
+  insideWallboxAmps: number | undefined;
+  outsideWallboxAmps: number | undefined;
+  batteryChargePower: number | undefined;
   newPrimaryWallboxLocation: WallboxLocation | undefined;
 }
 
-interface WallboxTarget {
-  current: number | undefined;
-  concedePriority: boolean;
+export interface InputState {
+  primaryWallboxLocation: WallboxLocation | undefined;
+  gridPower: number | undefined;
+  batteryMinSOC: number | undefined;
+  batterySOC: number | undefined;
+  batteryPower: number | undefined;
+  pvInverterPower: number | undefined;
+  wallboxPower: Map<WallboxLocation, number>;
+  wallboxVictronStatus: Map<WallboxLocation, WallboxStatus>;
+  wallboxChargeMode: Map<WallboxLocation, WallboxChargeMode>;
+  hourOfDay: number;
 }
 
-export function calculateTargetCurrentsAndPriority(
-  state: GlobalState,
-  hourOfDay: number
+export function calculateTargetAmpsAndPriority(
+  state: InputState
 ): CalculatedTargetResults {
   const primaryWallboxLocation =
     state.primaryWallboxLocation ?? WallboxLocation.Inside;
@@ -31,46 +39,57 @@ export function calculateTargetCurrentsAndPriority(
   const primaryWallboxTarget = calculateWallboxTarget(
     state,
     primaryWallboxLocation,
-    0,
-    hourOfDay
+    0
   );
 
-  const primaryTargetCurrent =
-    primaryWallboxTarget.current != undefined
-      ? coerceTargetCurrent(
-          primaryWallboxTarget.current,
-          primaryWallboxLocation
+  const primaryTargetAmps =
+    primaryWallboxTarget.amps != undefined
+      ? coerceTargetAmps(
+          primaryWallboxLocation,
+          powerToAmps(state.wallboxPower.get(primaryWallboxLocation) ?? 0),
+          primaryWallboxTarget.amps
         )
       : undefined;
 
-  const consumptionCurrentIncrease =
-    (primaryTargetCurrent ?? 0) -
+  let consumptionAmpsIncrease =
+    (primaryTargetAmps ?? 0) -
     powerToAmps(state.wallboxPower.get(primaryWallboxLocation) ?? 0);
 
   const secondaryWallboxTarget = calculateWallboxTarget(
     state,
     secondaryWallboxLocation,
-    consumptionCurrentIncrease,
-    hourOfDay
+    consumptionAmpsIncrease
   );
 
-  const secondaryTargetCurrent =
-    secondaryWallboxTarget.current != undefined
-      ? coerceTargetCurrent(
-          secondaryWallboxTarget.current,
-          secondaryWallboxLocation
+  const secondaryTargetAmps =
+    secondaryWallboxTarget.amps != undefined
+      ? coerceTargetAmps(
+          secondaryWallboxLocation,
+          powerToAmps(state.wallboxPower.get(secondaryWallboxLocation) ?? 0),
+          secondaryWallboxTarget.amps
         )
       : undefined;
 
+  consumptionAmpsIncrease =
+    consumptionAmpsIncrease +
+    (secondaryTargetAmps ?? 0) -
+    powerToAmps(state.wallboxPower.get(secondaryWallboxLocation) ?? 0);
+
+  const batteryChargePower = calculateBatteryChargePower(
+    state,
+    consumptionAmpsIncrease
+  );
+
   return {
-    insideCurrent:
+    insideWallboxAmps:
       primaryWallboxLocation == WallboxLocation.Inside
-        ? primaryTargetCurrent
-        : secondaryTargetCurrent,
-    outsideCurrent:
+        ? primaryTargetAmps
+        : secondaryTargetAmps,
+    outsideWallboxAmps:
       primaryWallboxLocation == WallboxLocation.Outside
-        ? primaryTargetCurrent
-        : secondaryTargetCurrent,
+        ? primaryTargetAmps
+        : secondaryTargetAmps,
+    batteryChargePower: batteryChargePower,
     // change primary wallbox to other one if first concedes and second doesn't
     newPrimaryWallboxLocation:
       primaryWallboxTarget.concedePriority == true &&
@@ -80,21 +99,52 @@ export function calculateTargetCurrentsAndPriority(
   };
 }
 
-function coerceTargetCurrent(value: number, location: WallboxLocation): number {
-  return Math.min(Math.max(0, value), MAX_AMPS_PER_LOCATION.get(location) ?? 0);
+function calculateBatteryChargePower(
+  state: InputState,
+  consumptionAmpsIncrease: number
+): number | undefined {
+  if (state.batterySOC == undefined || state.batteryMinSOC == undefined) {
+    return undefined;
+  }
+
+  const target =
+    state.batterySOC >= state.batteryMinSOC - 1
+      ? 0
+      : (state.batteryPower ?? 0) +
+        ampsToPower(MAX_GRID_CURRENT) -
+        ampsToPower(consumptionAmpsIncrease) -
+        (state.gridPower !== undefined
+          ? state.gridPower
+          : ampsToPower(MAX_GRID_CURRENT));
+
+  return Math.min(
+    MAX_BATTERY_CHARGE_POWER,
+    Math.max(MIN_BATTERY_CHARGE_POWER, target)
+  );
+}
+
+function coerceTargetAmps(
+  location: WallboxLocation,
+  existingAmps: number,
+  newAmps: number
+): number {
+  return Math.min(
+    Math.max(0, newAmps),
+    Math.max(TARGET_AMPS_MIN_START, existingAmps + 2),
+    MAX_AMPS_PER_LOCATION.get(location) ?? 0
+  );
 }
 
 function calculateWallboxTarget(
-  state: GlobalState,
+  state: InputState,
   location: WallboxLocation,
-  consumptionCurrentIncrease: number,
-  hourOfDay: number
+  consumptionAmpsIncrease: number
 ): WallboxTarget {
-  const target = modeToTarget(state, location, hourOfDay);
+  const target = modeToTarget(state, location);
 
   if (target == WallboxChargeTarget.NoAction) {
     return {
-      current: undefined,
+      amps: undefined,
       concedePriority: true,
     };
   }
@@ -109,11 +159,11 @@ function calculateWallboxTarget(
   if (canCharge) {
     if (target == WallboxChargeTarget.MaximumPossible) {
       return {
-        current:
+        amps:
           powerToAmps(state.wallboxPower.get(location) ?? 0) +
           powerToAmps(state.batteryPower ?? 0) +
           MAX_GRID_CURRENT -
-          consumptionCurrentIncrease -
+          consumptionAmpsIncrease -
           (state.gridPower !== undefined
             ? powerToAmps(state.gridPower)
             : MAX_GRID_CURRENT),
@@ -128,28 +178,27 @@ function calculateWallboxTarget(
       state.pvInverterPower > DETECT_SUN_MIN_PV_POWER
     ) {
       return {
-        current:
+        amps:
           powerToAmps(state.wallboxPower.get(location) ?? 0) +
           (state.batteryPower ? powerToAmps(state.batteryPower) : 0) +
           (state.batterySOC >= 95 ? 8 : 0) -
-          consumptionCurrentIncrease,
+          consumptionAmpsIncrease,
         concedePriority: false,
       };
     }
   }
 
   return {
-    current: 0,
+    amps: 0,
     concedePriority: true,
   };
 }
 
 function modeToTarget(
-  state: GlobalState,
-  location: WallboxLocation,
-  hourOfDay: number
+  state: InputState,
+  location: WallboxLocation
 ): WallboxChargeTarget {
-  const isOffPeak = hourOfDay < 8 || hourOfDay >= 22;
+  const isOffPeak = getIsOffPeak(state.hourOfDay);
 
   switch (state.wallboxChargeMode.get(location) ?? WallboxChargeMode.SunOnly) {
     case WallboxChargeMode.On:
@@ -159,7 +208,7 @@ function modeToTarget(
         ? WallboxChargeTarget.MaximumPossible
         : WallboxChargeTarget.ExcessSun;
     case WallboxChargeMode.ESSOnly: {
-      const socMargin = 2 * ((24 + 8 - hourOfDay) % 24);
+      const socMargin = 2 * ((24 + 8 - state.hourOfDay) % 24);
       if (
         isOffPeak &&
         state.batterySOC != undefined &&
@@ -184,12 +233,27 @@ function powerToAmps(power: number) {
   return Math.round(power / 240);
 }
 
+function ampsToPower(amps: number) {
+  return Math.round(amps * 240);
+}
+
+function getIsOffPeak(hourOfDay: number): boolean {
+  return hourOfDay < 8 || hourOfDay >= 22;
+}
+
 const MAX_GRID_CURRENT = 28;
 const DETECT_SUN_MIN_PV_POWER = 200;
+const MIN_BATTERY_CHARGE_POWER = 200;
+const MAX_BATTERY_CHARGE_POWER = 5000;
 const MAX_AMPS_PER_LOCATION = new Map([
   [WallboxLocation.Inside, 18],
   [WallboxLocation.Outside, 24],
 ]);
+
+interface WallboxTarget {
+  amps: number | undefined;
+  concedePriority: boolean;
+}
 
 enum WallboxChargeTarget {
   NoAction,

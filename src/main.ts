@@ -10,8 +10,7 @@ import { SetSocLimitTask } from "./tasks/set-soc-limit-task.ts";
 import { SetBatteryChargePowerTask } from "./tasks/set-battery-charge-power-task.ts";
 import { ChargeModeSwitcher } from "./tasks/charge-mode-switcher.ts";
 import {
-  calculateTargetCurrentsAndPriority,
-  DynamicPowerHandler,
+  calculateTargetAmpsAndPriority,
 } from "./tasks/dynamic-power-handler.ts";
 import { globals, WallboxChargeMode, WallboxLocation } from "./globals.ts";
 
@@ -54,15 +53,15 @@ class HomeAutomationApp {
     // const dynamicPowerHandler = new DynamicPowerHandler(this.mqttClient);
     scheduler.interval("Dynamic power", 5, () => {
       // dynamicPowerHandler.execute();
-      const result = calculateTargetCurrentsAndPriority(
+      const result = calculateTargetAmpsAndPriority(
         {
           ...globals,
+          hourOfDay: Temporal.Now.plainDateTimeISO().hour,
           wallboxChargeMode: new Map([
             [WallboxLocation.Inside, WallboxChargeMode.Night],
             [WallboxLocation.Outside, WallboxChargeMode.Manual],
           ]),
-        },
-        Temporal.Now.plainDateTimeISO().hour
+        }
       );
       globals.primaryWallboxLocation =
         result.newPrimaryWallboxLocation ?? globals.primaryWallboxLocation;

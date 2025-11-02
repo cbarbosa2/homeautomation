@@ -111,7 +111,7 @@ export class MqttToPrometheusTask {
       "N/102c6b9cfab9/evcharger/40/SetCurrent",
       METRICS.GAUGES.ESS_WALLBOX_INSIDE_CURRENT,
       (value) => {
-        globals.wallboxCurrentSetting.set(WallboxLocation.Inside, value ?? 0);
+        globals.wallboxSetCurrent.set(WallboxLocation.Inside, value ?? 0);
         events.wallboxCurrentInsideUpdated.emit(value ?? 0);
       }
     );
@@ -119,7 +119,7 @@ export class MqttToPrometheusTask {
       "N/102c6b9cfab9/evcharger/41/SetCurrent",
       METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_CURRENT,
       (value) => {
-        globals.wallboxCurrentSetting.set(WallboxLocation.Outside, value ?? 0);
+        globals.wallboxSetCurrent.set(WallboxLocation.Outside, value ?? 0);
         events.wallboxCurrentOutsideUpdated.emit(value ?? 0);
       }
     );
