@@ -9,7 +9,11 @@ import { MqttToPrometheusTask } from "./tasks/mqtt-to-prometheus-task.ts";
 import { SetSocLimitTask } from "./tasks/set-soc-limit-task.ts";
 import { SetBatteryChargePowerTask } from "./tasks/set-battery-charge-power-task.ts";
 import { ChargeModeSwitcher } from "./tasks/charge-mode-switcher.ts";
-import { DynamicPowerHandler } from "./tasks/dynamic-power-handler.ts";
+import {
+  calculateTargetCurrentsAndPriority,
+  DynamicPowerHandler,
+} from "./tasks/dynamic-power-handler.ts";
+import { globals, WallboxChargeMode, WallboxLocation } from "./globals.ts";
 
 class HomeAutomationApp {
   private mqttClient: MqttClient;
@@ -47,9 +51,22 @@ class HomeAutomationApp {
       mqttAwakeTask.execute();
     });
 
-    const dynamicPowerHandler = new DynamicPowerHandler(this.mqttClient);
-    scheduler.interval("Dynamic power", 15, () => {
-      dynamicPowerHandler.execute();
+    // const dynamicPowerHandler = new DynamicPowerHandler(this.mqttClient);
+    scheduler.interval("Dynamic power", 5, () => {
+      // dynamicPowerHandler.execute();
+      const result = calculateTargetCurrentsAndPriority(
+        {
+          ...globals,
+          wallboxChargeMode: new Map([
+            [WallboxLocation.Inside, WallboxChargeMode.Night],
+            [WallboxLocation.Outside, WallboxChargeMode.Manual],
+          ]),
+        },
+        Temporal.Now.plainDateTimeISO().hour
+      );
+      globals.primaryWallboxLocation =
+        result.newPrimaryWallboxLocation ?? globals.primaryWallboxLocation;
+      console.log(`Dynamic power ${JSON.stringify(result)}`);
     });
 
     const loadForecastTask = new LoadForecastTask(this.metrics);

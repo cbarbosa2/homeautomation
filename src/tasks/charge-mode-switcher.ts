@@ -86,6 +86,8 @@ export class ChargeModeSwitcher {
     }
     this.metrics.setGauge(gauge, mode);
 
-    console.log(`set mode ${WallboxChargeMode[mode]} in gauge ${gauge.name}`);
+    console.log(
+      `set mode ${WallboxChargeMode[mode]}(${mode}) in gauge ${gauge.name}`
+    );
   }
 }

@@ -20,38 +20,62 @@ export enum WallboxChargeMode {
   Manual = 6,
 }
 
+export enum WallboxStatus {
+  Disconnected = 0,
+  Connected = 1,
+  Charging = 2,
+  Charged = 3,
+  WaitingForSun = 4,
+  WaitingForRFID = 5,
+  WaitingForStart = 6,
+  LowSOC = 7,
+  ChargingLimit = 20,
+  StartCharging = 21,
+  SwitchingTo3Phase = 22,
+  SwitchingTo1Phase = 23,
+  StopCharging = 24,
+}
+
 export enum WallboxLocation {
   Inside,
   Outside,
 }
 
-/**
- * Most values are read from MQTT, but not all.
- */
-export const globals: {
+export interface GlobalState {
+  primaryWallboxLocation: WallboxLocation | undefined;
   // holds the value in kWh per day, index 0 is current day, index 1 is tomorrow, plus index 2 and 3
   solarForecastNextDays: number[];
   victronNextDays: number[];
   omieEntries: OmieEntry[];
-  gridPower: number;
-  batteryMinSOC: number;
-  batterySOC: number;
-  batteryPower: number;
+  gridPower: number | undefined;
+  batteryMinSOC: number | undefined;
+  batterySOC: number | undefined;
+  batteryPower: number | undefined;
+  pvInverterPower: number | undefined;
+  pvChargerPower: number | undefined;
   wallboxPower: Map<WallboxLocation, number>;
-  wallboxStatus: Map<WallboxLocation, number>;
-  wallboxCurrent: Map<WallboxLocation, number>;
+  wallboxVictronStatus: Map<WallboxLocation, WallboxStatus>;
+  wallboxCurrentSetting: Map<WallboxLocation, number>;
   wallboxChargeMode: Map<WallboxLocation, WallboxChargeMode>;
-} = {
+}
+
+/**
+ * Most values are read from MQTT, but not all.
+ */
+export const globals: GlobalState = {
+  primaryWallboxLocation: undefined,
   solarForecastNextDays: [],
   victronNextDays: [],
   omieEntries: [],
-  gridPower: -1,
-  batteryMinSOC: 0,
-  batterySOC: 0,
-  batteryPower: 0,
+  gridPower: undefined,
+  batteryMinSOC: undefined,
+  batterySOC: undefined,
+  batteryPower: undefined,
+  pvInverterPower: undefined,
+  pvChargerPower: undefined,
   wallboxPower: new Map(),
-  wallboxStatus: new Map(),
-  wallboxCurrent: new Map(),
+  wallboxVictronStatus: new Map(),
+  wallboxCurrentSetting: new Map(),
   wallboxChargeMode: new Map([
     [WallboxLocation.Inside, WallboxChargeMode.SunOnly],
     [WallboxLocation.Outside, WallboxChargeMode.SunOnly],

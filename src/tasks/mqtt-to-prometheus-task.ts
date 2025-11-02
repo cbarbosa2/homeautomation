@@ -29,7 +29,7 @@ export class MqttToPrometheusTask {
       "N/102c6b9cfab9/battery/512/Dc/0/Power",
       METRICS.GAUGES.ESS_BATTERY_POWER,
       (value) => {
-        globals.batteryPower = value ?? 0;
+        globals.batteryPower = value;
       }
     );
     this.subscribeAndAssignToGauge(
@@ -44,14 +44,14 @@ export class MqttToPrometheusTask {
       "N/102c6b9cfab9/battery/512/Soc",
       METRICS.GAUGES.ESS_BATTERY_SOC,
       (value) => {
-        globals.batterySOC = value ?? 0;
+        globals.batterySOC = value;
       }
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/system/0/Ac/Grid/L1/Power",
       METRICS.GAUGES.ESS_GRID_POWER,
       (value) => {
-        globals.gridPower = value ?? 0;
+        globals.gridPower = value;
       }
     );
     this.subscribeAndAssignToGauge(
@@ -62,16 +62,22 @@ export class MqttToPrometheusTask {
       "N/102c6b9cfab9/settings/0/Settings/CGwacs/BatteryLife/MinimumSocLimit",
       METRICS.GAUGES.ESS_BATTERY_MIN_SOC,
       (value) => {
-        globals.batteryMinSOC = value ?? 0;
+        globals.batteryMinSOC = value;
       }
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/system/0/Ac/PvOnGrid/L1/Power",
-      METRICS.GAUGES.ESS_PV_INVERTER_POWER
+      METRICS.GAUGES.ESS_PV_INVERTER_POWER,
+      (value) => {
+        globals.pvInverterPower = value;
+      }
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/system/0/Dc/Pv/Power",
-      METRICS.GAUGES.ESS_PV_CHARGER_POWER
+      METRICS.GAUGES.ESS_PV_CHARGER_POWER,
+      (value) => {
+        globals.pvChargerPower = value;
+      }
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/40/Ac/Power",
@@ -91,21 +97,21 @@ export class MqttToPrometheusTask {
       "N/102c6b9cfab9/evcharger/40/Status",
       METRICS.GAUGES.ESS_WALLBOX_INSIDE_STATUS,
       (value) => {
-        globals.wallboxStatus.set(WallboxLocation.Inside, value ?? 0);
+        globals.wallboxVictronStatus.set(WallboxLocation.Inside, value ?? 0);
       }
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/41/Status",
       METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_STATUS,
       (value) => {
-        globals.wallboxStatus.set(WallboxLocation.Outside, value ?? 0);
+        globals.wallboxVictronStatus.set(WallboxLocation.Outside, value ?? 0);
       }
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/40/SetCurrent",
       METRICS.GAUGES.ESS_WALLBOX_INSIDE_CURRENT,
       (value) => {
-        globals.wallboxCurrent.set(WallboxLocation.Inside, value ?? 0);
+        globals.wallboxCurrentSetting.set(WallboxLocation.Inside, value ?? 0);
         events.wallboxCurrentInsideUpdated.emit(value ?? 0);
       }
     );
@@ -113,7 +119,7 @@ export class MqttToPrometheusTask {
       "N/102c6b9cfab9/evcharger/41/SetCurrent",
       METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_CURRENT,
       (value) => {
-        globals.wallboxCurrent.set(WallboxLocation.Outside, value ?? 0);
+        globals.wallboxCurrentSetting.set(WallboxLocation.Outside, value ?? 0);
         events.wallboxCurrentOutsideUpdated.emit(value ?? 0);
       }
     );
