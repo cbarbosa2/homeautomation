@@ -94,53 +94,6 @@ sudo visudo
 
 Add the line: `carlos ALL=(ALL) NOPASSWD: /bin/systemctl`
 
-## Usage Examples
-
-### MQTT Operations
-
-```typescript
-// Publishing to MQTT
-await mqttClient.publish("home/lights/living-room", "on");
-await mqttClient.publishJson("home/sensors/temperature", {
-  value: 22.5,
-  unit: "C",
-});
-
-// Subscribing to topics
-await mqttClient.subscribe("home/sensors/+");
-```
-
-### HTTP Requests
-
-```typescript
-// GET request
-const response = await httpClient.get("https://api.weather.com/current");
-
-// POST with JSON data
-await httpClient.post("https://api.home.local/devices", {
-  device: "light",
-  action: "toggle",
-});
-```
-
-### Custom Metrics
-
-```typescript
-// Increment counters
-metrics.incrementCounter("device_actions_total", {
-  device: "light",
-  action: "on",
-});
-
-// Set gauge values
-metrics.setGauge("temperature_celsius", 22.5, { location: "living_room" });
-
-// Record timing
-const endTimer = metrics.startTimer("operation_duration_seconds");
-// ... perform operation
-endTimer();
-```
-
 ## Monitoring
 
 - **Task Dashboard**: `http://localhost:1881/` (local) / `http://bee.local:1881/` (server)
@@ -157,25 +110,6 @@ The task dashboard provides a web interface to view and manage scheduled tasks:
 - Real-time feedback on task execution status
 
 Access the dashboard at `http://localhost:1881/` during development or `http://bee.local:1881/` on the server.
-
-### Default Metrics
-
-- `mqtt_messages_received_total`: MQTT messages received
-- `mqtt_messages_sent_total`: MQTT messages sent
-- `http_requests_total`: HTTP requests made
-- `errors_total`: Total errors by type
-- `mqtt_connection_status`: MQTT connection status
-- Plus standard Node.js metrics (memory, CPU, etc.)
-
-## Project Structure
-
-```
-src/
-├── main.ts          # Application entry point
-├── mqtt.ts          # MQTT client implementation
-├── http.ts          # HTTP client implementation
-└── prometheus.ts    # Prometheus metrics
-```
 
 ## Development
 

@@ -1,4 +1,5 @@
 import { OmieEntry } from "../globals.ts";
+import { Temporal } from "../temporal.ts";
 
 const OMIE_API_URL = `https://www.omie.es/sites/default/files/dados/NUEVA_SECCION/INT_PBC_EV_H_ACUM.TXT`;
 const TAR_NIGHT = 1.57;

@@ -1,17 +1,18 @@
 {
   "tasks": {
-    "dev": "deno run --allow-net --allow-read --allow-env --unstable-temporal --unstable-cron --watch src/main.ts",
-    "start": "deno run --allow-net --allow-read --allow-env --unstable-temporal --unstable-cron src/main.ts",
+    "dev": "deno run --allow-net --allow-read --allow-env --unstable-cron --watch src/main.ts",
+    "start": "deno run --allow-net --allow-read --allow-env --unstable-cron src/main.ts",
     "check": "deno check src/*.ts",
     "lint": "deno lint src/",
     "fmt": "deno fmt src/",
-    "test": "deno test --allow-net --allow-read --allow-env --unstable-temporal --unstable-cron",
+    "test": "deno test --allow-net --allow-read --allow-env --unstable-cron",
     "analyze": "deno task check && deno task lint"
   },
   "imports": {
     "@std/dotenv": "jsr:@std/dotenv@^0.225.0",
     "mqtt": "npm:mqtt@^5.10.1",
-    "prom-client": "npm:prom-client@^15.1.0"
+    "prom-client": "npm:prom-client@^15.1.0",
+    "@js-temporal/polyfill": "npm:@js-temporal/polyfill@^0.5.1"
   },
   "compilerOptions": {
     "strict": true,

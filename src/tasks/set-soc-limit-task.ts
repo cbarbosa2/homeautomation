@@ -1,5 +1,6 @@
 import { globals } from "../globals.ts";
 import { MqttClient } from "../mqtt-client.ts";
+import { Temporal } from "../temporal.ts";
 
 export class SetSocLimitTask {
   private mqttClient: MqttClient;

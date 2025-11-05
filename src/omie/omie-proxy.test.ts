@@ -1,5 +1,6 @@
 import { assertEquals } from "jsr:@std/assert";
 import { parseOmieResponse } from "./omie-proxy.ts";
+import { Temporal } from "../temporal.ts";
 
 // Test data that simulates OMIE CSV format
 const sampleOmieData = `OMIE - Mercado de electricidad;Fecha Emisión :14/09/2025 - 13:56;;15/09/2025;Precios y volúmenes del mercado diario;;;;

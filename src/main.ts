@@ -1,6 +1,7 @@
 import { MqttClient } from "./mqtt-client.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { HttpServer } from "./http-server.ts";
+import { Temporal } from "./temporal.ts";
 import { MqttAwakeTask } from "./tasks/mqtt-awake-task.ts";
 import { LoadForecastTask } from "./tasks/load-forecast-task.ts";
 import { LoadOmieTask } from "./tasks/load-omie-task.ts";
