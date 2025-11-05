@@ -10,10 +10,12 @@ import { MqttToPrometheusTask } from "./tasks/mqtt-to-prometheus-task.ts";
 import { SetSocLimitTask } from "./tasks/set-soc-limit-task.ts";
 import { SetBatteryChargePowerTask } from "./tasks/set-battery-charge-power-task.ts";
 import { ChargeModeSwitcher } from "./tasks/charge-mode-switcher.ts";
-import {
-  calculateTargetAmpsAndPriority,
-} from "./tasks/dynamic-power-handler.ts";
+import { calculateTargetAmpsAndPriority } from "./tasks/dynamic-power-calculator.ts";
 import { globals, WallboxChargeMode, WallboxLocation } from "./globals.ts";
+import { PowerPublisher } from "./tasks/power-publisher.ts";
+
+const AWAKE_MQTT_INTERVAL_SECONDS = 30;
+const DYNAMIC_POWER_INTERVAL_SECONDS = 5;
 
 class HomeAutomationApp {
   private mqttClient: MqttClient;
@@ -47,26 +49,24 @@ class HomeAutomationApp {
 
   private setupScheduledTasks() {
     const mqttAwakeTask = new MqttAwakeTask(this.mqttClient);
-    scheduler.interval("Awake MQTT", 30, () => {
+    scheduler.interval("Awake MQTT", AWAKE_MQTT_INTERVAL_SECONDS, () => {
       mqttAwakeTask.execute();
     });
 
-    // const dynamicPowerHandler = new DynamicPowerHandler(this.mqttClient);
-    scheduler.interval("Dynamic power", 5, () => {
-      // dynamicPowerHandler.execute();
-      const result = calculateTargetAmpsAndPriority(
-        {
-          ...globals,
-          hourOfDay: Temporal.Now.plainDateTimeISO().hour,
-          wallboxChargeMode: new Map([
-            [WallboxLocation.Inside, WallboxChargeMode.Night],
-            [WallboxLocation.Outside, WallboxChargeMode.Manual],
-          ]),
-        }
-      );
+    const powerPublisher = new PowerPublisher(this.mqttClient);
+    scheduler.interval("Dynamic power", DYNAMIC_POWER_INTERVAL_SECONDS, () => {
+      const result = calculateTargetAmpsAndPriority({
+        ...globals,
+        hourOfDay: Temporal.Now.plainDateTimeISO().hour,
+        wallboxChargeMode: new Map([
+          [WallboxLocation.Inside, WallboxChargeMode.Night],
+          [WallboxLocation.Outside, WallboxChargeMode.Manual],
+        ]),
+      });
       globals.primaryWallboxLocation =
         result.newPrimaryWallboxLocation ?? globals.primaryWallboxLocation;
-      console.log(`Dynamic power ${JSON.stringify(result)}`);
+
+      powerPublisher.pushPowerSettings(globals, result);
     });
 
     const loadForecastTask = new LoadForecastTask(this.metrics);

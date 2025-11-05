@@ -3,6 +3,7 @@ import {
   WallboxLocation,
   WallboxStatus,
 } from "../globals.ts";
+import { ampsToPower, powerToAmps } from "../utils.ts";
 import { TARGET_AMPS_MIN_START } from "./power-publisher.ts";
 
 export interface CalculatedTargetResults {
@@ -36,44 +37,48 @@ export function calculateTargetAmpsAndPriority(
       ? WallboxLocation.Outside
       : WallboxLocation.Inside;
 
-  const primaryWallboxTarget = calculateWallboxTarget(
+  const primaryWallboxTargetValues = calculateWallboxTargetValues(
     state,
     primaryWallboxLocation,
     0
   );
 
   const primaryTargetAmps =
-    primaryWallboxTarget.amps != undefined
+    primaryWallboxTargetValues.amps != undefined
       ? coerceTargetAmps(
           primaryWallboxLocation,
           powerToAmps(state.wallboxPower.get(primaryWallboxLocation) ?? 0),
-          primaryWallboxTarget.amps
+          primaryWallboxTargetValues.amps
         )
       : undefined;
 
-  let consumptionAmpsIncrease =
+  let consumptionAmpsIncrease = Math.max(
+    0,
     (primaryTargetAmps ?? 0) -
-    powerToAmps(state.wallboxPower.get(primaryWallboxLocation) ?? 0);
+      powerToAmps(state.wallboxPower.get(primaryWallboxLocation) ?? 0)
+  );
 
-  const secondaryWallboxTarget = calculateWallboxTarget(
+  const secondaryWallboxTargetValues = calculateWallboxTargetValues(
     state,
     secondaryWallboxLocation,
     consumptionAmpsIncrease
   );
 
   const secondaryTargetAmps =
-    secondaryWallboxTarget.amps != undefined
+    secondaryWallboxTargetValues.amps != undefined
       ? coerceTargetAmps(
           secondaryWallboxLocation,
           powerToAmps(state.wallboxPower.get(secondaryWallboxLocation) ?? 0),
-          secondaryWallboxTarget.amps
+          secondaryWallboxTargetValues.amps
         )
       : undefined;
 
-  consumptionAmpsIncrease =
+  consumptionAmpsIncrease = Math.max(
+    0,
     consumptionAmpsIncrease +
-    (secondaryTargetAmps ?? 0) -
-    powerToAmps(state.wallboxPower.get(secondaryWallboxLocation) ?? 0);
+      (secondaryTargetAmps ?? 0) -
+      powerToAmps(state.wallboxPower.get(secondaryWallboxLocation) ?? 0)
+  );
 
   const batteryChargePower = calculateBatteryChargePower(
     state,
@@ -92,8 +97,8 @@ export function calculateTargetAmpsAndPriority(
     batteryChargePower: batteryChargePower,
     // change primary wallbox to other one if first concedes and second doesn't
     newPrimaryWallboxLocation:
-      primaryWallboxTarget.concedePriority == true &&
-      secondaryWallboxTarget.concedePriority == false
+      primaryWallboxTargetValues.concedePriority == true &&
+      secondaryWallboxTargetValues.concedePriority == false
         ? secondaryWallboxLocation
         : undefined,
   };
@@ -119,7 +124,7 @@ function calculateBatteryChargePower(
 
   return Math.min(
     MAX_BATTERY_CHARGE_POWER,
-    Math.max(MIN_BATTERY_CHARGE_POWER, target)
+    Math.max(MIN_BATTERY_CHARGE_POWER, Math.round(target))
   );
 }
 
@@ -135,7 +140,7 @@ function coerceTargetAmps(
   );
 }
 
-function calculateWallboxTarget(
+function calculateWallboxTargetValues(
   state: InputState,
   location: WallboxLocation,
   consumptionAmpsIncrease: number
@@ -227,14 +232,6 @@ function modeToTarget(
     default:
       return WallboxChargeTarget.NoAction;
   }
-}
-
-function powerToAmps(power: number) {
-  return Math.round(power / 240);
-}
-
-function ampsToPower(amps: number) {
-  return Math.round(amps * 240);
 }
 
 function getIsOffPeak(hourOfDay: number): boolean {
