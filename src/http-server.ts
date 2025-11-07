@@ -1,6 +1,7 @@
 import * as client from "prom-client";
 import { HTTP_PORT } from "./constants.ts";
 import { scheduler } from "./task-scheduler.ts";
+import { globals, WallboxLocation, WallboxChargeMode } from "./globals.ts";
 
 export class HttpServer {
   private server: Deno.HttpServer | null = null;
@@ -36,6 +37,20 @@ export class HttpServer {
 
       if (url.pathname === "/api/trigger" && request.method === "POST") {
         return await this.handleTriggerTask(request);
+      }
+
+      // Wallbox charge mode API endpoints
+      if (
+        url.pathname === "/api/wallbox-charge-mode" &&
+        request.method === "GET"
+      ) {
+        return this.handleGetWallboxChargeMode();
+      }
+      if (
+        url.pathname === "/api/wallbox-charge-mode" &&
+        request.method === "POST"
+      ) {
+        return await this.handleSetWallboxChargeMode(request);
       }
 
       return new Response("Not Found", { status: 404 });
@@ -115,6 +130,53 @@ export class HttpServer {
 
       const success = await scheduler.triggerTask(taskName);
       return new Response(JSON.stringify({ success }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      return new Response(
+        JSON.stringify({ success: false, error: String(error) }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    }
+  }
+
+  private handleGetWallboxChargeMode(): Response {
+    // Return current charge mode for inside and outside
+    const inside =
+      globals.wallboxChargeMode.get(WallboxLocation.Inside) ??
+      WallboxChargeMode.Off;
+    const outside =
+      globals.wallboxChargeMode.get(WallboxLocation.Outside) ??
+      WallboxChargeMode.Off;
+    return new Response(JSON.stringify({ Inside: inside, Outside: outside }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  private async handleSetWallboxChargeMode(
+    request: Request
+  ): Promise<Response> {
+    try {
+      const body = await request.json();
+      const locationStr = body.location;
+      const value = Number(body.value);
+      let location: WallboxLocation | undefined;
+      if (locationStr === "Inside") location = WallboxLocation.Inside;
+      else if (locationStr === "Outside") location = WallboxLocation.Outside;
+      if (
+        location === undefined ||
+        !Object.values(WallboxChargeMode).includes(value)
+      ) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Invalid location or value",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      globals.wallboxChargeMode.set(location, value);
+      return new Response(JSON.stringify({ success: true }), {
         headers: { "Content-Type": "application/json" },
       });
     } catch (error) {

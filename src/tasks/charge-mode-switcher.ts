@@ -35,12 +35,12 @@ export class ChargeModeSwitcher {
     });
     events.wallboxCurrentInsideUpdated.subscribe((payload) => {
       if (payload == 6) {
-        this.setChargeMode(true, 6);
+        this.setChargeMode(WallboxLocation.Inside, WallboxChargeMode.Manual);
       }
     });
     events.wallboxCurrentOutsideUpdated.subscribe((payload) => {
       if (payload == 6) {
-        this.setChargeMode(false, 6);
+        this.setChargeMode(WallboxLocation.Outside, WallboxChargeMode.Manual);
       }
     });
   }
@@ -65,25 +65,25 @@ export class ChargeModeSwitcher {
     const mode = mapIdAndPushesToChargeMode.get(id + "_" + pushes);
 
     if (mode != undefined) {
-      const inside = id == 0 || id == 1;
-      this.setChargeMode(inside, mode);
+      const location =
+        id == 0 || id == 1 ? WallboxLocation.Inside : WallboxLocation.Outside;
+      this.setChargeMode(location, mode);
     }
   }
 
-  private setChargeMode(inside: boolean, mode: number) {
+  public setChargeMode(location: WallboxLocation, mode: WallboxChargeMode) {
     if (!Object.values(WallboxChargeMode).includes(mode)) {
       console.warn(`Mode ${mode} is not a valid WallboxChargeMode`);
       return;
     }
 
     let gauge;
-    if (inside) {
-      globals.wallboxChargeMode.set(WallboxLocation.Inside, mode);
+    if (location == WallboxLocation.Inside) {
       gauge = METRICS.GAUGES.ESS_WALLBOX_INSIDE_CHARGE_MODE;
     } else {
-      globals.wallboxChargeMode.set(WallboxLocation.Outside, mode);
       gauge = METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_CHARGE_MODE;
     }
+    globals.wallboxChargeMode.set(location, mode);
     this.metrics.setGauge(gauge, mode);
 
     console.log(
