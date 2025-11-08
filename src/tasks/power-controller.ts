@@ -4,7 +4,8 @@ import { MqttClient } from "../mqtt-client.ts";
 import { powerToAmps } from "../utils.ts";
 import { CalculatedTargetResults } from "./dynamic-power-calculator.ts";
 
-export interface WallboxesPowerAndStatus {
+export interface SystemState {
+  batteryMaxChargePower: number | undefined;
   wallboxPower: Map<WallboxLocation, number>;
   wallboxVictronStatus: Map<WallboxLocation, WallboxStatus>;
 }
@@ -16,10 +17,7 @@ export class PowerController {
     this.mqttClient = mqttClient;
   }
 
-  pushPowerSettings(
-    state: WallboxesPowerAndStatus,
-    targets: CalculatedTargetResults
-  ) {
+  pushPowerSettings(state: SystemState, targets: CalculatedTargetResults) {
     const insideWallboxPower = state.wallboxPower.get(WallboxLocation.Inside);
 
     this.setWallboxAmps(
@@ -42,7 +40,12 @@ export class PowerController {
       state.wallboxVictronStatus.get(WallboxLocation.Outside)
     );
 
-    this.publishBatteryChargePower(targets.batteryChargePower);
+    if (
+      targets.batteryChargePower != undefined &&
+      targets.batteryChargePower != state.batteryMaxChargePower
+    ) {
+      this.publishBatteryMaxChargePower(targets.batteryChargePower);
+    }
   }
 
   private setWallboxAmps(
@@ -119,13 +122,11 @@ export class PowerController {
     }
   }
 
-  private publishBatteryChargePower(power: number | undefined) {
-    if (power != undefined) {
-      console.log(`Battery charge power -> ${power}`);
-      const topic = "W/102c6b9cfab9/settings/0/Settings/CGwacs/MaxChargePower";
-      if (POWER_CONTROL_ENABLED) {
-        this.mqttClient.publishJson(topic, { value: power });
-      }
+  private publishBatteryMaxChargePower(power: number) {
+    console.log(`Battery max charge power -> ${power}`);
+    const topic = "W/102c6b9cfab9/settings/0/Settings/CGwacs/MaxChargePower";
+    if (POWER_CONTROL_ENABLED) {
+      this.mqttClient.publishJson(topic, { value: power });
     }
   }
 }

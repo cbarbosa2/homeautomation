@@ -33,6 +33,13 @@ export class MqttToPrometheusTask {
       }
     );
     this.subscribeAndAssignToGauge(
+      "N/102c6b9cfab9/settings/0/Settings/CGwacs/MaxChargePower",
+      METRICS.GAUGES.ESS_BATTERY_MAX_CHARGE_POWER,
+      (value) => {
+        globals.batteryMaxChargePower = value;
+      }
+    );
+    this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/battery/512/Dc/0/Voltage",
       METRICS.GAUGES.ESS_BATTERY_VOLTAGE
     );

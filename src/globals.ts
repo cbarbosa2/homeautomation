@@ -52,6 +52,7 @@ export interface GlobalState {
   batteryMinSOC: number | undefined;
   batterySOC: number | undefined;
   batteryPower: number | undefined;
+  batteryMaxChargePower: number | undefined;
   pvInverterPower: number | undefined;
   pvChargerPower: number | undefined;
   wallboxPower: Map<WallboxLocation, number>;
@@ -72,6 +73,7 @@ export const globals: GlobalState = {
   batteryMinSOC: undefined,
   batterySOC: undefined,
   batteryPower: undefined,
+  batteryMaxChargePower: undefined,
   pvInverterPower: undefined,
   pvChargerPower: undefined,
   wallboxPower: new Map(),

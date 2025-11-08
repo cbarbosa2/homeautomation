@@ -8,7 +8,6 @@ import { LoadOmieTask } from "./tasks/load-omie-task.ts";
 import { scheduler } from "./task-scheduler.ts";
 import { MqttToPrometheusTask } from "./tasks/mqtt-to-prometheus-task.ts";
 import { SetSocLimitTask } from "./tasks/set-soc-limit-task.ts";
-import { SetBatteryChargePowerTask } from "./tasks/set-battery-charge-power-task.ts";
 import { ChargeModeSwitcher } from "./tasks/charge-mode-switcher.ts";
 import { calculateTargetAmpsAndPriority } from "./tasks/dynamic-power-calculator.ts";
 import { globals, WallboxChargeMode, WallboxLocation } from "./globals.ts";
@@ -94,27 +93,6 @@ class HomeAutomationApp {
     scheduler.cron("Set SOC limit in evening", "1 22 * * *", () => {
       setSocLimitTask.executeInEvening();
     });
-
-    const setBatteryChargePowerTask = new SetBatteryChargePowerTask(
-      this.mqttClient
-    );
-    scheduler.cron("Set Battery Charge Power in morning", "0 8 * * *", () => {
-      setBatteryChargePowerTask.executeInMorning();
-    });
-    scheduler.cron(
-      "Set Battery Charge Power in early evening",
-      "0 22 * * *",
-      () => {
-        setBatteryChargePowerTask.executeInEarlyEvening();
-      }
-    );
-    scheduler.cron(
-      "Set Battery Charge Power in late evening",
-      "0 3 * * *",
-      () => {
-        setBatteryChargePowerTask.executeInLateEvening();
-      }
-    );
   }
 
   private setupGracefulShutdown(): void {

@@ -73,6 +73,11 @@ export const METRICS = {
       title: "Battery Power",
       description: "Battery power in watts",
     },
+    ESS_BATTERY_MAX_CHARGE_POWER: {
+      name: "ess_battery_max_charge_power",
+      title: "Battery Max Charge Power",
+      description: "Battery max charge power in watts",
+    },
     ESS_BATTERY_VOLTAGE: {
       name: "ess_battery_voltage",
       title: "Battery Voltage",
