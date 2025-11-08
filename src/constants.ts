@@ -17,7 +17,7 @@ export const HTTP_TIMEOUT = parseInt(Deno.env.get("HTTP_TIMEOUT") || "30000");
 export const HTTP_PORT = parseInt(Deno.env.get("HTTP_PORT") || "1881");
 
 export const POWER_CONTROL_ENABLED =
-  parseInt(Deno.env.get("POWER_CONTROL_ENABLED") || "0") === 1;
+  Deno.env.get("POWER_CONTROL_ENABLED") === "true";
 
 export const FORECAST_SOLAR_API_KEY =
   Deno.env.get("FORECAST_SOLAR_API_KEY") || "";

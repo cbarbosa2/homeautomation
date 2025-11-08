@@ -120,3 +120,15 @@ Deno.test("wallbox amps on a sunny day", () => {
   state.wallboxPower.set(WallboxLocation.Outside, 0);
   assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 0);
 });
+
+Deno.test("wallbox amps when on", () => {
+  const state = createDefaultState();
+  state.pvInverterPower = undefined;
+  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.On);
+  state.wallboxVictronStatus.set(
+    WallboxLocation.Inside,
+    WallboxStatus.Connected
+  );
+  state.hourOfDay = 20;
+  assertEquals(calculateTargetAmpsAndPriority(state).insideWallboxAmps, 8);
+});

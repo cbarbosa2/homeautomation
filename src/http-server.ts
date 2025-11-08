@@ -2,13 +2,15 @@ import * as client from "prom-client";
 import { HTTP_PORT } from "./constants.ts";
 import { scheduler } from "./task-scheduler.ts";
 import { globals, WallboxLocation, WallboxChargeMode } from "./globals.ts";
+import { ChargeModeSwitcher } from "./tasks/charge-mode-switcher.ts";
+import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 
 export class HttpServer {
   private server: Deno.HttpServer | null = null;
-  private register: client.Registry;
+  private metrics: PrometheusMetrics;
 
-  constructor(register: client.Registry) {
-    this.register = register;
+  constructor(metrics: PrometheusMetrics) {
+    this.metrics = metrics;
   }
 
   start(): void {
@@ -83,9 +85,9 @@ export class HttpServer {
   }
 
   private async handleMetrics(): Promise<Response> {
-    const metrics = await this.register.metrics();
+    const metrics = await this.metrics.getRegister().metrics();
     return new Response(metrics, {
-      headers: { "Content-Type": this.register.contentType },
+      headers: { "Content-Type": this.metrics.getRegister().contentType },
     });
   }
 
@@ -175,7 +177,9 @@ export class HttpServer {
           { status: 400, headers: { "Content-Type": "application/json" } }
         );
       }
-      globals.wallboxChargeMode.set(location, value);
+
+      new ChargeModeSwitcher(this.metrics).setChargeMode(location, value);
+
       return new Response(JSON.stringify({ success: true }), {
         headers: { "Content-Type": "application/json" },
       });

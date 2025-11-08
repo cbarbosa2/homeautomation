@@ -24,7 +24,7 @@ class HomeAutomationApp {
   constructor() {
     this.metrics = new PrometheusMetrics();
     this.mqttClient = new MqttClient(this.metrics);
-    this.httpServer = new HttpServer(this.metrics.getRegister());
+    this.httpServer = new HttpServer(this.metrics);
   }
 
   async start(): Promise<void> {
@@ -54,14 +54,11 @@ class HomeAutomationApp {
 
     const powerPublisher = new PowerController(this.mqttClient);
     scheduler.interval("Dynamic power", DYNAMIC_POWER_INTERVAL_SECONDS, () => {
-      const result = calculateTargetAmpsAndPriority({
+      const inputState = {
         ...globals,
         hourOfDay: Temporal.Now.plainDateTimeISO().hour,
-        wallboxChargeMode: new Map([
-          [WallboxLocation.Inside, WallboxChargeMode.Night],
-          [WallboxLocation.Outside, WallboxChargeMode.Manual],
-        ]),
-      });
+      };
+      const result = calculateTargetAmpsAndPriority(inputState);
       globals.primaryWallboxLocation =
         result.newPrimaryWallboxLocation ?? globals.primaryWallboxLocation;
 
