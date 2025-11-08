@@ -10,8 +10,9 @@ import { MqttToPrometheusTask } from "./tasks/mqtt-to-prometheus-task.ts";
 import { SetSocLimitTask } from "./tasks/set-soc-limit-task.ts";
 import { ChargeModeSwitcher } from "./tasks/charge-mode-switcher.ts";
 import { calculateTargetAmpsAndPriority } from "./tasks/dynamic-power-calculator.ts";
-import { globals } from "./globals.ts";
+import { globals, WallboxLocation } from "./globals.ts";
 import { PowerController } from "./tasks/power-controller.ts";
+import { loadPersistentStorage } from "./persistent-storage.ts";
 
 const AWAKE_MQTT_INTERVAL_SECONDS = 30;
 const DYNAMIC_POWER_INTERVAL_SECONDS = 5;
@@ -25,6 +26,7 @@ class HomeAutomationApp {
     this.metrics = new PrometheusMetrics();
     this.mqttClient = new MqttClient(this.metrics);
     this.httpServer = new HttpServer(this.metrics);
+    this.loadPersistedSettings();
   }
 
   async start(): Promise<void> {
@@ -90,6 +92,29 @@ class HomeAutomationApp {
     scheduler.cron("Set SOC limit in evening", "1 22 * * *", () => {
       setSocLimitTask.executeInEvening();
     });
+  }
+
+  private async loadPersistedSettings(): Promise<void> {
+    try {
+      const data = await loadPersistentStorage();
+      if (data.inside != undefined) {
+        new ChargeModeSwitcher(this.metrics).setChargeMode(
+          WallboxLocation.Inside,
+          data.inside,
+          false
+        );
+      }
+      if (data.outside != undefined) {
+        new ChargeModeSwitcher(this.metrics).setChargeMode(
+          WallboxLocation.Outside,
+          data.outside,
+          false
+        );
+      }
+      console.log("💾 Persistent storage loaded successfully");
+    } catch (error) {
+      console.error("❌ Failed to load persistent storage:", error);
+    }
   }
 
   private setupGracefulShutdown(): void {
