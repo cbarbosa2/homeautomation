@@ -12,7 +12,7 @@ import { SetBatteryChargePowerTask } from "./tasks/set-battery-charge-power-task
 import { ChargeModeSwitcher } from "./tasks/charge-mode-switcher.ts";
 import { calculateTargetAmpsAndPriority } from "./tasks/dynamic-power-calculator.ts";
 import { globals, WallboxChargeMode, WallboxLocation } from "./globals.ts";
-import { PowerPublisher } from "./tasks/power-publisher.ts";
+import { PowerController } from "./tasks/power-controller.ts";
 
 const AWAKE_MQTT_INTERVAL_SECONDS = 30;
 const DYNAMIC_POWER_INTERVAL_SECONDS = 5;
@@ -53,7 +53,7 @@ class HomeAutomationApp {
       mqttAwakeTask.execute();
     });
 
-    const powerPublisher = new PowerPublisher(this.mqttClient);
+    const powerPublisher = new PowerController(this.mqttClient);
     scheduler.interval("Dynamic power", DYNAMIC_POWER_INTERVAL_SECONDS, () => {
       const result = calculateTargetAmpsAndPriority({
         ...globals,

@@ -1,40 +1,44 @@
+import { POWER_CONTROL_ENABLED } from "../constants.ts";
 import { WallboxLocation, WallboxStatus } from "../globals.ts";
 import { MqttClient } from "../mqtt-client.ts";
 import { powerToAmps } from "../utils.ts";
 import { CalculatedTargetResults } from "./dynamic-power-calculator.ts";
 
-export interface InputState {
+export interface WallboxesPowerAndStatus {
   wallboxPower: Map<WallboxLocation, number>;
   wallboxVictronStatus: Map<WallboxLocation, WallboxStatus>;
 }
 
-export class PowerPublisher {
+export class PowerController {
   private mqttClient: MqttClient;
 
   constructor(mqttClient: MqttClient) {
     this.mqttClient = mqttClient;
   }
 
-  pushPowerSettings(state: InputState, targets: CalculatedTargetResults) {
-    const powerInsideWallbox = state.wallboxPower.get(WallboxLocation.Inside);
+  pushPowerSettings(
+    state: WallboxesPowerAndStatus,
+    targets: CalculatedTargetResults
+  ) {
+    const insideWallboxPower = state.wallboxPower.get(WallboxLocation.Inside);
 
     this.setWallboxAmps(
       WallboxLocation.Inside,
       targets.insideWallboxAmps,
-      powerInsideWallbox == undefined
+      insideWallboxPower == undefined
         ? undefined
-        : powerToAmps(powerInsideWallbox),
+        : powerToAmps(insideWallboxPower),
       state.wallboxVictronStatus.get(WallboxLocation.Inside)
     );
 
-    const powerOutsideWallbox = state.wallboxPower.get(WallboxLocation.Outside);
+    const outsideWallboxPower = state.wallboxPower.get(WallboxLocation.Outside);
 
     this.setWallboxAmps(
       WallboxLocation.Outside,
       targets.outsideWallboxAmps,
-      powerOutsideWallbox == undefined
+      outsideWallboxPower == undefined
         ? undefined
-        : powerToAmps(powerOutsideWallbox),
+        : powerToAmps(outsideWallboxPower),
       state.wallboxVictronStatus.get(WallboxLocation.Outside)
     );
 
@@ -91,7 +95,9 @@ export class PowerPublisher {
         location == WallboxLocation.Inside
           ? "W/102c6b9cfab9/evcharger/40/SetCurrent"
           : "W/102c6b9cfab9/evcharger/41/SetCurrent";
-      // this.mqttClient.publishJson(topic, { value: current });
+      if (POWER_CONTROL_ENABLED) {
+        this.mqttClient.publishJson(topic, { value: current });
+      }
     }
   }
 
@@ -107,7 +113,9 @@ export class PowerPublisher {
         location == WallboxLocation.Inside
           ? "W/102c6b9cfab9/evcharger/40/StartStop"
           : "W/102c6b9cfab9/evcharger/41/StartStop";
-      // this.mqttClient.publishJson(topic, { value: startStop });
+      if (POWER_CONTROL_ENABLED) {
+        this.mqttClient.publishJson(topic, { value: startStop });
+      }
     }
   }
 
@@ -115,7 +123,9 @@ export class PowerPublisher {
     if (power != undefined) {
       console.log(`Battery charge power -> ${power}`);
       const topic = "W/102c6b9cfab9/settings/0/Settings/CGwacs/MaxChargePower";
-      // this.mqttClient.publishJson(topic, { value: power });
+      if (POWER_CONTROL_ENABLED) {
+        this.mqttClient.publishJson(topic, { value: power });
+      }
     }
   }
 }

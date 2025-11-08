@@ -39,13 +39,13 @@ export class PrometheusMetrics {
     });
 
     // Create all histograms using the METRICS.HISTOGRAMS structure
-    Object.values(METRICS.HISTOGRAMS).forEach((histogram) => {
-      this.createHistogram(
-        histogram.name,
-        histogram.description,
-        "labels" in histogram ? [...(histogram.labels as string[])] : []
-      );
-    });
+    // Object.values(METRICS.HISTOGRAMS).forEach((histogram) => {
+    //   this.createHistogram(
+    //     histogram.name,
+    //     histogram.description,
+    //     "labels" in histogram ? [...(histogram.labels as string[])] : []
+    //   );
+    // });
   }
 
   getRegister(): client.Registry {
@@ -142,34 +142,34 @@ export class PrometheusMetrics {
     }
   }
 
-  observeHistogram(
-    histogramKey: keyof typeof METRICS.HISTOGRAMS,
-    value: number,
-    labels?: Record<string, string | number>
-  ): void {
-    const histogramInfo = METRICS.HISTOGRAMS[histogramKey]!;
-    const histogram = this.histograms.get(histogramInfo.name);
-    if (histogram) {
-      if (labels) {
-        histogram.observe(labels, value);
-      } else {
-        histogram.observe(value);
-      }
-    } else {
-      console.warn(`Histogram '${histogramInfo.name}' not found`);
-    }
-  }
+  // observeHistogram(
+  //   histogramKey: keyof typeof METRICS.HISTOGRAMS,
+  //   value: number,
+  //   labels?: Record<string, string | number>
+  // ): void {
+  //   const histogramInfo = METRICS.HISTOGRAMS[histogramKey]!;
+  //   const histogram = this.histograms.get(histogramInfo.name);
+  //   if (histogram) {
+  //     if (labels) {
+  //       histogram.observe(labels, value);
+  //     } else {
+  //       histogram.observe(value);
+  //     }
+  //   } else {
+  //     console.warn(`Histogram '${histogramInfo.name}' not found`);
+  //   }
+  // }
 
-  startTimer(histogramKey: keyof typeof METRICS.HISTOGRAMS): () => void {
-    const histogramInfo = METRICS.HISTOGRAMS[histogramKey]!;
-    const histogram = this.histograms.get(histogramInfo.name);
-    if (histogram) {
-      return histogram.startTimer();
-    } else {
-      console.warn(`Histogram '${histogramInfo.name}' not found`);
-      return () => {};
-    }
-  }
+  // startTimer(histogramKey: keyof typeof METRICS.HISTOGRAMS): () => void {
+  //   const histogramInfo = METRICS.HISTOGRAMS[histogramKey]!;
+  //   const histogram = this.histograms.get(histogramInfo.name);
+  //   if (histogram) {
+  //     return histogram.startTimer();
+  //   } else {
+  //     console.warn(`Histogram '${histogramInfo.name}' not found`);
+  //     return () => {};
+  //   }
+  // }
 
   recordMqttConnection(connected: boolean): void {
     this.setGauge(METRICS.GAUGES.MQTT_CONNECTION_STATUS, connected ? 1 : 0);

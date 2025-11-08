@@ -1,10 +1,17 @@
 import {
+  DETECT_SUN_MIN_PV_POWER,
+  MAX_AMPS_PER_LOCATION,
+  MAX_BATTERY_CHARGE_POWER,
+  MAX_GRID_CURRENT,
+  MIN_BATTERY_CHARGE_POWER,
+} from "../constants.ts";
+import {
   WallboxChargeMode,
   WallboxLocation,
   WallboxStatus,
 } from "../globals.ts";
 import { ampsToPower, powerToAmps } from "../utils.ts";
-import { TARGET_AMPS_MIN_START } from "./power-publisher.ts";
+import { TARGET_AMPS_MIN_START } from "./power-controller.ts";
 
 export interface CalculatedTargetResults {
   insideWallboxAmps: number | undefined;
@@ -237,15 +244,6 @@ function modeToTarget(
 function getIsOffPeak(hourOfDay: number): boolean {
   return hourOfDay < 8 || hourOfDay >= 22;
 }
-
-const MAX_GRID_CURRENT = 28;
-const DETECT_SUN_MIN_PV_POWER = 200;
-const MIN_BATTERY_CHARGE_POWER = 200;
-const MAX_BATTERY_CHARGE_POWER = 5000;
-const MAX_AMPS_PER_LOCATION = new Map([
-  [WallboxLocation.Inside, 18],
-  [WallboxLocation.Outside, 24],
-]);
 
 interface WallboxTarget {
   amps: number | undefined;

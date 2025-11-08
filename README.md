@@ -122,3 +122,16 @@ The application handles SIGINT and SIGTERM signals for graceful shutdown, ensuri
 - MQTT connections are properly closed
 - Prometheus server is stopped
 - All resources are cleaned up
+
+## Testing
+
+Unit tests are provided for core logic, including the dynamic power calculation:
+
+- Function: `calculateTargetAmpsAndPriority` (see `src/tasks/dynamic-power-calculator.test.ts`)
+- Run all tests:
+
+  ```bash
+  deno test src/tasks/dynamic-power-calculator.test.ts --allow-read --allow-env
+  ```
+
+Tests use [@std/assert](https://jsr.io/@std/assert) for assertions. You can add more tests for other modules as needed.

@@ -1,4 +1,5 @@
 import { load } from "@std/dotenv";
+import { WallboxLocation } from "./globals.ts";
 
 // Load environment variables from .env file
 await load({ export: true });
@@ -15,7 +16,19 @@ export const MQTT_CLIENT_ID =
 export const HTTP_TIMEOUT = parseInt(Deno.env.get("HTTP_TIMEOUT") || "30000");
 export const HTTP_PORT = parseInt(Deno.env.get("HTTP_PORT") || "1881");
 
+export const POWER_CONTROL_ENABLED =
+  parseInt(Deno.env.get("POWER_CONTROL_ENABLED") || "0") === 1;
+
 export const FORECAST_SOLAR_API_KEY =
   Deno.env.get("FORECAST_SOLAR_API_KEY") || "";
 
 export const VICTRON_API_KEY = Deno.env.get("VICTRON_API_KEY") || "";
+
+export const MAX_GRID_CURRENT = 27;
+export const DETECT_SUN_MIN_PV_POWER = 200;
+export const MIN_BATTERY_CHARGE_POWER = 200;
+export const MAX_BATTERY_CHARGE_POWER = 5000;
+export const MAX_AMPS_PER_LOCATION = new Map([
+  [WallboxLocation.Inside, 18],
+  [WallboxLocation.Outside, 24],
+]);
