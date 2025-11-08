@@ -32,3 +32,7 @@ export const MAX_AMPS_PER_LOCATION = new Map([
   [WallboxLocation.Inside, 18],
   [WallboxLocation.Outside, 24],
 ]);
+
+export const TARGET_AMPS_MIN_STOP = 7;
+export const TARGET_AMPS_MIN_START = 8;
+export const TARGET_AMPS_MAX_INCREASE = 4;

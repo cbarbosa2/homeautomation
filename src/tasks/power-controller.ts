@@ -1,4 +1,8 @@
-import { POWER_CONTROL_ENABLED } from "../constants.ts";
+import {
+  POWER_CONTROL_ENABLED,
+  TARGET_AMPS_MIN_START,
+  TARGET_AMPS_MIN_STOP,
+} from "../constants.ts";
 import { WallboxLocation, WallboxStatus } from "../globals.ts";
 import { MqttClient } from "../mqtt-client.ts";
 import { powerToAmps } from "../utils.ts";
@@ -130,6 +134,3 @@ export class PowerController {
     }
   }
 }
-
-const TARGET_AMPS_MIN_STOP = 7;
-export const TARGET_AMPS_MIN_START = 8;

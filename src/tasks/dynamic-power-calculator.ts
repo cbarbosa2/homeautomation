@@ -4,6 +4,7 @@ import {
   MAX_BATTERY_CHARGE_POWER,
   MAX_GRID_CURRENT,
   MIN_BATTERY_CHARGE_POWER,
+  TARGET_AMPS_MAX_INCREASE,
 } from "../constants.ts";
 import {
   WallboxChargeMode,
@@ -142,7 +143,7 @@ function coerceTargetAmps(
 ): number {
   return Math.min(
     Math.max(0, newAmps),
-    Math.max(TARGET_AMPS_MIN_START, existingAmps + 2),
+    Math.max(TARGET_AMPS_MIN_START, existingAmps + TARGET_AMPS_MAX_INCREASE),
     MAX_AMPS_PER_LOCATION.get(location) ?? 0
   );
 }
