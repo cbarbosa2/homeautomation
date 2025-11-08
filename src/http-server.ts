@@ -1,4 +1,3 @@
-import * as client from "prom-client";
 import { HTTP_PORT } from "./constants.ts";
 import { scheduler } from "./task-scheduler.ts";
 import { globals, WallboxLocation, WallboxChargeMode } from "./globals.ts";

@@ -10,7 +10,7 @@ import { MqttToPrometheusTask } from "./tasks/mqtt-to-prometheus-task.ts";
 import { SetSocLimitTask } from "./tasks/set-soc-limit-task.ts";
 import { ChargeModeSwitcher } from "./tasks/charge-mode-switcher.ts";
 import { calculateTargetAmpsAndPriority } from "./tasks/dynamic-power-calculator.ts";
-import { globals, WallboxChargeMode, WallboxLocation } from "./globals.ts";
+import { globals } from "./globals.ts";
 import { PowerController } from "./tasks/power-controller.ts";
 
 const AWAKE_MQTT_INTERVAL_SECONDS = 30;

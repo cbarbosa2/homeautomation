@@ -5,6 +5,11 @@
 
 set -e
 
+if ! deno task compile; then
+  echo "❌ Compilation failed. Aborting deployment."
+  exit 1
+fi
+
 echo "🚀 Starting deployment to bee.local..."
 
 ssh carlos@bee.local << 'EOF'

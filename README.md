@@ -80,9 +80,9 @@ sudo systemctl disable homeautomation
 
 ## Deploy changes
 
-Make sure you first commit and push your changes to Git then run the `deploy.sh` file.
+Make sure you first commit and push your changes to Git then run the `deploy-git.sh` file.
 
-But if you just want to do a quick test you may skip Git and run `deploy-dev.sh` which will
+But if you just want to do a quick test you may skip Git and run `deploy-local.sh` which will
 copy your local files directly to the server.
 
 NOTE: Make sure you have passwordless sudo configured. If not configure like this:

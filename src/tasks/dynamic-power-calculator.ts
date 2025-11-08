@@ -5,6 +5,7 @@ import {
   MAX_GRID_CURRENT,
   MIN_BATTERY_CHARGE_POWER,
   TARGET_AMPS_MAX_INCREASE,
+  TARGET_AMPS_MIN_START,
 } from "../constants.ts";
 import {
   WallboxChargeMode,
@@ -12,7 +13,6 @@ import {
   WallboxStatus,
 } from "../globals.ts";
 import { ampsToPower, powerToAmps } from "../utils.ts";
-import { TARGET_AMPS_MIN_START } from "./power-controller.ts";
 
 export interface CalculatedTargetResults {
   insideWallboxAmps: number | undefined;
