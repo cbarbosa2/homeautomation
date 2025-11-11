@@ -7,6 +7,7 @@ import {
 import { savePersistentStorage } from "../persistent-storage.ts";
 import { METRICS } from "../prometheus/metrics.ts";
 import { PrometheusMetrics } from "../prometheus/prometheus.ts";
+import { log, warn, error as _error } from "../logger.ts";
 
 const mapIdAndPushesToChargeMode = new Map([
   ["0_1", WallboxChargeMode.ESSOnly],
@@ -78,7 +79,7 @@ export class ChargeModeSwitcher {
     persistSetting: boolean = true
   ): void {
     if (!Object.values(WallboxChargeMode).includes(mode)) {
-      console.warn(`Mode ${mode} is not a valid WallboxChargeMode`);
+      warn(`Mode ${mode} is not a valid WallboxChargeMode`);
       return;
     }
 
@@ -91,9 +92,7 @@ export class ChargeModeSwitcher {
     globals.wallboxChargeMode.set(location, mode);
     this.metrics.setGauge(gauge, mode);
 
-    console.log(
-      `set mode ${WallboxChargeMode[mode]}(${mode}) in gauge ${gauge.name}`
-    );
+    log(`set mode ${WallboxChargeMode[mode]}(${mode}) in gauge ${gauge.name}`);
 
     if (persistSetting) {
       savePersistentStorage({
@@ -104,7 +103,7 @@ export class ChargeModeSwitcher {
           globals.wallboxChargeMode.get(WallboxLocation.Outside) ??
           WallboxChargeMode.SunOnly,
       }).catch((error) => {
-        console.error("❌ Failed to save persistent storage:", error);
+        error(`❌ Failed to save persistent storage: ${String(error)}`);
       });
     }
   }

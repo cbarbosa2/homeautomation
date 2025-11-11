@@ -2,6 +2,7 @@ import { events, globals, WallboxLocation } from "../globals.ts";
 import { MqttClient } from "../mqtt-client.ts";
 import { MetricInfo, METRICS } from "../prometheus/metrics.ts";
 import { PrometheusMetrics } from "../prometheus/prometheus.ts";
+import { log } from "../logger.ts";
 
 export class MqttToPrometheusTask {
   private metrics: PrometheusMetrics;
@@ -155,6 +156,7 @@ export class MqttToPrometheusTask {
       const payload = data as { value: number | undefined };
       this.metrics.setGauge(gaugeInfo, payload.value ?? 0);
       if (handler) {
+        // log(`Handling MQTT topic ${topic} with value ${payload.value}`);
         handler(payload.value);
       }
     });

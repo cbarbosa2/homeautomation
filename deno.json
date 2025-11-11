@@ -1,11 +1,11 @@
 {
   "tasks": {
-    "dev": "deno run --allow-net --allow-read --allow-env --unstable-cron --watch src/main.ts",
-    "start": "deno run --allow-net --allow-read --allow-env --unstable-cron src/main.ts",
+    "dev": "deno run --allow-net --allow-read --allow-write --allow-env --unstable-cron --watch src/main.ts",
+    "start": "deno run --allow-net --allow-read --allow-write --allow-env --unstable-cron src/main.ts",
     "check": "deno check src/*.ts",
     "lint": "deno lint src/",
     "fmt": "deno fmt src/",
-    "test": "deno test --allow-net --allow-read --allow-env --unstable-cron",
+    "test": "deno test --allow-net --allow-read --allow-write --allow-env --unstable-cron",
     "analyze": "deno task check && deno task lint",
     "compile": "deno check src/**/*.ts"
   },

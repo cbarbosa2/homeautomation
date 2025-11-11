@@ -1,4 +1,5 @@
 import { MqttClient } from "./mqtt-client.ts";
+import { log, error as _error } from "./logger.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { HttpServer } from "./http-server.ts";
 import { Temporal } from "./temporal.ts";
@@ -31,7 +32,7 @@ class HomeAutomationApp {
 
   async start(): Promise<void> {
     try {
-      console.log("🏠 Starting Home Automation System...");
+      await log("🏠 Starting Home Automation System...");
 
       await this.mqttClient.connect();
       this.httpServer.start();
@@ -40,10 +41,12 @@ class HomeAutomationApp {
 
       new ChargeModeSwitcher(this.metrics).setupHandlers();
 
-      console.log("✅ Home Automation System started successfully");
+      await log("✅ Home Automation System started successfully");
       this.setupGracefulShutdown();
     } catch (error) {
-      console.error("❌ Failed to start Home Automation System:", error);
+      await _error(
+        `❌ Failed to start Home Automation System: ${String(error)}`
+      );
       Deno.exit(1);
     }
   }
@@ -111,24 +114,24 @@ class HomeAutomationApp {
           false
         );
       }
-      console.log("💾 Persistent storage loaded successfully");
+      await log("💾 Persistent storage loaded successfully");
     } catch (error) {
-      console.error("❌ Failed to load persistent storage:", error);
+      await _error(`❌ Failed to load persistent storage: ${String(error)}`);
     }
   }
 
   private setupGracefulShutdown(): void {
     const shutdown = async () => {
-      console.log("🛑 Shutting down Home Automation System...");
+      await log("🛑 Shutting down Home Automation System...");
 
       try {
         scheduler.terminateAll();
         await this.mqttClient.disconnect();
         await this.httpServer.stop();
-        console.log("✅ Shutdown complete");
+        await log("✅ Shutdown complete");
         Deno.exit(0);
       } catch (error) {
-        console.error("❌ Error during shutdown:", error);
+        await _error(`❌ Error during shutdown: ${String(error)}`);
         Deno.exit(1);
       }
     };

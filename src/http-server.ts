@@ -1,4 +1,5 @@
 import { HTTP_PORT } from "./constants.ts";
+import { log, error as _error } from "./logger.ts";
 import { scheduler } from "./task-scheduler.ts";
 import { globals, WallboxLocation, WallboxChargeMode } from "./globals.ts";
 import { ChargeModeSwitcher } from "./tasks/charge-mode-switcher.ts";
@@ -57,12 +58,10 @@ export class HttpServer {
       return new Response("Not Found", { status: 404 });
     };
 
-    console.log(`🌐 HTTP server starting on port ${HTTP_PORT}`);
+    log(`🌐 HTTP server starting on port ${HTTP_PORT}`);
     this.server = Deno.serve({ port: HTTP_PORT }, handler);
-    console.log(
-      `📊 Metrics available at: http://localhost:${HTTP_PORT}/metrics`
-    );
-    console.log(`📋 Task dashboard at: http://localhost:${HTTP_PORT}/`);
+    log(`📊 Metrics available at: http://localhost:${HTTP_PORT}/metrics`);
+    log(`📋 Task dashboard at: http://localhost:${HTTP_PORT}/`);
   }
 
   async stop(): Promise<void> {
@@ -75,9 +74,9 @@ export class HttpServer {
         );
 
         await Promise.race([shutdownPromise, timeoutPromise]);
-        console.log("🌐 HTTP server stopped");
+        log("🌐 HTTP server stopped");
       } catch (_) {
-        console.log("🌐 HTTP server force stopped");
+        log("🌐 HTTP server force stopped");
         // Force exit if graceful shutdown fails
       }
     }
@@ -101,7 +100,7 @@ export class HttpServer {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
     } catch (error) {
-      console.error("Failed to read index.html:", error);
+      error(`Failed to read index.html: ${String(error)}`);
       return new Response("Dashboard not found", { status: 500 });
     }
   }
