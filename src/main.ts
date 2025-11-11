@@ -1,5 +1,5 @@
 import { MqttClient } from "./mqtt-client.ts";
-import { log, error as _error } from "./logger.ts";
+import { logInfo, logError as _error } from "./logger.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { HttpServer } from "./http-server.ts";
 import { Temporal } from "./temporal.ts";
@@ -32,7 +32,7 @@ class HomeAutomationApp {
 
   async start(): Promise<void> {
     try {
-      await log("🏠 Starting Home Automation System...");
+      await logInfo("🏠 Starting Home Automation System...");
 
       await this.mqttClient.connect();
       this.httpServer.start();
@@ -41,7 +41,7 @@ class HomeAutomationApp {
 
       new ChargeModeSwitcher(this.metrics).setupHandlers();
 
-      await log("✅ Home Automation System started successfully");
+      await logInfo("✅ Home Automation System started successfully");
       this.setupGracefulShutdown();
     } catch (error) {
       await _error(
@@ -114,7 +114,7 @@ class HomeAutomationApp {
           false
         );
       }
-      await log("💾 Persistent storage loaded successfully");
+      await logInfo("💾 Persistent storage loaded successfully");
     } catch (error) {
       await _error(`❌ Failed to load persistent storage: ${String(error)}`);
     }
@@ -122,13 +122,13 @@ class HomeAutomationApp {
 
   private setupGracefulShutdown(): void {
     const shutdown = async () => {
-      await log("🛑 Shutting down Home Automation System...");
+      await logInfo("🛑 Shutting down Home Automation System...");
 
       try {
         scheduler.terminateAll();
         await this.mqttClient.disconnect();
         await this.httpServer.stop();
-        await log("✅ Shutdown complete");
+        await logInfo("✅ Shutdown complete");
         Deno.exit(0);
       } catch (error) {
         await _error(`❌ Error during shutdown: ${String(error)}`);

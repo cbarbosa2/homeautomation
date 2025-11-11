@@ -39,14 +39,14 @@ async function writeLog(level: string, message: string) {
   }
 }
 
-export async function log(message: string) {
+export async function logInfo(message: string) {
   await writeLog("INFO", message);
 }
 
-export async function warn(message: string) {
+export async function logWarn(message: string) {
   await writeLog("WARN", message);
 }
 
-export async function error(message: string) {
+export async function logError(message: string) {
   await writeLog("ERROR", message);
 }

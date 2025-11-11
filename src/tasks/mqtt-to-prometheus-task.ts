@@ -2,7 +2,6 @@ import { events, globals, WallboxLocation } from "../globals.ts";
 import { MqttClient } from "../mqtt-client.ts";
 import { MetricInfo, METRICS } from "../prometheus/metrics.ts";
 import { PrometheusMetrics } from "../prometheus/prometheus.ts";
-import { log } from "../logger.ts";
 
 export class MqttToPrometheusTask {
   private metrics: PrometheusMetrics;
