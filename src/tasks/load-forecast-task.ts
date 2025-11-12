@@ -1,5 +1,6 @@
 import { FORECAST_SOLAR_API_KEY, VICTRON_API_KEY } from "../constants.ts";
 import { globals } from "../globals.ts";
+import { logError } from "../logger.ts";
 import { METRICS } from "../prometheus/metrics.ts";
 import { PrometheusMetrics } from "../prometheus/prometheus.ts";
 
@@ -15,13 +16,21 @@ export class LoadForecastTask {
   }
 
   public async execute(): Promise<void> {
-    const forecastSolarValues = await this.fetchSolarForecast();
-    this.setMetrics(forecastSolarValues, "solarForecast");
-    globals.solarForecastNextDays = forecastSolarValues;
+    try {
+      const forecastSolarValues = await this.fetchSolarForecast();
+      this.setMetrics(forecastSolarValues, "solarForecast");
+      globals.solarForecastNextDays = forecastSolarValues;
+    } catch (error) {
+      logError(`Error fetching solar forecast: ${error}`);
+    }
 
-    const victronValues = await this.fetchVictron();
-    this.setMetrics(victronValues, "victron");
-    globals.victronNextDays = victronValues;
+    try {
+      const victronValues = await this.fetchVictron();
+      this.setMetrics(victronValues, "victron");
+      globals.victronNextDays = victronValues;
+    } catch (error) {
+      logError(`Error fetching Victron data: ${error}`);
+    }
   }
 
   private setMetrics(values: number[], source: string) {
