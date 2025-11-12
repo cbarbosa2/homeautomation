@@ -1,4 +1,5 @@
 import { OmieEntry } from "../globals.ts";
+import { logError } from "../logger.ts";
 import { Temporal } from "../temporal.ts";
 
 const OMIE_API_URL = `https://www.omie.es/sites/default/files/dados/NUEVA_SECCION/INT_PBC_EV_H_ACUM.TXT`;
@@ -15,7 +16,7 @@ export async function fetchOmie(): Promise<string> {
 
     return await response.text();
   } catch (error) {
-    console.error("Error fetching/parsing OMIE:", error);
+    logError("Error fetching/parsing OMIE:", error);
     throw error;
   }
 }

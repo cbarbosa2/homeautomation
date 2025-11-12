@@ -1,5 +1,6 @@
 import * as client from "prom-client";
 import { MetricInfo, METRICS } from "./metrics.ts";
+import { logWarn } from "../logger.ts";
 // Using Deno's built-in HTTP server
 
 export class PrometheusMetrics {
@@ -117,7 +118,7 @@ export class PrometheusMetrics {
         counter.inc();
       }
     } else {
-      console.warn(`Counter '${counterInfo.name}' not found`);
+      logWarn(`Counter '${counterInfo.name}' not found`);
     }
   }
 
@@ -138,7 +139,7 @@ export class PrometheusMetrics {
         gauge.set(value);
       }
     } else {
-      console.warn(`Gauge '${gaugeInfo.name}' not found`);
+      logWarn(`Gauge '${gaugeInfo.name}' not found`);
     }
   }
 

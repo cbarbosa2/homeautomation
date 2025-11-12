@@ -7,6 +7,7 @@ import {
   MQTT_CLIENT_ID,
 } from "./constants.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
+import { logError, logInfo, logWarn } from "./logger.ts";
 
 export class MqttClient {
   private client: MqttClientType | null = null;
@@ -22,7 +23,7 @@ export class MqttClient {
   }
 
   async connect(): Promise<void> {
-    console.log(`🔌 Connecting to MQTT broker: ${MQTT_BROKER_URL}`);
+    logInfo(`🔌 Connecting to MQTT broker: ${MQTT_BROKER_URL}`);
 
     return new Promise((resolve, reject) => {
       try {
@@ -35,25 +36,25 @@ export class MqttClient {
         });
 
         this.client.on("connect", () => {
-          console.log("✅ Connected to MQTT broker");
+          logInfo("✅ Connected to MQTT broker");
           this.isConnected = true;
           this.metrics.recordMqttConnection(true);
           resolve();
         });
 
         this.client.on("error", (error) => {
-          console.error("❌ MQTT connection error:", error);
+          logError("❌ MQTT connection error:", error);
           reject(error);
         });
 
         this.client.on("offline", () => {
-          console.warn("⚠️ MQTT client offline");
+          logWarn("⚠️ MQTT client offline");
           this.isConnected = false;
           this.metrics.recordMqttConnection(false);
         });
 
         this.client.on("reconnect", () => {
-          console.log("🔄 Reconnecting to MQTT broker...");
+          logInfo("🔄 Reconnecting to MQTT broker...");
         });
 
         this.client.on("message", (topic, message) => {
@@ -69,7 +70,7 @@ export class MqttClient {
     if (this.client && this.isConnected) {
       return new Promise((resolve) => {
         this.client!.end(false, {}, () => {
-          console.log("📤 Disconnected from MQTT broker");
+          logInfo("📤 Disconnected from MQTT broker");
           this.isConnected = false;
           resolve();
         });
@@ -85,10 +86,10 @@ export class MqttClient {
     return new Promise((resolve, reject) => {
       this.client!.subscribe(topic, (error) => {
         if (error) {
-          console.error(`❌ Failed to subscribe to ${topic}:`, error);
+          logError(`❌ Failed to subscribe to ${topic}:`, error);
           reject(error);
         } else {
-          console.log(`📥 Subscribed to topic: ${topic}`);
+          logInfo(`📥 Subscribed to topic: ${topic}`);
           resolve();
         }
       });
@@ -108,12 +109,12 @@ export class MqttClient {
     return new Promise((resolve, reject) => {
       this.client!.publish(topic, message, { retain }, (error) => {
         if (error) {
-          console.error(`❌ Failed to publish to ${topic}:`, error);
+          logError(`❌ Failed to publish to ${topic}:`, error);
           reject(error);
         } else {
           this.metrics.recordMqttMessage("sent");
           if (log) {
-            console.log(`📤 Published to ${topic}: ${message}`);
+            logInfo(`📤 Published to ${topic}: ${message}`);
           }
           resolve();
         }
@@ -149,7 +150,7 @@ export class MqttClient {
     }
 
     // Default behavior if no handler found
-    console.log(`🔄 No handler for topic ${topic}:`, data);
+    logInfo(`🔄 No handler for topic ${topic}:`, data);
   }
 
   getConnectionStatus(): boolean {
@@ -175,7 +176,7 @@ export class MqttClient {
     handler: (topic: string, data: unknown) => void
   ): void {
     this.topicHandlers.set(topicPattern, handler);
-    console.log(`📋 Added handler for topic pattern: ${topicPattern}`);
+    logInfo(`📋 Added handler for topic pattern: ${topicPattern}`);
   }
 
   /**
@@ -185,7 +186,7 @@ export class MqttClient {
   removeTopicHandler(topicPattern: string): boolean {
     const removed = this.topicHandlers.delete(topicPattern);
     if (removed) {
-      console.log(`🗑️ Removed handler for topic pattern: ${topicPattern}`);
+      logInfo(`🗑️ Removed handler for topic pattern: ${topicPattern}`);
     }
     return removed;
   }

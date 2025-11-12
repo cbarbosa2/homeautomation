@@ -1,8 +1,7 @@
 // logger.ts
 // Simple file logger with daily rotation for Deno
 
-const LOG_TO_FILE =
-  (Deno.env.get("LOG_TO_FILE") ?? "true").toLowerCase() === "true";
+import { LOG_TO_FILE } from "./constants.ts";
 
 const LOG_DIR = "./logs";
 const LOG_PREFIX = "homeautomation";
@@ -21,32 +20,36 @@ async function ensureLogDir() {
   } catch (_) {}
 }
 
-async function writeLog(level: string, message: string) {
-  const timestamp = new Date().toISOString();
-  const line = `[${timestamp}] [${level}] ${message}\n`;
+async function writeLog(level: string, ...args: unknown[]) {
   if (LOG_TO_FILE) {
+    const timestamp = new Date().toISOString();
+    const message = args
+      .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
+      .join(" ");
+    const line = `[${timestamp}] [${level}] ${message}\n`;
+
     await ensureLogDir();
     const filePath = getLogFilePath();
     await Deno.writeTextFile(filePath, line, { append: true });
   } else {
     if (level === "ERROR") {
-      console.error(line);
+      console.error(...args);
     } else if (level === "WARN") {
-      console.warn(line);
+      console.warn(...args);
     } else {
-      console.log(line);
+      console.log(...args);
     }
   }
 }
 
-export async function logInfo(message: string) {
-  await writeLog("INFO", message);
+export async function logInfo(...args: unknown[]) {
+  await writeLog("INFO", ...args);
 }
 
-export async function logWarn(message: string) {
-  await writeLog("WARN", message);
+export async function logWarn(...args: unknown[]) {
+  await writeLog("WARN", ...args);
 }
 
-export async function logError(message: string) {
-  await writeLog("ERROR", message);
+export async function logError(...args: unknown[]) {
+  await writeLog("ERROR", ...args);
 }

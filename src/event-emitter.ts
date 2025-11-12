@@ -1,3 +1,5 @@
+import { logError } from "./logger.ts";
+
 type EventHandler<T> = (value: T) => void | Promise<void>;
 
 export class EventEmitter<T> {
@@ -16,7 +18,7 @@ export class EventEmitter<T> {
       try {
         await handler(value);
       } catch (error) {
-        console.error("Event handler error:", error);
+        logError("Event handler error:", error);
       }
     }
   }

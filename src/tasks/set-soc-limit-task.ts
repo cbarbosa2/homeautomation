@@ -1,4 +1,5 @@
 import { globals } from "../globals.ts";
+import { logInfo } from "../logger.ts";
 import { MqttClient } from "../mqtt-client.ts";
 import { Temporal } from "../temporal.ts";
 
@@ -17,7 +18,7 @@ export class SetSocLimitTask {
 
   public executeInEvening(): Promise<void> {
     const calcResults = this.calculateEveningValue();
-    console.log("Evening SOC results: " + JSON.stringify(calcResults));
+    logInfo("Evening SOC results: " + JSON.stringify(calcResults));
     return this.publishValue(calcResults.value);
   }
 

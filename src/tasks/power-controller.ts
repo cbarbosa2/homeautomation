@@ -4,6 +4,7 @@ import {
   TARGET_AMPS_MIN_STOP,
 } from "../constants.ts";
 import { WallboxLocation, WallboxStatus } from "../globals.ts";
+import { logInfo } from "../logger.ts";
 import { MqttClient } from "../mqtt-client.ts";
 import { powerToAmps } from "../utils.ts";
 import { CalculatedTargetResults } from "./dynamic-power-calculator.ts";
@@ -95,9 +96,7 @@ export class PowerController {
     current: number | undefined
   ) {
     if (current != undefined) {
-      console.log(
-        `Current of ${WallboxLocation[location]} Wallbox -> ${current}`
-      );
+      logInfo(`Current of ${WallboxLocation[location]} Wallbox -> ${current}`);
       const topic =
         location == WallboxLocation.Inside
           ? "W/102c6b9cfab9/evcharger/40/SetCurrent"
@@ -113,7 +112,7 @@ export class PowerController {
     startStop: number | undefined
   ) {
     if (startStop != undefined) {
-      console.log(
+      logInfo(
         `Start/stop of ${WallboxLocation[location]} Wallbox -> ${startStop}`
       );
       const topic =
@@ -127,7 +126,7 @@ export class PowerController {
   }
 
   private publishBatteryMaxChargePower(power: number) {
-    console.log(`Battery max charge power -> ${power}`);
+    logInfo(`Battery max charge power -> ${power}`);
     const topic = "W/102c6b9cfab9/settings/0/Settings/CGwacs/MaxChargePower";
     if (POWER_CONTROL_ENABLED) {
       this.mqttClient.publishJson(topic, { value: power });

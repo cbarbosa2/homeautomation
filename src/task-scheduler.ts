@@ -1,3 +1,5 @@
+import { logError, logInfo } from "./logger.ts";
+
 export interface TaskInfo {
   name: string;
   type: "cron" | "interval";
@@ -20,15 +22,15 @@ export class TaskScheduler {
     cronExpression: string,
     handler: () => Promise<void> | void
   ): void {
-    console.log(`⏰ Scheduling task "${name}" with cron: ${cronExpression}`);
+    logInfo(`⏰ Scheduling task "${name}" with cron: ${cronExpression}`);
 
     const cronHandler = async () => {
       try {
-        console.log(`🔄 Executing scheduled task: ${name}`);
+        logInfo(`🔄 Executing scheduled task: ${name}`);
         await handler();
-        console.log(`✅ Completed scheduled task: ${name}`);
+        logInfo(`✅ Completed scheduled task: ${name}`);
       } catch (error) {
-        console.error(`❌ Error in scheduled task "${name}":`, error);
+        logError(`❌ Error in scheduled task "${name}":`, error);
       }
     };
 
@@ -52,17 +54,15 @@ export class TaskScheduler {
     intervalSeconds: number,
     handler: () => Promise<void> | void
   ): void {
-    console.log(
-      `⏰ Scheduling task "${name}" every ${intervalSeconds} seconds`
-    );
+    logInfo(`⏰ Scheduling task "${name}" every ${intervalSeconds} seconds`);
 
     const intervalHandler = async () => {
       try {
-        console.log(`🔄 Executing scheduled task: ${name}`);
+        logInfo(`🔄 Executing scheduled task: ${name}`);
         await handler();
-        console.log(`✅ Completed scheduled task: ${name}`);
+        logInfo(`✅ Completed scheduled task: ${name}`);
       } catch (error) {
-        console.error(`❌ Error in scheduled task "${name}":`, error);
+        logError(`❌ Error in scheduled task "${name}":`, error);
       }
     };
 
@@ -93,13 +93,13 @@ export class TaskScheduler {
   async triggerTask(name: string): Promise<boolean> {
     const task = this.scheduledTasks.get(name);
     if (task) {
-      console.log(`🔄 Manually triggering task: ${name}`);
+      logInfo(`🔄 Manually triggering task: ${name}`);
       try {
         await task.handler();
-        console.log(`✅ Manually triggered task completed: ${name}`);
+        logInfo(`✅ Manually triggered task completed: ${name}`);
         return true;
       } catch (error) {
-        console.error(`❌ Error manually triggering task "${name}":`, error);
+        logError(`❌ Error manually triggering task "${name}":`, error);
         return false;
       }
     }
@@ -115,7 +115,7 @@ export class TaskScheduler {
     if (task && task.type === "interval" && task.intervalId) {
       clearInterval(task.intervalId);
       this.scheduledTasks.delete(name);
-      console.log(`🛑 Stopped scheduled task: ${name}`);
+      logInfo(`🛑 Stopped scheduled task: ${name}`);
       return true;
     }
     return false;
@@ -125,17 +125,17 @@ export class TaskScheduler {
    * Terminate all scheduled tasks
    */
   terminateAll(): void {
-    console.log("🛑 Terminating all scheduled tasks...");
+    logInfo("🛑 Terminating all scheduled tasks...");
     for (const [name, task] of this.scheduledTasks.entries()) {
       if (task.type === "interval" && task.intervalId) {
         clearInterval(task.intervalId);
-        console.log(`🛑 Stopped interval task: ${name}`);
+        logInfo(`🛑 Stopped interval task: ${name}`);
       } else if (task.type === "cron") {
-        console.log(`🛑 Stopped cron task: ${name}`);
+        logInfo(`🛑 Stopped cron task: ${name}`);
       }
     }
     this.scheduledTasks.clear();
-    console.log("✅ All scheduled tasks terminated");
+    logInfo("✅ All scheduled tasks terminated");
   }
 }
 
