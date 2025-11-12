@@ -43,66 +43,54 @@ export class LoadForecastTask {
   }
 
   private async fetchSolarForecast(): Promise<number[]> {
-    try {
-      const response = await fetch(this.forecastSolarApiUrl);
+    const response = await fetch(this.forecastSolarApiUrl);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const jsonResponse = (await response.json()) as SolarForecastResponse;
-
-      const today = new Date();
-
-      const indexes = Array.from({ length: 4 }, (_, i) => i);
-
-      return indexes.map((index) => {
-        const day = new Date();
-        day.setDate(today.getDate() + index);
-        return jsonResponse.result[day.toISOString().substring(0, 10)] || 0;
-      });
-    } catch (error) {
-      console.error("Error fetching solar forecast:", error);
-      throw error;
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const jsonResponse = (await response.json()) as SolarForecastResponse;
+
+    const today = new Date();
+
+    const indexes = Array.from({ length: 4 }, (_, i) => i);
+
+    return indexes.map((index) => {
+      const day = new Date();
+      day.setDate(today.getDate() + index);
+      return jsonResponse.result[day.toISOString().substring(0, 10)] || 0;
+    });
   }
 
   private async fetchVictron(): Promise<number[]> {
-    try {
-      const headers = {
-        "X-Authorization": `Token ${VICTRON_API_KEY}`,
-      };
+    const headers = {
+      "X-Authorization": `Token ${VICTRON_API_KEY}`,
+    };
 
-      const midnightOfToday = new Date(
-        new Date().setHours(0, 0, 0, 0)
-      ).valueOf();
-      const midnightOfDayAfterWeek = new Date(
-        new Date().setHours(95, 0, 0, 0)
-      ).valueOf();
+    const midnightOfToday = new Date(new Date().setHours(0, 0, 0, 0)).valueOf();
+    const midnightOfDayAfterWeek = new Date(
+      new Date().setHours(95, 0, 0, 0)
+    ).valueOf();
 
-      const start = Math.floor(midnightOfToday / 1000);
-      const end = Math.floor(midnightOfDayAfterWeek / 1000);
+    const start = Math.floor(midnightOfToday / 1000);
+    const end = Math.floor(midnightOfDayAfterWeek / 1000);
 
-      const apiUrl = `${this.victronApiUrl}&start=${start}&end=${end}`;
+    const apiUrl = `${this.victronApiUrl}&start=${start}&end=${end}`;
 
-      const response = await fetch(apiUrl, {
-        headers: headers,
-      });
+    const response = await fetch(apiUrl, {
+      headers: headers,
+    });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const jsonResponse = (await response.json()) as VictronResponse;
-
-      // add 50% more to account for Inverter as that would require an additional HTTP call, not worth it
-      return jsonResponse.records.vrm_pv_charger_yield_fc.map((value) =>
-        Math.floor(value[1]! * 1.5)
-      );
-    } catch (error) {
-      console.error("Error fetching solar forecast:", error);
-      throw error;
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const jsonResponse = (await response.json()) as VictronResponse;
+
+    // add 50% more to account for Inverter as that would require an additional HTTP call, not worth it
+    return jsonResponse.records.vrm_pv_charger_yield_fc.map((value) =>
+      Math.floor(value[1]! * 1.5)
+    );
   }
 }
 

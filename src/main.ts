@@ -1,5 +1,5 @@
 import { MqttClient } from "./mqtt-client.ts";
-import { logInfo, logError as _error } from "./logger.ts";
+import { logInfo, logError } from "./logger.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { HttpServer } from "./http-server.ts";
 import { Temporal } from "./temporal.ts";
@@ -32,7 +32,13 @@ class HomeAutomationApp {
 
   async start(): Promise<void> {
     try {
-      await logInfo("🏠 Starting Home Automation System...");
+      await logInfo(`
+    __  ______  __  _________   ___   __  ____________  __  ______  ______________  _   __
+   / / / / __ \\/  |/  / ____/  /   | / / / /_  __/ __ \\/  |/  /   |/_  __/  _/ __ \\/ | / /
+  / /_/ / / / / /|_/ / __/    / /| |/ / / / / / / / / / /|_/ / /| | / /  / // / / /  |/ / 
+ / __  / /_/ / /  / / /___   / ___ / /_/ / / / / /_/ / /  / / ___ |/ / _/ // /_/ / /|  /  
+/_/ /_/\\____/_/  /_/_____/  /_/  |_\\____/ /_/  \\____/_/  /_/_/  |_/_/ /___/\\____/_/ |_/   
+`);
 
       await this.mqttClient.connect();
       this.httpServer.start();
@@ -44,7 +50,7 @@ class HomeAutomationApp {
       await logInfo("✅ Home Automation System started successfully");
       this.setupGracefulShutdown();
     } catch (error) {
-      await _error(
+      await logError(
         `❌ Failed to start Home Automation System: ${String(error)}`
       );
       Deno.exit(1);
@@ -71,11 +77,9 @@ class HomeAutomationApp {
     });
 
     const loadForecastTask = new LoadForecastTask(this.metrics);
-    scheduler.cron(
-      "Load forecast solar",
-      "0 * * * *",
-      loadForecastTask.execute
-    );
+    scheduler.cron("Load forecast solar", "0 * * * *", () => {
+      loadForecastTask.execute();
+    });
 
     const loadOmieTask = new LoadOmieTask(this.metrics);
     scheduler.cron("Load omie", "0 * * * *", () => {
@@ -116,7 +120,7 @@ class HomeAutomationApp {
       }
       await logInfo("💾 Persistent storage loaded successfully");
     } catch (error) {
-      await _error(`❌ Failed to load persistent storage: ${String(error)}`);
+      await logError(`❌ Failed to load persistent storage: ${String(error)}`);
     }
   }
 
@@ -131,7 +135,7 @@ class HomeAutomationApp {
         await logInfo("✅ Shutdown complete");
         Deno.exit(0);
       } catch (error) {
-        await _error(`❌ Error during shutdown: ${String(error)}`);
+        await logError(`❌ Error during shutdown: ${String(error)}`);
         Deno.exit(1);
       }
     };
@@ -140,6 +144,22 @@ class HomeAutomationApp {
     Deno.addSignalListener("SIGTERM", shutdown);
   }
 }
+
+// Log uncaught exceptions and unhandled rejections
+Deno.addSignalListener("SIGUSR1", async () => {
+  await logError("Received SIGUSR1 - possible manual or system stop.");
+});
+Deno.addSignalListener("SIGUSR2", async () => {
+  await logError("Received SIGUSR2 - possible manual or system stop.");
+});
+
+addEventListener("unhandledrejection", async (event) => {
+  await logError(`Unhandled promise rejection: ${String(event.reason)}`);
+});
+
+addEventListener("error", async (event) => {
+  await logError(`Uncaught exception: ${String(event.error)}`);
+});
 
 if (import.meta.main) {
   const app = new HomeAutomationApp();
