@@ -37,10 +37,7 @@ Deno.test("parseOmieResponse should parse OMIE data correctly", () => {
 
   // Check that price has been processed through the formula
   // Original price was 22.98, should be transformed
-  // ((22.98 + 0.4 + 0.2893 + 1) * 1.16 + TAR_NIGHT * 10) * 1.23
-  // TAR_NIGHT = 1.57 for hour 0 (night tariff)
-  const expectedRawPrice =
-    ((22.98 + 0.4 + 0.2893 + 1) * 1.16 + 1.57 * 10) * 1.23;
+  const expectedRawPrice = ((22.98 + 0.09) * (1 + 0.16) + 1.49 * 10) * 1.23;
   const expectedPrice = Math.round(expectedRawPrice / 10);
   assertEquals(firstEntry.price, expectedPrice);
 

@@ -3,8 +3,10 @@ import { logError } from "../logger.ts";
 import { Temporal } from "../temporal.ts";
 
 const OMIE_API_URL = `https://www.omie.es/sites/default/files/dados/NUEVA_SECCION/INT_PBC_EV_H_ACUM.TXT`;
-const TAR_NIGHT = 1.57;
-const TAR_DAY = 8.6;
+const TAR_NIGHT = 1.49;
+const TAR_DAY = 8.3;
+const MARGEM_COOPERNICO = 0.09; // 9 cents per kWh margin for Coopernico customers
+const PERFIL_PERDA = 0.16; // 16% loss profile
 
 export async function fetchOmie(): Promise<string> {
   try {
@@ -52,9 +54,10 @@ export function parseOmieResponse(
       tarCents = TAR_DAY;
     }
 
-    // ((OMIE + CGS + TSE + k) x (1+FP) + TAR) x IVA
+    // ((OMIE + k) x (1+FP) + TAR) x IVA
     const formulaResult =
-      ((entry.price + 0.4 + 0.2893 + 1) * 1.16 + tarCents * 10) * 1.23;
+      ((entry.price + MARGEM_COOPERNICO) * (1 + PERFIL_PERDA) + tarCents * 10) *
+      1.23;
 
     // convert to cents per kWh
     return { date: entry.date, price: Math.round(formulaResult / 10) };
