@@ -121,8 +121,8 @@ function calculateBatteryChargePower(
   }
 
   const target =
-    state.batterySOC >= state.batteryMinSOC - 1
-      ? 0
+    state.batterySOC >= state.batteryMinSOC
+      ? MAX_BATTERY_CHARGE_POWER
       : (state.batteryPower ?? 0) +
         ampsToPower(MAX_GRID_CURRENT) -
         ampsToPower(consumptionAmpsIncrease) -
