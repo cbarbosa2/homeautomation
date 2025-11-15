@@ -3,60 +3,71 @@ import { parseOmieResponse } from "./omie-proxy.ts";
 import { Temporal } from "../temporal.ts";
 
 // Test data that simulates OMIE CSV format
-const sampleOmieData = `OMIE - Mercado de electricidad;Fecha Emisión :14/09/2025 - 13:56;;15/09/2025;Precios y volúmenes del mercado diario;;;;
+const sampleOmieData = `OMIE - Mercado de electricidad;Fecha Emisión :14/11/2025 - 13:10;;15/11/2025;Precios y volúmenes del mercado diario;;;;
 
-Fecha;Periodo;Precio marginal en el sistema español (EUR/MWh);Precio marginal en el sistema portugués (EUR/MWh);Energía total de compra sistema español (MWh);Energía total de venta sistema español (MWh);Energía total de compra sistema portugués (MWh);Energía total de venta sistema portugués (MWh);Energía total de compra del mercado Ibérico (MWh);Energía total de venta del mercado Ibérico (MWh);Energía total con bilaterales del mercado Ibérico (MWh);
-15/09/2025;1;97,03;97,03;15675,5;13466,3;5073,6;4982,8;20749,1;18449,1;28727,3;
-15/09/2025;2;94,95;94,95;15168,5;13586,6;4816;4097,9;19984,5;17684,5;27035,5;
-15/09/2025;3;90;90;14622,3;13443;4577;3456,3;19199,3;16899,3;25920,9;
-15/09/2025;4;89;89;14570,5;13295,9;4400,3;3374,9;18970,8;16670,8;25524,2;
-15/09/2025;5;87,82;87,82;14544,1;13319;4328,5;3253,6;18872,6;16572,6;25328,9;
-15/09/2025;6;94,17;94,17;14111,8;12637;4309,1;3483,9;18420,9;16120,9;25587,5;
-15/09/2025;7;97,33;97,33;15722,2;13155,3;4406;4672,9;20128,2;17828,2;28095,4;
-15/09/2025;8;120,83;120,83;17850,6;13679;4833,6;6705,2;22684,2;20384,2;31161,5;`;
+Fecha;Periodo;Precio marginal en el sistema español (EUR/MWh);Precio marginal en el sistema portugués (EUR/MWh);Potencia total de compra sistema español (MW);Potencia total de venta sistema español (MW);Potencia total de compra sistema portugués (MW);Potencia total de venta sistema portugués (MW);Potencia total de compra del mercado Ibérico (MW);Potencia total de venta del mercado Ibérico (MW);Potencia total con bilaterales del mercado Ibérico (MW);
+15/11/2025;1;31,5;31,5;19027,4;18635,4;5871,2;5267,6;24898,6;23903;32041,3;
+15/11/2025;2;22,2;22,2;19169,4;18705,1;5815;5135,8;24984,4;23840,9;32084;
+15/11/2025;3;21,14;21,14;19176,8;18792,7;5690,7;5147,1;24867,5;23939,8;31888,1;
+15/11/2025;4;17,11;17,11;19663,3;18877,4;5753,6;5110,4;25416,9;23987,8;32365,6;
+15/11/2025;5;23,04;23,04;21027,1;21638,8;5371,5;5147,9;26398,6;26786,7;30466,2;
+15/11/2025;6;19,1;19,1;21601,9;21532;5297,3;5138,6;26899,2;26670,6;30967,6;
+15/11/2025;7;19,51;19,51;21002,3;21443,4;5198,8;5136,5;26201,1;26579,9;30263,2;
+15/11/2025;8;17,37;17,37;21267,8;21369,7;5134,2;5092;26402;26461,7;30439,5;
+15/11/2025;41;33;33;22732,7;25116,9;5453;5281,7;28185,7;30398,6;33088,9;
+15/11/2025;42;21,8;21,8;23643,1;25465;5613;5155,7;29256,1;30620,7;34230;
+15/11/2025;43;23,98;23,98;23557,6;25784,9;5659,9;5112,6;29217,5;30897,5;34242,4;
+15/11/2025;44;18,49;18,49;24375,7;26040,6;5701,8;5132,5;30077,5;31173,1;35142,5;`;
 
-Deno.test("parseOmie should parse OMIE data correctly", () => {
-  const entries = parseOmieResponse(
-    sampleOmieData,
-    new Temporal.PlainDateTime(2025, 9, 15)
-  );
+Deno.test("parseOmieResponse should parse OMIE data correctly", () => {
+  const startOfToday = new Temporal.PlainDateTime(2025, 11, 14, 0, 0, 0);
 
-  // the first entry is discarded because it's in the previous day
-  assertEquals(entries.length, 7);
+  const result = parseOmieResponse(sampleOmieData, startOfToday);
 
-  // Check first entry
-  const firstEntry = entries[0]!;
-  assertEquals(firstEntry.date.day, 15);
-  assertEquals(firstEntry.date.month, 9);
+  // Should have 3 entries
+  assertEquals(result.length, 3);
+
+  // Check first entry (period 1 = hour 0, offset -1 = hour 23 of previous day)
+  // But since we're filtering >= startOfToday, this should be the first valid entry
+  const firstEntry = result[0]!;
   assertEquals(firstEntry.date.year, 2025);
-  assertEquals(firstEntry.date.hour, 0);
+  assertEquals(firstEntry.date.month, 11);
+  assertEquals(firstEntry.date.day, 14); // Previous day due to -1 hour offset
+  assertEquals(firstEntry.date.hour, 23); // Period 1 becomes hour 0, then -1 = 23
 
-  assertEquals(firstEntry.price, 16);
+  // Check that price has been processed through the formula
+  // Original price was 22.98, should be transformed
+  // ((22.98 + 0.4 + 0.2893 + 1) * 1.16 + TAR_NIGHT * 10) * 1.23
+  // TAR_NIGHT = 1.57 for hour 0 (night tariff)
+  const expectedRawPrice =
+    ((22.98 + 0.4 + 0.2893 + 1) * 1.16 + 1.57 * 10) * 1.23;
+  const expectedPrice = Math.round(expectedRawPrice / 10);
+  assertEquals(firstEntry.price, expectedPrice);
+
+  // Check last entry
+  const lastEntry = result[result.length - 1]!;
+  assertEquals(lastEntry.date.hour, 9);
+
+  // Verify entries are sorted by date
+  for (let i = 1; i < result.length; i++) {
+    const comparison = Temporal.PlainDateTime.compare(
+      result[i - 1]!.date,
+      result[i]!.date
+    );
+    assertEquals(comparison <= 0, true, "Entries should be sorted by date");
+  }
 });
 
-// Deno.test("parseOmie should handle time zone conversion correctly", () => {
-//   // Hour 01 should become hour 23 of previous day (01 - 2 = -1)
-//   const data = "01/01/2025;01;01;45.67;0;0;0;0;0";
-//   const entries = parseOmieResponse(data);
+Deno.test("parseOmieResponse should filter entries before startOfToday", () => {
+  const response = `15/11/2025;1;31,5;31,5;19027,4;18635,4;5871,2;5267,6;24898,6;23903;32041,3;
+16/11/2025;5;25,0;25,0;19027,4;18635,4;5871,2;5267,6;24898,6;23903;32041,3;`;
 
-//   if (entries.length > 0) {
-//     const entry = entries[0]!;
-//     assertEquals(entry.date.hour, 23);
-//     assertEquals(entry.date.day, 31); // Should be previous day
-//     assertEquals(entry.date.month, 12); // Should be previous month
-//     assertEquals(entry.date.year, 2024); // Should be previous year
-//   }
-// });
+  // Set startOfToday to 16/11/2025, so 15/11/2025 entries should be filtered out
+  const startOfToday = new Temporal.PlainDateTime(2025, 11, 16, 0, 0, 0);
 
-// Deno.test("parseOmie should apply correct tariffs", () => {
-//   const nightData = "01/01/2025;24;01;45.67;0;0;0;0;0"; // Hour 22 after conversion
-//   const dayData = "01/01/2025;12;01;45.67;0;0;0;0;0"; // Hour 10 after conversion
+  const result = parseOmieResponse(response, startOfToday);
 
-//   const nightEntries = parseOmieResponse(nightData);
-//   const dayEntries = parseOmieResponse(dayData);
-
-//   // Night entry should have lower total price due to lower tariff
-//   // but we need to account for the formula complexity
-//   assertEquals(nightEntries.length > 0, true);
-//   assertEquals(dayEntries.length > 0, true);
-// });
+  // Should only have 1 entry (the 16/11/2025 one)
+  assertEquals(result.length, 1);
+  assertEquals(result[0]!.date.day, 16);
+});

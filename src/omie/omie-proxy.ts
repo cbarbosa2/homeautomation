@@ -38,25 +38,56 @@ export function parseOmieResponse(
     }
   }
 
-  entries.sort(function (a, b) {
+  const averagedEntries = createAveragedEntries(entries);
+
+  averagedEntries.sort(function (a, b) {
     return Temporal.PlainDateTime.compare(a.date, b.date);
   });
 
-  entries.forEach(function (entry) {
+  const resultEntries = averagedEntries.map((entry) => {
     let tarCents = 0;
     if (entry.date.hour >= 22 || entry.date.hour < 8) {
       tarCents = TAR_NIGHT;
     } else {
       tarCents = TAR_DAY;
     }
+
     // ((OMIE + CGS + TSE + k) x (1+FP) + TAR) x IVA
     const formulaResult =
       ((entry.price + 0.4 + 0.2893 + 1) * 1.16 + tarCents * 10) * 1.23;
+
     // convert to cents per kWh
-    entry.price = Math.round(formulaResult / 10);
+    return { date: entry.date, price: Math.round(formulaResult / 10) };
   });
 
-  return entries;
+  return resultEntries;
+}
+
+function createAveragedEntries(entries: OmieEntry[]): OmieEntry[] {
+  const averagedEntries: OmieEntry[] = [];
+  const dateTimeGroups = new Map<string, OmieEntry[]>();
+
+  // Group entries by full PlainDateTime
+  entries.forEach((entry) => {
+    const dateTimeKey = entry.date.toString();
+    if (!dateTimeGroups.has(dateTimeKey)) {
+      dateTimeGroups.set(dateTimeKey, []);
+    }
+    dateTimeGroups.get(dateTimeKey)!.push(entry);
+  });
+
+  // Calculate average price for each date-time group
+  dateTimeGroups.forEach((groupEntries) => {
+    const averagePrice =
+      groupEntries.reduce((sum, entry) => sum + entry.price, 0) /
+      groupEntries.length;
+    averagedEntries.push({
+      date: groupEntries[0]!.date,
+      price: averagePrice,
+    });
+  });
+
+  return averagedEntries;
 }
 
 function parseDate(input: string): Temporal.PlainDate | undefined {
@@ -83,7 +114,7 @@ function parseLine(line: string): OmieEntry | undefined {
   if (!date) return undefined;
 
   const dateTime = date
-    .toPlainDateTime({ hour: parseInt(parts[1]!) - 1 })
+    .toPlainDateTime({ hour: Math.floor((parseInt(parts[1]!) - 1) / 4) })
     // offset spain to portugal
     .add({ hours: -1 });
 
