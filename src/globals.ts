@@ -55,9 +55,10 @@ export interface GlobalState {
   batteryMaxChargePower: number | undefined;
   pvInverterPower: number | undefined;
   pvChargerPower: number | undefined;
-  wallboxPower: Map<WallboxLocation, number>;
+  wallboxPower: Map<WallboxLocation, number>; // power in watts
+  wallboxCurrent: Map<WallboxLocation, number>; // current in amps
   wallboxVictronStatus: Map<WallboxLocation, WallboxStatus>;
-  wallboxSetCurrent: Map<WallboxLocation, number>;
+  wallboxSetCurrent: Map<WallboxLocation, number>; // target current in amps
   wallboxChargeMode: Map<WallboxLocation, WallboxChargeMode>;
 }
 
@@ -77,6 +78,7 @@ export const globals: GlobalState = {
   pvInverterPower: undefined,
   pvChargerPower: undefined,
   wallboxPower: new Map(),
+  wallboxCurrent: new Map(),
   wallboxVictronStatus: new Map(),
   wallboxSetCurrent: new Map(),
   wallboxChargeMode: new Map([

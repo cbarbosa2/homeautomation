@@ -15,19 +15,50 @@ export interface SystemState {
   wallboxVictronStatus: Map<WallboxLocation, WallboxStatus>;
 }
 
+const MAX_HISTORY_TARGET_AMPS = 3;
+
 export class PowerController {
   private mqttClient: MqttClient;
+  private insideWallboxLastTargetAmps: (number | undefined)[];
+  private outsideWallboxLastTargetAmps: (number | undefined)[];
 
   constructor(mqttClient: MqttClient) {
     this.mqttClient = mqttClient;
+    this.insideWallboxLastTargetAmps = [];
+    this.outsideWallboxLastTargetAmps = [];
   }
 
-  pushPowerSettings(state: SystemState, targets: CalculatedTargetResults) {
+  applyPowerSettings(state: SystemState, targets: CalculatedTargetResults) {
+    function addToList(
+      list: (number | undefined)[],
+      value: number | undefined
+    ) {
+      list.push(value);
+      if (list.length > MAX_HISTORY_TARGET_AMPS) {
+        list.shift();
+      }
+    }
+
+    function getMinFromList(list: (number | undefined)[]): number | undefined {
+      return list.reduce((previous, current) => {
+        if (previous === undefined) return current;
+        if (current === undefined) return previous;
+        return Math.min(previous, current);
+      }, undefined);
+    }
+
+    addToList(this.insideWallboxLastTargetAmps, targets.insideWallboxAmps);
+    addToList(this.outsideWallboxLastTargetAmps, targets.outsideWallboxAmps);
+
     const insideWallboxPower = state.wallboxPower.get(WallboxLocation.Inside);
+
+    const targetInsideWallboxAmps = getMinFromList(
+      this.insideWallboxLastTargetAmps
+    );
 
     this.setWallboxAmps(
       WallboxLocation.Inside,
-      targets.insideWallboxAmps,
+      targetInsideWallboxAmps,
       insideWallboxPower == undefined
         ? undefined
         : powerToAmps(insideWallboxPower),
@@ -36,9 +67,13 @@ export class PowerController {
 
     const outsideWallboxPower = state.wallboxPower.get(WallboxLocation.Outside);
 
+    const targetOutsideWallboxAmps = getMinFromList(
+      this.outsideWallboxLastTargetAmps
+    );
+
     this.setWallboxAmps(
       WallboxLocation.Outside,
-      targets.outsideWallboxAmps,
+      targetOutsideWallboxAmps,
       outsideWallboxPower == undefined
         ? undefined
         : powerToAmps(outsideWallboxPower),

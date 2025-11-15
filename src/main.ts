@@ -69,11 +69,13 @@ class HomeAutomationApp {
         ...globals,
         hourOfDay: Temporal.Now.plainDateTimeISO().hour,
       };
+
       const result = calculateTargetAmpsAndPriority(inputState);
+
       globals.primaryWallboxLocation =
         result.newPrimaryWallboxLocation ?? globals.primaryWallboxLocation;
 
-      powerPublisher.pushPowerSettings(globals, result);
+      powerPublisher.applyPowerSettings(globals, result);
     });
 
     const loadForecastTask = new LoadForecastTask(this.metrics);

@@ -144,10 +144,20 @@ export const METRICS = {
       title: "Inside Wallbox Current",
       description: "Inside wallbox current (A)",
     },
+    ESS_WALLBOX_INSIDE_SET_CURRENT: {
+      name: "ess_wallbox_inside_set_current",
+      title: "Inside Wallbox Set Current",
+      description: "Inside wallbox set current (A)",
+    },
     ESS_WALLBOX_OUTSIDE_CURRENT: {
       name: "ess_wallbox_outside_current",
       title: "Outside Wallbox Current",
       description: "Outside wallbox current (A)",
+    },
+    ESS_WALLBOX_OUTSIDE_SET_CURRENT: {
+      name: "ess_wallbox_outside_set_current",
+      title: "Outside Wallbox Set Current",
+      description: "Outside wallbox set current (A)",
     },
     ESS_WALLBOX_INSIDE_CHARGE_MODE: {
       name: "ess_wallbox_inside_charge_mode",

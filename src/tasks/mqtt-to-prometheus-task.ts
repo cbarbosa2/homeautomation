@@ -115,16 +115,30 @@ export class MqttToPrometheusTask {
       }
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/evcharger/40/SetCurrent",
+      "N/102c6b9cfab9/evcharger/40/Current",
       METRICS.GAUGES.ESS_WALLBOX_INSIDE_CURRENT,
+      (value) => {
+        globals.wallboxCurrent.set(WallboxLocation.Inside, value ?? 0);
+      }
+    );
+    this.subscribeAndAssignToGauge(
+      "N/102c6b9cfab9/evcharger/40/SetCurrent",
+      METRICS.GAUGES.ESS_WALLBOX_INSIDE_SET_CURRENT,
       (value) => {
         globals.wallboxSetCurrent.set(WallboxLocation.Inside, value ?? 0);
         events.wallboxCurrentInsideUpdated.emit(value ?? 0);
       }
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/evcharger/41/SetCurrent",
+      "N/102c6b9cfab9/evcharger/41/Current",
       METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_CURRENT,
+      (value) => {
+        globals.wallboxCurrent.set(WallboxLocation.Outside, value ?? 0);
+      }
+    );
+    this.subscribeAndAssignToGauge(
+      "N/102c6b9cfab9/evcharger/41/SetCurrent",
+      METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_SET_CURRENT,
       (value) => {
         globals.wallboxSetCurrent.set(WallboxLocation.Outside, value ?? 0);
         events.wallboxCurrentOutsideUpdated.emit(value ?? 0);
