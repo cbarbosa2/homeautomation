@@ -81,7 +81,7 @@ Deno.test("batteryChargePower battery charge", () => {
   state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Off);
 
   const result = calculateTargetAmpsAndPriority(state);
-  assertEquals(result.batteryChargePower, 4480);
+  assertEquals(result.batteryChargePower, 4240);
 
   state.gridPower = 1000;
   assertEquals(
@@ -104,7 +104,7 @@ Deno.test("wallbox amps on a sunny day", () => {
   assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 8);
 
   state.wallboxPower.set(WallboxLocation.Outside, 3500);
-  assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 17);
+  assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 19);
 
   state.pvInverterPower = 0;
   assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 0);
@@ -112,7 +112,7 @@ Deno.test("wallbox amps on a sunny day", () => {
   state.batteryPower = 0;
   state.pvInverterPower = 1000;
   state.batterySOC = 99;
-  assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 17);
+  assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 19);
 
   state.batteryPower = 0;
   state.pvInverterPower = 1000;

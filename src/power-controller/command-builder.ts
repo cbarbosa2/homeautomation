@@ -1,13 +1,7 @@
-import {
-  POWER_CONTROL_ENABLED,
-  TARGET_AMPS_MIN_START,
-  TARGET_AMPS_MIN_STOP,
-} from "../constants.ts";
+import { TARGET_AMPS_MIN_START, TARGET_AMPS_MIN_STOP } from "../constants.ts";
 import { WallboxLocation, WallboxStatus } from "../globals.ts";
-import { logInfo } from "../logger.ts";
-import { MqttClient } from "../mqtt-client.ts";
 import { powerToAmps } from "../utils.ts";
-import { CalculatedTargetResults } from "./dynamic-power-calculator.ts";
+import { CalculatedTargetResults as SystemTargetValues } from "./dynamic-power-calculator.ts";
 
 export interface SystemState {
   batteryMaxChargePower: number | undefined;
@@ -17,18 +11,20 @@ export interface SystemState {
 
 const MAX_HISTORY_TARGET_AMPS = 3;
 
-export class PowerController {
-  private mqttClient: MqttClient;
+export class CommandBuilder {
   private insideWallboxLastTargetAmps: (number | undefined)[];
   private outsideWallboxLastTargetAmps: (number | undefined)[];
 
-  constructor(mqttClient: MqttClient) {
-    this.mqttClient = mqttClient;
+  constructor() {
     this.insideWallboxLastTargetAmps = [];
     this.outsideWallboxLastTargetAmps = [];
   }
 
-  applyPowerSettings(state: SystemState, targets: CalculatedTargetResults) {
+  // beware of side effects: this method depends on internal state to smooth commands
+  createCommandsFromPowerSettings(
+    state: SystemState,
+    targets: SystemTargetValues
+  ): PowerCommand[] {
     function addToList(
       list: (number | undefined)[],
       value: number | undefined
@@ -56,13 +52,17 @@ export class PowerController {
       this.insideWallboxLastTargetAmps
     );
 
-    this.setWallboxAmps(
-      WallboxLocation.Inside,
-      targetInsideWallboxAmps,
-      insideWallboxPower == undefined
-        ? undefined
-        : powerToAmps(insideWallboxPower),
-      state.wallboxVictronStatus.get(WallboxLocation.Inside)
+    const commands: PowerCommand[] = [];
+
+    commands.push(
+      ...this.createWallboxCommands(
+        WallboxLocation.Inside,
+        targetInsideWallboxAmps,
+        insideWallboxPower == undefined
+          ? undefined
+          : powerToAmps(insideWallboxPower),
+        state.wallboxVictronStatus.get(WallboxLocation.Inside)
+      )
     );
 
     const outsideWallboxPower = state.wallboxPower.get(WallboxLocation.Outside);
@@ -71,30 +71,34 @@ export class PowerController {
       this.outsideWallboxLastTargetAmps
     );
 
-    this.setWallboxAmps(
-      WallboxLocation.Outside,
-      targetOutsideWallboxAmps,
-      outsideWallboxPower == undefined
-        ? undefined
-        : powerToAmps(outsideWallboxPower),
-      state.wallboxVictronStatus.get(WallboxLocation.Outside)
+    commands.push(
+      ...this.createWallboxCommands(
+        WallboxLocation.Outside,
+        targetOutsideWallboxAmps,
+        outsideWallboxPower == undefined
+          ? undefined
+          : powerToAmps(outsideWallboxPower),
+        state.wallboxVictronStatus.get(WallboxLocation.Outside)
+      )
     );
 
     if (
       targets.batteryChargePower != undefined &&
       targets.batteryChargePower != state.batteryMaxChargePower
     ) {
-      this.publishBatteryMaxChargePower(targets.batteryChargePower);
+      commands.push(this.createBatteryCommand(targets.batteryChargePower));
     }
+
+    return commands;
   }
 
-  private setWallboxAmps(
+  private createWallboxCommands(
     location: WallboxLocation,
     targetAmps: number | undefined,
     currentAmps: number | undefined,
     chargerStatus: WallboxStatus | undefined
-  ) {
-    if (targetAmps == undefined || targetAmps == currentAmps) return;
+  ): PowerCommand[] {
+    if (targetAmps == undefined || targetAmps == currentAmps) return [];
 
     let newStartStop;
     let newCurrent;
@@ -122,49 +126,57 @@ export class PowerController {
       newCurrent = targetAmps;
     }
 
-    this.publishWallboxCurrent(location, newCurrent);
-    this.publishWallboxStartStop(location, newStartStop);
+    return [
+      this.createWallboxCurrentCommand(location, newCurrent),
+      this.createWallboxStartStopCommand(location, newStartStop),
+    ].filter((cmd) => cmd !== undefined);
   }
 
-  private publishWallboxCurrent(
+  private createWallboxCurrentCommand(
     location: WallboxLocation,
     current: number | undefined
-  ) {
-    if (current != undefined) {
-      logInfo(`Current of ${WallboxLocation[location]} Wallbox -> ${current}`);
-      const topic =
-        location == WallboxLocation.Inside
-          ? "W/102c6b9cfab9/evcharger/40/SetCurrent"
-          : "W/102c6b9cfab9/evcharger/41/SetCurrent";
-      if (POWER_CONTROL_ENABLED) {
-        this.mqttClient.publishJson(topic, { value: current });
-      }
+  ): PowerCommand | undefined {
+    if (current == undefined) {
+      return;
+    } else {
+      return {
+        type: location == WallboxLocation.Inside ? "InsideAmps" : "OutsideAmps",
+        value: current,
+      };
     }
   }
 
-  private publishWallboxStartStop(
+  private createWallboxStartStopCommand(
     location: WallboxLocation,
     startStop: number | undefined
-  ) {
-    if (startStop != undefined) {
-      logInfo(
-        `Start/stop of ${WallboxLocation[location]} Wallbox -> ${startStop}`
-      );
-      const topic =
-        location == WallboxLocation.Inside
-          ? "W/102c6b9cfab9/evcharger/40/StartStop"
-          : "W/102c6b9cfab9/evcharger/41/StartStop";
-      if (POWER_CONTROL_ENABLED) {
-        this.mqttClient.publishJson(topic, { value: startStop });
-      }
+  ): PowerCommand | undefined {
+    if (startStop == undefined) {
+      return;
+    } else {
+      return {
+        type:
+          location == WallboxLocation.Inside
+            ? "InsideStartStop"
+            : "OutsideStartStop",
+        value: startStop,
+      };
     }
   }
 
-  private publishBatteryMaxChargePower(power: number) {
-    logInfo(`Battery max charge power -> ${power}`);
-    const topic = "W/102c6b9cfab9/settings/0/Settings/CGwacs/MaxChargePower";
-    if (POWER_CONTROL_ENABLED) {
-      this.mqttClient.publishJson(topic, { value: power });
-    }
+  private createBatteryCommand(power: number): PowerCommand {
+    return {
+      type: "BatteryMaxChargePower",
+      value: power,
+    };
   }
+}
+
+export interface PowerCommand {
+  type:
+    | "InsideAmps"
+    | "InsideStartStop"
+    | "OutsideAmps"
+    | "OutsideStartStop"
+    | "BatteryMaxChargePower";
+  value: number;
 }

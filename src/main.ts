@@ -10,10 +10,11 @@ import { scheduler } from "./task-scheduler.ts";
 import { MqttToPrometheusTask } from "./tasks/mqtt-to-prometheus-task.ts";
 import { SetSocLimitTask } from "./tasks/set-soc-limit-task.ts";
 import { ChargeModeSwitcher } from "./tasks/charge-mode-switcher.ts";
-import { calculateTargetAmpsAndPriority } from "./tasks/dynamic-power-calculator.ts";
+import { calculateTargetAmpsAndPriority } from "./power-controller/dynamic-power-calculator.ts";
 import { globals, WallboxLocation } from "./globals.ts";
-import { PowerController } from "./tasks/power-controller.ts";
 import { loadPersistentStorage } from "./persistent-storage.ts";
+import { runCommands } from "./power-controller/power-controller.ts";
+import { CommandBuilder } from "./power-controller/command-builder.ts";
 
 const AWAKE_MQTT_INTERVAL_SECONDS = 30;
 const DYNAMIC_POWER_INTERVAL_SECONDS = 5;
@@ -63,7 +64,7 @@ class HomeAutomationApp {
       mqttAwakeTask.execute();
     });
 
-    const powerPublisher = new PowerController(this.mqttClient);
+    const powerCommandGenerator = new CommandBuilder();
     scheduler.interval("Dynamic power", DYNAMIC_POWER_INTERVAL_SECONDS, () => {
       const inputState = {
         ...globals,
@@ -75,7 +76,12 @@ class HomeAutomationApp {
       globals.primaryWallboxLocation =
         result.newPrimaryWallboxLocation ?? globals.primaryWallboxLocation;
 
-      powerPublisher.applyPowerSettings(globals, result);
+      const commands = powerCommandGenerator.createCommandsFromPowerSettings(
+        globals,
+        result
+      );
+
+      runCommands(commands, this.mqttClient);
     });
 
     const loadForecastTask = new LoadForecastTask(this.metrics);
