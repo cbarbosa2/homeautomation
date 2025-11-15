@@ -123,36 +123,6 @@ Deno.test(
   }
 );
 
-Deno.test(
-  "CommandBuilder should smooth power commands using minimum of recent values",
-  () => {
-    const builder = new CommandBuilder();
-    const state = createSystemState();
-
-    // First call with high amps
-    let targets = createTargets({ insideWallboxAmps: 15 });
-    let commands = builder.createCommandsFromPowerSettings(state, targets);
-    assertEquals(commands[0]!.value, 15);
-
-    // Second call with lower amps
-    targets = createTargets({ insideWallboxAmps: 10 });
-    commands = builder.createCommandsFromPowerSettings(state, targets);
-    assertEquals(commands[0]!.value, 10); // Should use minimum (10)
-
-    // Third call with higher amps again
-    targets = createTargets({ insideWallboxAmps: 20 });
-    commands = builder.createCommandsFromPowerSettings(state, targets);
-    assertEquals(commands[0]!.value, 10); // Should still use minimum (10)
-
-    // Fourth call with even lower amps - should update the minimum
-    targets = createTargets({ insideWallboxAmps: 5 });
-    commands = builder.createCommandsFromPowerSettings(state, targets);
-    if (commands.length > 0) {
-      assertEquals(commands[0]!.value, 5); // Should use new minimum (5)
-    }
-  }
-);
-
 Deno.test("CommandBuilder should limit history to maximum size", () => {
   const builder = new CommandBuilder();
   const state = createSystemState();

@@ -4,8 +4,6 @@ import {
   MAX_BATTERY_CHARGE_POWER,
   MAX_GRID_CURRENT,
   MIN_BATTERY_CHARGE_POWER,
-  TARGET_AMPS_MAX_INCREASE,
-  TARGET_AMPS_MIN_START,
 } from "../constants.ts";
 import {
   WallboxChargeMode,
@@ -55,7 +53,7 @@ export function calculateTargetAmpsAndPriority(
     primaryWallboxTargetValues.amps != undefined
       ? coerceTargetAmps(
           primaryWallboxLocation,
-          powerToAmps(state.wallboxPower.get(primaryWallboxLocation) ?? 0),
+          // powerToAmps(state.wallboxPower.get(primaryWallboxLocation) ?? 0),
           primaryWallboxTargetValues.amps
         )
       : undefined;
@@ -81,7 +79,7 @@ export function calculateTargetAmpsAndPriority(
     secondaryWallboxTargetValues.amps != undefined
       ? coerceTargetAmps(
           secondaryWallboxLocation,
-          powerToAmps(state.wallboxPower.get(secondaryWallboxLocation) ?? 0),
+          // powerToAmps(state.wallboxPower.get(secondaryWallboxLocation) ?? 0),
           secondaryWallboxTargetValues.amps
         )
       : undefined;
@@ -141,14 +139,9 @@ function calculateBatteryChargePower(
   );
 }
 
-function coerceTargetAmps(
-  location: WallboxLocation,
-  existingAmps: number,
-  newAmps: number
-): number {
+function coerceTargetAmps(location: WallboxLocation, newAmps: number): number {
   return Math.min(
     Math.max(0, newAmps),
-    Math.max(TARGET_AMPS_MIN_START, existingAmps + TARGET_AMPS_MAX_INCREASE),
     MAX_AMPS_PER_LOCATION.get(location) ?? 0
   );
 }
