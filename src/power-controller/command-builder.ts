@@ -22,7 +22,7 @@ export class CommandBuilder {
   }
 
   // beware of side effects: this method depends on internal state to smooth commands
-  createCommandsFromPowerSettings(
+  public createCommandsFromPowerSettings(
     state: SystemState,
     targets: SystemTargetValues
   ): PowerCommand[] {

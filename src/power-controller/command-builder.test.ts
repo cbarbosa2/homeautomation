@@ -1,7 +1,8 @@
 import { assertEquals } from "jsr:@std/assert";
-import { CommandBuilder, SystemState } from "./command-builder.ts";
 import { WallboxLocation, WallboxStatus } from "../globals.ts";
 import { CalculatedTargetResults } from "./dynamic-power-calculator.ts";
+import { CommandBuilder, SystemState } from "./command-builder.ts";
+import { CommandType } from "./power-controller.ts";
 
 function createSystemState(overrides?: Partial<SystemState>): SystemState {
   return {
@@ -36,7 +37,7 @@ Deno.test("CommandBuilder should create wallbox current commands", () => {
   const commands = builder.createCommandsFromPowerSettings(state, targets);
 
   assertEquals(commands.length, 1);
-  assertEquals(commands[0]!.type, CommandType.InsideAmps);
+  assertEquals(commands[0]!.type, CommandType.InsideCurrent);
   assertEquals(commands[0]!.value, 15);
 });
 
@@ -58,7 +59,7 @@ Deno.test("CommandBuilder should create start/stop commands", () => {
     (cmd) => cmd.type === CommandType.InsideStartStop
   );
   const currentCommand = commands.find(
-    (cmd) => cmd.type === CommandType.InsideAmps
+    (cmd) => cmd.type === CommandType.InsideCurrent
   );
 
   assertEquals(startStopCommand?.value, 1); // Start
@@ -83,7 +84,7 @@ Deno.test(
       (cmd) => cmd.type === CommandType.InsideStartStop
     );
     const currentCommand = commands.find(
-      (cmd) => cmd.type === CommandType.InsideAmps
+      (cmd) => cmd.type === CommandType.InsideCurrent
     );
 
     assertEquals(startStopCommand?.value, 0); // Stop
@@ -162,10 +163,10 @@ Deno.test(
 
     assertEquals(commands.length, 2);
     const insideCommand = commands.find(
-      (cmd) => cmd.type === CommandType.InsideAmps
+      (cmd) => cmd.type === CommandType.InsideCurrent
     );
     const outsideCommand = commands.find(
-      (cmd) => cmd.type === CommandType.OutsideAmps
+      (cmd) => cmd.type === CommandType.OutsideCurrent
     );
 
     assertEquals(insideCommand?.value, 15);
