@@ -2,8 +2,8 @@ import { HTTP_PORT } from "./constants.ts";
 import { logInfo, logError as _error, logError } from "./logger.ts";
 import { scheduler } from "./task-scheduler.ts";
 import { globals, WallboxLocation, WallboxChargeMode } from "./globals.ts";
-import { ChargeModeSwitcher } from "./tasks/charge-mode-switcher.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
+import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
 
 export class HttpServer {
   private server: Deno.HttpServer | null = null;
@@ -176,7 +176,7 @@ export class HttpServer {
         );
       }
 
-      new ChargeModeSwitcher(this.metrics).setChargeMode(location, value);
+      setChargeMode(this.metrics, location, value);
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { "Content-Type": "application/json" },

@@ -9,12 +9,13 @@ import { LoadOmieTask } from "./tasks/load-omie-task.ts";
 import { scheduler } from "./task-scheduler.ts";
 import { MqttToPrometheusTask } from "./tasks/mqtt-to-prometheus-task.ts";
 import { SetSocLimitTask } from "./tasks/set-soc-limit-task.ts";
-import { ChargeModeSwitcher } from "./tasks/charge-mode-switcher.ts";
 import { calculateTargetAmpsAndPriority } from "./power-controller/dynamic-power-calculator.ts";
 import { globals, WallboxLocation } from "./globals.ts";
 import { loadPersistentStorage } from "./persistent-storage.ts";
 import { runCommands } from "./power-controller/power-controller.ts";
 import { CommandBuilder } from "./power-controller/command-builder.ts";
+import { setupWallSwitchHandler } from "./charge-mode/wall-switch-handler.ts";
+import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
 
 const AWAKE_MQTT_INTERVAL_SECONDS = 30;
 const DYNAMIC_POWER_INTERVAL_SECONDS = 5;
@@ -46,7 +47,7 @@ class HomeAutomationApp {
 
       this.setupScheduledTasks();
 
-      new ChargeModeSwitcher(this.metrics).setupHandlers();
+      setupWallSwitchHandler(this.mqttClient, this.metrics);
 
       await logInfo("✅ Home Automation System started successfully");
       this.setupGracefulShutdown();
@@ -113,14 +114,11 @@ class HomeAutomationApp {
     try {
       const data = await loadPersistentStorage();
       if (data.inside != undefined) {
-        new ChargeModeSwitcher(this.metrics).setChargeMode(
-          WallboxLocation.Inside,
-          data.inside,
-          false
-        );
+        setChargeMode(this.metrics, WallboxLocation.Inside, data.inside, false);
       }
       if (data.outside != undefined) {
-        new ChargeModeSwitcher(this.metrics).setChargeMode(
+        setChargeMode(
+          this.metrics,
           WallboxLocation.Outside,
           data.outside,
           false

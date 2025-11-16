@@ -36,7 +36,7 @@ Deno.test("CommandBuilder should create wallbox current commands", () => {
   const commands = builder.createCommandsFromPowerSettings(state, targets);
 
   assertEquals(commands.length, 1);
-  assertEquals(commands[0]!.type, "InsideAmps");
+  assertEquals(commands[0]!.type, CommandType.InsideAmps);
   assertEquals(commands[0]!.value, 15);
 });
 
@@ -55,9 +55,11 @@ Deno.test("CommandBuilder should create start/stop commands", () => {
 
   assertEquals(commands.length, 2);
   const startStopCommand = commands.find(
-    (cmd) => cmd.type === "InsideStartStop"
+    (cmd) => cmd.type === CommandType.InsideStartStop
   );
-  const currentCommand = commands.find((cmd) => cmd.type === "InsideAmps");
+  const currentCommand = commands.find(
+    (cmd) => cmd.type === CommandType.InsideAmps
+  );
 
   assertEquals(startStopCommand?.value, 1); // Start
   assertEquals(currentCommand?.value, 8);
@@ -78,9 +80,11 @@ Deno.test(
 
     assertEquals(commands.length, 2);
     const startStopCommand = commands.find(
-      (cmd) => cmd.type === "InsideStartStop"
+      (cmd) => cmd.type === CommandType.InsideStartStop
     );
-    const currentCommand = commands.find((cmd) => cmd.type === "InsideAmps");
+    const currentCommand = commands.find(
+      (cmd) => cmd.type === CommandType.InsideAmps
+    );
 
     assertEquals(startStopCommand?.value, 0); // Stop
     assertEquals(currentCommand?.value, 8); // Set to minimum start current
@@ -101,7 +105,7 @@ Deno.test(
     const commands = builder.createCommandsFromPowerSettings(state, targets);
 
     assertEquals(commands.length, 1);
-    assertEquals(commands[0]!.type, "BatteryMaxChargePower");
+    assertEquals(commands[0]!.type, CommandType.BatteryMaxChargePower);
     assertEquals(commands[0]!.value, 1500);
   }
 );
@@ -157,8 +161,12 @@ Deno.test(
     const commands = builder.createCommandsFromPowerSettings(state, targets);
 
     assertEquals(commands.length, 2);
-    const insideCommand = commands.find((cmd) => cmd.type === "InsideAmps");
-    const outsideCommand = commands.find((cmd) => cmd.type === "OutsideAmps");
+    const insideCommand = commands.find(
+      (cmd) => cmd.type === CommandType.InsideAmps
+    );
+    const outsideCommand = commands.find(
+      (cmd) => cmd.type === CommandType.OutsideAmps
+    );
 
     assertEquals(insideCommand?.value, 15);
     assertEquals(outsideCommand?.value, 8);

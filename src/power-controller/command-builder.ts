@@ -2,6 +2,7 @@ import { TARGET_AMPS_MIN_START, TARGET_AMPS_MIN_STOP } from "../constants.ts";
 import { WallboxLocation, WallboxStatus } from "../globals.ts";
 import { powerToAmps } from "../utils.ts";
 import { CalculatedTargetResults as SystemTargetValues } from "./dynamic-power-calculator.ts";
+import { CommandType, PowerCommand } from "./power-controller.ts";
 
 export interface SystemState {
   batteryMaxChargePower: number | undefined;
@@ -140,7 +141,10 @@ export class CommandBuilder {
       return;
     } else {
       return {
-        type: location == WallboxLocation.Inside ? "InsideAmps" : "OutsideAmps",
+        type:
+          location == WallboxLocation.Inside
+            ? CommandType.InsideCurrent
+            : CommandType.OutsideCurrent,
         value: current,
       };
     }
@@ -156,8 +160,8 @@ export class CommandBuilder {
       return {
         type:
           location == WallboxLocation.Inside
-            ? "InsideStartStop"
-            : "OutsideStartStop",
+            ? CommandType.InsideStartStop
+            : CommandType.OutsideStartStop,
         value: startStop,
       };
     }
@@ -165,18 +169,8 @@ export class CommandBuilder {
 
   private createBatteryCommand(power: number): PowerCommand {
     return {
-      type: "BatteryMaxChargePower",
+      type: CommandType.BatteryMaxChargePower,
       value: power,
     };
   }
-}
-
-export interface PowerCommand {
-  type:
-    | "InsideAmps"
-    | "InsideStartStop"
-    | "OutsideAmps"
-    | "OutsideStartStop"
-    | "BatteryMaxChargePower";
-  value: number;
 }

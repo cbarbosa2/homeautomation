@@ -1,7 +1,19 @@
 import { POWER_CONTROL_ENABLED } from "../constants.ts";
 import { logInfo } from "../logger.ts";
 import { MqttClient } from "../mqtt-client.ts";
-import { PowerCommand } from "./command-builder.ts";
+
+export enum CommandType {
+  InsideCurrent = "InsideCurrent",
+  InsideStartStop = "InsideStartStop",
+  OutsideCurrent = "OutsideCurrent",
+  OutsideStartStop = "OutsideStartStop",
+  BatteryMaxChargePower = "BatteryMaxChargePower",
+}
+
+export interface PowerCommand {
+  type: CommandType;
+  value: number;
+}
 
 export function runCommands(commands: PowerCommand[], mqttClient: MqttClient) {
   for (const command of commands) {
@@ -18,15 +30,15 @@ export function runCommands(commands: PowerCommand[], mqttClient: MqttClient) {
 function getTopic(command: PowerCommand): string | undefined {
   const BASE = "W/102c6b9cfab9/";
   switch (command.type) {
-    case "InsideAmps":
+    case CommandType.InsideCurrent:
       return `${BASE}evcharger/40/SetCurrent`;
-    case "OutsideAmps":
+    case CommandType.OutsideCurrent:
       return `${BASE}evcharger/41/SetCurrent`;
-    case "InsideStartStop":
+    case CommandType.InsideStartStop:
       return `${BASE}evcharger/40/StartStop`;
-    case "OutsideStartStop":
+    case CommandType.OutsideStartStop:
       return `${BASE}evcharger/41/StartStop`;
-    case "BatteryMaxChargePower":
+    case CommandType.BatteryMaxChargePower:
       return `${BASE}settings/0/Settings/CGwacs/MaxChargePower`;
     default:
       return undefined;
