@@ -7,9 +7,13 @@
     "jsr:@std/internal@1": "1.0.10",
     "jsr:@std/internal@^1.0.10": "1.0.10",
     "npm:@js-temporal/polyfill@*": "0.5.1",
+    "npm:@js-temporal/polyfill@~0.5.1": "0.5.1",
+    "npm:@loglayer/transport-logflare@1": "1.0.7",
     "npm:@types/node@*": "22.15.15",
+    "npm:loglayer@latest": "8.0.2",
     "npm:mqtt@^5.10.1": "5.14.0",
-    "npm:prom-client@^15.1.0": "15.1.3"
+    "npm:prom-client@^15.1.0": "15.1.3",
+    "npm:serialize-error@9": "9.1.1"
   },
   "jsr": {
     "@std/assert@0.225.3": {
@@ -39,6 +43,45 @@
       "integrity": "sha512-hloP58zRVCRSpgDxmqCWJNlizAlUgJFqG2ypq79DCvyv9tHjRYMDOcPFjzfl/A1/YxDvRCZz8wvZvmapQnKwFQ==",
       "dependencies": [
         "jsbi"
+      ]
+    },
+    "@loglayer/context-manager@1.1.11": {
+      "integrity": "sha512-/7nMCgkY158A2x8IOr4/SuEwINXdiOre6kLCAPbHQyJbFBAGFSrZV1MKaujeeKDVOyWoyRDMAClosD8Q/3Shpg==",
+      "dependencies": [
+        "@loglayer/shared"
+      ]
+    },
+    "@loglayer/log-level-manager@1.0.1": {
+      "integrity": "sha512-iEHeR9u1n3IJgxnZbAXhIO8ohK/WfwBUPvnlz0s7FDMZUc9XeYDbUdNPzXv8ZCmrfmu0PlCSPBXFeMrKskLZQw==",
+      "dependencies": [
+        "@loglayer/shared"
+      ]
+    },
+    "@loglayer/plugin@2.2.3": {
+      "integrity": "sha512-0/BmEc0K4rzHe2QepqKior+T8qdLquW0PjTi24XH5PSZf+uz/eXW4fF4fcmijfZwxh0ICYNSaHRcBC0UHEHEYw==",
+      "dependencies": [
+        "@loglayer/shared"
+      ]
+    },
+    "@loglayer/shared@3.0.1": {
+      "integrity": "sha512-adHlZMjPLKwPWwyCPA/MMtDRuPDGn9vPQFmkRlwu4byAMpPNRVl04kywncUTGPMtxOl/bDnPIyfGgYu/y/LvrQ=="
+    },
+    "@loglayer/transport-http@1.1.7": {
+      "integrity": "sha512-eHfBVC+S5y+pnBjHrfPJ9D+E7/TpNNm2l/ytFuIAUOHAeN8cmBrGnwvIxK7MOaIk8AUZN2vh4VoZcX941UlRDA==",
+      "dependencies": [
+        "@loglayer/transport"
+      ]
+    },
+    "@loglayer/transport-logflare@1.0.7": {
+      "integrity": "sha512-YzkPgyb44QAgzwjmkUP0yynJV40yl8hwnG6pcvKReKX5PnzSIufKzUpRzD0tqUc8L700+EZiBN9GsAnQx0ISFg==",
+      "dependencies": [
+        "@loglayer/transport-http"
+      ]
+    },
+    "@loglayer/transport@2.3.9": {
+      "integrity": "sha512-hytHalfX8AKrAhJHpS7SVQwLDpaJUCtpWO76dnkLsMcf12eQOzAERrDx1fITrqGCgjbPB8ruf8XIim9a7d0eTA==",
+      "dependencies": [
+        "@loglayer/shared"
       ]
     },
     "@opentelemetry/api@1.9.0": {
@@ -158,6 +201,16 @@
     "jsbn@1.1.0": {
       "integrity": "sha512-4bYVV3aAMtDTTu4+xsDYa6sy9GyJ69/amsu9sYF2zqjiEoZA5xJi3BrfX3uY+/IekIu7MwdObdbDWpoZdBv3/A=="
     },
+    "loglayer@8.0.2": {
+      "integrity": "sha512-tFC0M5WVlGaFAT++Vgj3/KPwolovGy549uOyxg740Hc8hQJEAVk4h/faIYoM+SqCZ5xPPsx2pYC60G7fX1L1kQ==",
+      "dependencies": [
+        "@loglayer/context-manager",
+        "@loglayer/log-level-manager",
+        "@loglayer/plugin",
+        "@loglayer/shared",
+        "@loglayer/transport"
+      ]
+    },
     "lru-cache@10.4.3": {
       "integrity": "sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ=="
     },
@@ -241,6 +294,12 @@
     "safe-buffer@5.2.1": {
       "integrity": "sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ=="
     },
+    "serialize-error@9.1.1": {
+      "integrity": "sha512-6uZQLGyUkNA4N+Zii9fYukmNu9PEA1F5rqcwXzN/3LtBjwl2dFBbVZ1Zyn08/CGkB4H440PIemdOQBt1Wvjbrg==",
+      "dependencies": [
+        "type-fest"
+      ]
+    },
     "smart-buffer@4.2.0": {
       "integrity": "sha512-94hK0Hh8rPqQl2xXc3HsaBoOXKV20MToPkcXvwbISWLEs+64sBq5kFgn2kJDHb1Pry9yrP0dxrCI9RRci7RXKg=="
     },
@@ -271,6 +330,9 @@
     },
     "tslib@2.8.1": {
       "integrity": "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="
+    },
+    "type-fest@2.19.0": {
+      "integrity": "sha512-RAH822pAdBgcNMAfWnCBU3CFZcfZ/i1eZjwFU/dsLKumyuuP3niueg2UAukXYF0E2AAoc82ZSSf9J0WQBinzHA=="
     },
     "typedarray@0.0.6": {
       "integrity": "sha512-/aCDEGatGvZ2BIk+HmLf4ifCJFwvKFNb9/JeZPMulfgFracn9QFcAf5GO8B/mweUjSoblS5In0cWhqpfs/5PQA=="
@@ -325,8 +387,11 @@
       "jsr:@std/assert@0.225",
       "jsr:@std/dotenv@0.225",
       "npm:@js-temporal/polyfill@~0.5.1",
+      "npm:@loglayer/transport-logflare@1",
+      "npm:loglayer@latest",
       "npm:mqtt@^5.10.1",
-      "npm:prom-client@^15.1.0"
+      "npm:prom-client@^15.1.0",
+      "npm:serialize-error@9"
     ]
   }
 }

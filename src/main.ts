@@ -167,7 +167,5 @@ addEventListener("error", async (event) => {
   await logError(`Uncaught exception: ${String(event.error)}`);
 });
 
-if (import.meta.main) {
-  const app = new HomeAutomationApp();
-  await app.start();
-}
+const app = new HomeAutomationApp();
+await app.start();

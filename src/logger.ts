@@ -1,55 +1,100 @@
-// logger.ts
-// Simple file logger with daily rotation for Deno
+// src/logger.ts
+// Explicit LogLayer integration with Logflare transport.
+// Falls back to console when LogLayer credentials are not available.
+import { LogLayer } from "loglayer";
+import { LogflareTransport } from "@loglayer/transport-logflare";
+import { serializeError } from "serialize-error";
 
-import { LOG_TO_FILE } from "./constants.ts";
+export const LOGLAYER_SOURCE_ID = Deno.env.get("LOGLAYER_SOURCE_ID");
+export const LOGLAYER_API_KEY = Deno.env.get("LOGLAYER_API_KEY");
 
-const LOG_DIR = "./logs";
-const LOG_PREFIX = "homeautomation";
-
-function getLogFilePath(): string {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  return `${LOG_DIR}/${LOG_PREFIX}-${yyyy}-${mm}-${dd}.log`;
-}
-
-async function ensureLogDir() {
+// Determine a host identifier synchronously. Prefer explicit env `HOST_ID`,
+// then `HOSTNAME`, then `/etc/hostname`, else fall back to 'unknown-host'.
+function detectHostId(): string {
+  const fromEnv =
+    Deno.env.get("HOST_ID") || Deno.env.get("HOSTNAME") || Deno.env.get("HOST");
+  if (fromEnv) return fromEnv;
   try {
-    await Deno.mkdir(LOG_DIR, { recursive: true });
-  } catch (_) {}
+    const hostname = Deno.readTextFileSync("/etc/hostname");
+    if (hostname) return hostname.trim();
+  } catch {
+    // ignore
+  }
+  return "unknown-host";
 }
 
-async function writeLog(level: string, ...args: unknown[]) {
-  if (LOG_TO_FILE) {
-    const timestamp = new Date().toISOString();
-    const message = args
-      .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
-      .join(" ");
-    const line = `[${timestamp}] [${level}] ${message}\n`;
+const HOST_ID = detectHostId();
 
-    await ensureLogDir();
-    const filePath = getLogFilePath();
-    await Deno.writeTextFile(filePath, line, { append: true });
-  } else {
-    if (level === "ERROR") {
-      console.error(...args);
-    } else if (level === "WARN") {
-      console.warn(...args);
-    } else {
-      console.log(...args);
-    }
+type LogLike = {
+  info: (...args: unknown[]) => void;
+  warn: (...args: unknown[]) => void;
+  error: (...args: unknown[]) => void;
+  withMetadata: (metadata: Record<string, unknown>) => LogLike;
+};
+
+let logger: LogLike | undefined;
+
+if (LOGLAYER_SOURCE_ID && LOGLAYER_API_KEY) {
+  try {
+    logger = new LogLayer({
+      errorSerializer: serializeError,
+      transport: new LogflareTransport({
+        sourceId: LOGLAYER_SOURCE_ID,
+        apiKey: LOGLAYER_API_KEY,
+        onError: (err: unknown) => {
+          console.error("Failed to send logs to Logflare:", err);
+        },
+        onDebug: () => {
+          // console.log("Log entry being sent to Logflare:", entry);
+        },
+      }),
+    }) as unknown as LogLike;
+  } catch (e) {
+    console.error("Failed to initialize LogLayer transport:", e);
+    logger = undefined;
   }
 }
 
-export async function logInfo(...args: unknown[]) {
-  await writeLog("INFO", ...args);
+export function logInfo(...args: unknown[]): void {
+  log("info", ...args);
 }
 
-export async function logWarn(...args: unknown[]) {
-  await writeLog("WARN", ...args);
+export function logWarn(...args: unknown[]): void {
+  log("warn", ...args);
 }
 
-export async function logError(...args: unknown[]) {
-  await writeLog("ERROR", ...args);
+export function logError(...args: unknown[]): void {
+  log("error", ...args);
+}
+
+function log(level: "info" | "warn" | "error", ...args: unknown[]): void {
+  const payload = makePayload(args);
+  if (
+    logger &&
+    typeof logger.withMetadata === "function" &&
+    typeof logger[level] === "function"
+  ) {
+    try {
+      logger.withMetadata({ host: HOST_ID })[level](payload);
+    } catch (e) {
+      console.error(`LogLayer.${level} failed:`, e);
+    }
+  }
+  console[level](...args);
+}
+
+function makePayload(args: unknown[]): unknown {
+  if (args.length === 0) return undefined;
+  if (args.length === 1) return args[0];
+  const [first, second, ...rest] = args;
+  if (typeof first === "string") {
+    if (typeof second === "object" && second !== null && rest.length === 0) {
+      return {
+        message: first,
+        ...(second as Record<string, unknown>),
+      };
+    }
+    return { message: first, meta: [second, ...rest] };
+  }
+  return { ...args };
 }

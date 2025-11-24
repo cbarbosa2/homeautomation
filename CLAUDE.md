@@ -38,12 +38,11 @@ cp .env.example .env
 
 ### Main Application Flow
 
-The `HomeAutomationApp` class (`src/main.ts`) orchestrates the three core services:
+The `HomeAutomationApp` class orchestrates the core services:
 
-1. Loads environment variables from `.env`
-2. Connects MQTT client and starts Prometheus server
-3. Runs a main loop every 5 seconds calling `processAutomationTasks()`
-4. Handles graceful shutdown on SIGINT/SIGTERM
+1. Connects MQTT client and starts Prometheus server
+2. Runs a main loop every 5 seconds calling `processAutomationTasks()`
+3. Handles graceful shutdown on SIGINT/SIGTERM
 
 ### Core Services
 
