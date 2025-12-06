@@ -132,7 +132,7 @@ Deno.test("CommandBuilder should limit history to maximum size", () => {
   const builder = new CommandBuilder();
   const state = createSystemState();
 
-  // Add more than MAX_HISTORY_TARGET_AMPS (3) values
+  // Add more than TARGET_AMPS_MAX_HISTORY (3) values
   const targets1 = createTargets({ insideWallboxAmps: 10 });
   builder.createCommandsFromPowerSettings(state, targets1);
 

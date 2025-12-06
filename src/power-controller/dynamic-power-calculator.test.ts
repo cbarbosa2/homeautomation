@@ -11,7 +11,7 @@ import {
 import {
   MAX_BATTERY_CHARGE_POWER,
   MIN_BATTERY_CHARGE_POWER,
-} from "../constants.ts";
+} from "./power-constants.ts";
 
 function createDefaultState(): InputState {
   return {

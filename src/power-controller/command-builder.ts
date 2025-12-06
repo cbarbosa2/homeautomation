@@ -1,4 +1,3 @@
-import { TARGET_AMPS_MIN_START, TARGET_AMPS_MIN_STOP } from "../constants.ts";
 import { WallboxLocation, WallboxStatus } from "../globals.ts";
 import { powerToAmps } from "../utils.ts";
 import { CalculatedTargetResults as SystemTargetValues } from "./dynamic-power-calculator.ts";
@@ -10,7 +9,9 @@ export interface SystemState {
   wallboxVictronStatus: Map<WallboxLocation, WallboxStatus>;
 }
 
-const MAX_HISTORY_TARGET_AMPS = 3;
+const TARGET_AMPS_MIN_STOP = 7;
+const TARGET_AMPS_MIN_START = 8;
+const TARGET_AMPS_MAX_HISTORY = 3;
 
 export class CommandBuilder {
   private insideWallboxLastTargetAmps: (number | undefined)[];
@@ -31,7 +32,7 @@ export class CommandBuilder {
       value: number | undefined
     ) {
       list.push(value);
-      if (list.length > MAX_HISTORY_TARGET_AMPS) {
+      if (list.length > TARGET_AMPS_MAX_HISTORY) {
         list.shift();
       }
     }

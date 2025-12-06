@@ -4,7 +4,7 @@ import {
   MAX_BATTERY_CHARGE_POWER,
   MAX_GRID_CURRENT,
   MIN_BATTERY_CHARGE_POWER,
-} from "../constants.ts";
+} from "./power-constants.ts";
 import {
   WallboxChargeMode,
   WallboxLocation,
@@ -124,14 +124,13 @@ function calculateBatteryChargePower(
   }
 
   const target =
-    state.batterySOC >= state.batteryMinSOC
+    state.gridPower == undefined
+      ? MIN_BATTERY_CHARGE_POWER
+      : state.batterySOC >= state.batteryMinSOC
       ? MAX_BATTERY_CHARGE_POWER
       : (state.batteryPower ?? 0) +
-        ampsToPower(MAX_GRID_CURRENT) -
-        ampsToPower(consumptionAmpsIncrease) -
-        (state.gridPower !== undefined
-          ? state.gridPower
-          : ampsToPower(MAX_GRID_CURRENT));
+        ampsToPower(MAX_GRID_CURRENT - consumptionAmpsIncrease) -
+        state.gridPower;
 
   return Math.min(
     MAX_BATTERY_CHARGE_POWER,
