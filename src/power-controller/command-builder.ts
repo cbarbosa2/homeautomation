@@ -28,8 +28,8 @@ export class CommandBuilder {
     targets: SystemTargetValues
   ): PowerCommand[] {
     function addToList(
-      list: (number | undefined)[],
-      value: number | undefined
+      value: number | undefined,
+      list: (number | undefined)[]
     ) {
       list.push(value);
       if (list.length > TARGET_AMPS_MAX_HISTORY) {
@@ -45,8 +45,8 @@ export class CommandBuilder {
       }, undefined);
     }
 
-    addToList(this.insideWallboxLastTargetAmps, targets.insideWallboxAmps);
-    addToList(this.outsideWallboxLastTargetAmps, targets.outsideWallboxAmps);
+    addToList(targets.insideWallboxAmps, this.insideWallboxLastTargetAmps);
+    addToList(targets.outsideWallboxAmps, this.outsideWallboxLastTargetAmps);
 
     const insideWallboxPower = state.wallboxPower.get(WallboxLocation.Inside);
 

@@ -8,9 +8,19 @@ import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
 export class HttpServer {
   private server: Deno.HttpServer | null = null;
   private metrics: PrometheusMetrics;
+  private readonly buildTimestamp: string;
 
   constructor(metrics: PrometheusMetrics) {
     this.metrics = metrics;
+    this.buildTimestamp = this.readBuildTimestamp();
+  }
+
+  private readBuildTimestamp(): string {
+    try {
+      return Deno.readTextFileSync("./build-timestamp.txt").trim();
+    } catch {
+      return "unknown";
+    }
   }
 
   start(): void {
@@ -95,7 +105,8 @@ export class HttpServer {
 
   private async handleTaskDashboard(): Promise<Response> {
     try {
-      const html = await Deno.readTextFile("./static/index.html");
+      let html = await Deno.readTextFile("./static/index.html");
+      html = html.replace("__BUILD_TIMESTAMP__", this.buildTimestamp);
       return new Response(html, {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });

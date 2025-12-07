@@ -10,6 +10,7 @@ A background service for home automation built with Deno, featuring MQTT communi
 - 📊 Prometheus metrics export
 - 🏠 Background service operation
 - 🔧 Environment-based configuration
+- Logging in Logflare.app
 
 ## Quick Start
 
@@ -52,9 +53,13 @@ sudo systemctl status homeautomation
 
 #### View logs
 
+In service:
+
 ```
 sudo journalctl -u homeautomation -f
 ```
+
+In cloud access https://logflare.app/sources/37017 with email me@carlosb.com
 
 ### Stop/start/restart
 
