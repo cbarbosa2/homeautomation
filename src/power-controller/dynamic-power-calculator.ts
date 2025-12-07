@@ -1,10 +1,11 @@
 import {
-  BATTERY_FULL_BUMP_CURRENT,
+  BATTERY_FULL_BUMP_AMPS,
   DETECT_SUN_MIN_PV_POWER,
   MAX_AMPS_PER_LOCATION,
   MAX_BATTERY_CHARGE_POWER,
-  MAX_GRID_CURRENT,
+  MAX_GRID_AMPS,
   MIN_BATTERY_CHARGE_POWER,
+  WALLBOX_MIN_CHARGE_AMPS,
 } from "./power-constants.ts";
 import {
   WallboxChargeMode,
@@ -127,7 +128,7 @@ function calculateBatteryChargePower(
       : state.batterySOC >= state.batteryMinSOC
       ? MAX_BATTERY_CHARGE_POWER
       : (state.batteryPower ?? 0) +
-        ampsToPower(MAX_GRID_CURRENT - consumptionAmpsIncrease) -
+        ampsToPower(MAX_GRID_AMPS - consumptionAmpsIncrease) -
         state.gridPower;
 
   return Math.min(
@@ -137,10 +138,11 @@ function calculateBatteryChargePower(
 }
 
 function coerceTargetAmps(location: WallboxLocation, newAmps: number): number {
-  return Math.min(
-    Math.max(0, newAmps),
-    MAX_AMPS_PER_LOCATION.get(location) ?? 0
-  );
+  if (newAmps < WALLBOX_MIN_CHARGE_AMPS) {
+    return 0;
+  } else {
+    return Math.min(newAmps, MAX_AMPS_PER_LOCATION.get(location) ?? 0);
+  }
 }
 
 function calculateWallboxTargetValues(
@@ -170,11 +172,11 @@ function calculateWallboxTargetValues(
         amps:
           powerToAmps(state.wallboxPower.get(location) ?? 0) +
           powerToAmps(state.batteryPower ?? 0) +
-          MAX_GRID_CURRENT -
+          MAX_GRID_AMPS -
           consumptionAmpsIncrease -
           (state.gridPower !== undefined
             ? powerToAmps(state.gridPower)
-            : MAX_GRID_CURRENT),
+            : MAX_GRID_AMPS),
         concedePriority: false,
       };
     } else if (
@@ -189,7 +191,7 @@ function calculateWallboxTargetValues(
         amps:
           powerToAmps(state.wallboxPower.get(location) ?? 0) +
           (state.batteryPower ? powerToAmps(state.batteryPower) : 0) +
-          (state.batterySOC >= 95 ? BATTERY_FULL_BUMP_CURRENT : 0) -
+          (state.batterySOC >= 95 ? BATTERY_FULL_BUMP_AMPS : 0) -
           consumptionAmpsIncrease,
         concedePriority: false,
       };

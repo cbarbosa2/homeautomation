@@ -1,6 +1,7 @@
 import { WallboxLocation, WallboxStatus } from "../globals.ts";
 import { powerToAmps } from "../utils.ts";
 import { CalculatedTargetResults as SystemTargetValues } from "./dynamic-power-calculator.ts";
+import { WALLBOX_MIN_CHARGE_AMPS } from "./power-constants.ts";
 import { CommandType, PowerCommand } from "./power-controller.ts";
 
 export interface SystemState {
@@ -9,10 +10,20 @@ export interface SystemState {
   wallboxVictronStatus: Map<WallboxLocation, WallboxStatus>;
 }
 
-const TARGET_AMPS_MIN_STOP = 7;
 const TARGET_AMPS_MIN_START = 8;
 const TARGET_AMPS_MAX_HISTORY = 3;
 
+/**
+ * CommandBuilder generates power control commands for wallboxes and battery based on target power values.
+ *
+ * This class smooths wallbox amp adjustments by tracking recent target values to prevent rapid fluctuations
+ * that could cause charging to start/stop frequently. It creates commands to:
+ * - Start/stop wallbox charging when targets cross minimum thresholds
+ * - Adjust wallbox current (amps) to match calculated targets
+ * - Set battery max charge power when targets change
+ *
+ * The builder maintains state to avoid sending duplicate commands when values haven't changed.
+ */
 export class CommandBuilder {
   private insideWallboxLastTargetAmps: (number | undefined)[];
   private outsideWallboxLastTargetAmps: (number | undefined)[];
@@ -105,7 +116,7 @@ export class CommandBuilder {
     let newStartStop;
     let newCurrent;
 
-    if (targetAmps < TARGET_AMPS_MIN_STOP) {
+    if (targetAmps < WALLBOX_MIN_CHARGE_AMPS) {
       // turn off
       if ((currentAmps ?? 0) > 0) {
         // stop
