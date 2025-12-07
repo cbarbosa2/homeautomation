@@ -1,4 +1,5 @@
 import {
+  BATTERY_FULL_BUMP_CURRENT,
   DETECT_SUN_MIN_PV_POWER,
   MAX_AMPS_PER_LOCATION,
   MAX_BATTERY_CHARGE_POWER,
@@ -188,7 +189,7 @@ function calculateWallboxTargetValues(
         amps:
           powerToAmps(state.wallboxPower.get(location) ?? 0) +
           (state.batteryPower ? powerToAmps(state.batteryPower) : 0) +
-          (state.batterySOC >= 95 ? 8 : 0) -
+          (state.batterySOC >= 95 ? BATTERY_FULL_BUMP_CURRENT : 0) -
           consumptionAmpsIncrease,
         concedePriority: false,
       };

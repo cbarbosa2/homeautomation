@@ -136,7 +136,7 @@ Unit tests are provided for core logic, including the dynamic power calculation:
 - Run all tests:
 
   ```bash
-  deno test src/tasks/dynamic-power-calculator.test.ts --allow-read --allow-env --allow-write
+  deno task test
   ```
 
 Tests use [@std/assert](https://jsr.io/@std/assert) for assertions. You can add more tests for other modules as needed.

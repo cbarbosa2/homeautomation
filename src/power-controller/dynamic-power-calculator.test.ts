@@ -81,9 +81,9 @@ Deno.test("batteryChargePower battery charge", () => {
   state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Off);
 
   const result = calculateTargetAmpsAndPriority(state);
-  assertEquals(result.batteryChargePower, 4240);
+  assertEquals(result.batteryChargePower, 4720);
 
-  state.gridPower = 1000;
+  state.gridPower = 0;
   assertEquals(
     calculateTargetAmpsAndPriority(state).batteryChargePower,
     MAX_BATTERY_CHARGE_POWER
@@ -101,18 +101,21 @@ Deno.test("wallbox amps on a sunny day", () => {
   state.batteryPower = 4000;
   state.pvInverterPower = 1000;
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Manual);
-  assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 8);
+  assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 17);
 
+  // since battery is charging and wallbox as well there's enough power to go to max
   state.wallboxPower.set(WallboxLocation.Outside, 3500);
-  assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 19);
+  assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 32);
 
+  // since there's no PV power, no charging should happen
   state.pvInverterPower = 0;
   assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 0);
 
+  // keep current charging plus a 8A bump since battery is almost full
   state.batteryPower = 0;
   state.pvInverterPower = 1000;
   state.batterySOC = 99;
-  assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 19);
+  assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 23);
 
   state.batteryPower = 0;
   state.pvInverterPower = 1000;
@@ -130,5 +133,6 @@ Deno.test("wallbox amps when on", () => {
     WallboxStatus.Connected
   );
   state.hourOfDay = 20;
-  assertEquals(calculateTargetAmpsAndPriority(state).insideWallboxAmps, 8);
+  // set maximum amps for inside wallbox
+  assertEquals(calculateTargetAmpsAndPriority(state).insideWallboxAmps, 18);
 });
