@@ -15,6 +15,17 @@ export interface PowerCommand {
   value: number;
 }
 
+/**
+ * PowerController executes power control commands by publishing MQTT messages to Victron devices.
+ *
+ * This module translates PowerCommand objects into MQTT topics and messages that control:
+ * - Wallbox charging current (amps) for inside and outside locations
+ * - Wallbox start/stop commands to enable/disable charging
+ * - Battery maximum charge power settings
+ *
+ * Commands can be simulated (logged without execution) when POWER_CONTROL_ENABLED is false,
+ * useful for testing and development without affecting actual hardware.
+ */
 export function runCommands(commands: PowerCommand[], mqttClient: MqttClient) {
   for (const command of commands) {
     const topic = getTopic(command);

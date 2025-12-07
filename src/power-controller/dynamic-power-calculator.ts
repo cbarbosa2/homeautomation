@@ -34,6 +34,22 @@ export interface InputState {
   hourOfDay: number;
 }
 
+/**
+ * DynamicPowerCalculator determines optimal power allocation across wallboxes and battery.
+ *
+ * This module calculates target charging currents (amps) for wallboxes and battery charge power
+ * based on system state and configured charge modes. Key features:
+ *
+ * - Prioritizes one wallbox over another to avoid exceeding grid limits
+ * - Respects different charge modes (On, Night, ESSOnly, SunOnly, Off, Manual)
+ * - Maximizes use of excess solar power for charging
+ * - Prevents grid overload by limiting total consumption to MAX_GRID_AMPS
+ * - Adjusts battery charge power to optimize energy storage
+ * - Handles priority switching when the primary wallbox concedes to the secondary
+ *
+ * The calculator considers real-time data including grid power, battery state, PV production,
+ * and wallbox status to make intelligent power distribution decisions.
+ */
 export function calculateTargetAmpsAndPriority(
   state: InputState
 ): CalculatedTargetResults {
