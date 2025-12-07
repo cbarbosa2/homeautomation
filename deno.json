@@ -7,7 +7,7 @@
     "fmt": "deno fmt src/",
     "test": "deno test --allow-net --allow-read --allow-write --allow-env --unstable-cron",
     "analyze": "deno task check && deno task lint",
-    "compile": "deno eval \"Deno.writeTextFileSync('build-timestamp.txt', new Date().toISOString())\" && deno check src/**/*.ts"
+    "compile": "deno check src/**/*.ts"
   },
   "imports": {
     "@std/dotenv": "jsr:@std/dotenv@^0.225.0",

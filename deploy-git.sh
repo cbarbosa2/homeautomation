@@ -21,6 +21,9 @@ ssh carlos@bee.local << 'EOF'
     echo "🔄 Pulling latest code from git..."
     git pull origin main
 
+    echo "📝 Creating build timestamp..."
+    date -u +"%Y-%m-%dT%H:%M:%S.%3NZ" > build-timestamp.txt
+
     echo "🔄 Restarting homeautomation service..."
     sudo -n systemctl start homeautomation
 
