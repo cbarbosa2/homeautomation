@@ -70,7 +70,7 @@ Deno.test("calculateTargetAmpsAndPriority changes primary wallbox", () => {
   assertEquals(result.newPrimaryWallboxLocation, WallboxLocation.Outside);
 });
 
-Deno.test("batteryChargePower battery charge", () => {
+Deno.test("batteryChargePower with moderate grid power", () => {
   const state = {
     ...createDefaultState(),
     gridPower: 2000,
@@ -82,44 +82,97 @@ Deno.test("batteryChargePower battery charge", () => {
 
   const result = calculateTargetAmpsAndPriority(state);
   assertEquals(result.batteryChargePower, 4720);
+});
 
-  state.gridPower = 0;
+Deno.test("batteryChargePower with no grid power", () => {
+  const state = {
+    ...createDefaultState(),
+    gridPower: 0,
+    batteryMinSOC: 55,
+    hourOfDay: 23,
+  };
+  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Off);
+  state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Off);
+
   assertEquals(
     calculateTargetAmpsAndPriority(state).batteryChargePower,
     MAX_BATTERY_CHARGE_POWER
   );
+});
 
-  state.gridPower = 7000;
+Deno.test("batteryChargePower with high grid power", () => {
+  const state = {
+    ...createDefaultState(),
+    gridPower: 7000,
+    batteryMinSOC: 55,
+    hourOfDay: 23,
+  };
+  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Off);
+  state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Off);
+
   assertEquals(
     calculateTargetAmpsAndPriority(state).batteryChargePower,
     MIN_BATTERY_CHARGE_POWER
   );
 });
 
-Deno.test("wallbox amps on a sunny day", () => {
+Deno.test("batteryChargePower with car charging", () => {
+  const state = {
+    ...createDefaultState(),
+    gridPower: 18 * 240,
+    hourOfDay: 23,
+    batterySOC: 5,
+  };
+  state.wallboxPower.set(WallboxLocation.Inside, 18 * 240);
+  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.On);
+  state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Off);
+
+  const result = calculateTargetAmpsAndPriority(state);
+  assertEquals(result.insideWallboxAmps, 18);
+  assertEquals(result.batteryChargePower, MAX_BATTERY_CHARGE_POWER - 18 * 240);
+});
+
+Deno.test("wallbox amps with excess battery power", () => {
   const state = createDefaultState();
   state.batteryPower = 4000;
   state.pvInverterPower = 1000;
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Manual);
   assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 17);
+});
 
-  // since battery is charging and wallbox as well there's enough power to go to max
+Deno.test("wallbox amps when already charging with high power", () => {
+  const state = createDefaultState();
+  state.batteryPower = 4000;
+  state.pvInverterPower = 1000;
+  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Manual);
   state.wallboxPower.set(WallboxLocation.Outside, 3500);
   assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 32);
+});
 
-  // since there's no PV power, no charging should happen
+Deno.test("wallbox amps when no PV power available", () => {
+  const state = createDefaultState();
+  state.batteryPower = 4000;
   state.pvInverterPower = 0;
+  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Manual);
   assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 0);
+});
 
-  // keep current charging plus a 8A bump since battery is almost full
+Deno.test("wallbox amps with battery almost full gets 8A bump", () => {
+  const state = createDefaultState();
   state.batteryPower = 0;
   state.pvInverterPower = 1000;
   state.batterySOC = 99;
+  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Manual);
+  state.wallboxPower.set(WallboxLocation.Outside, 3500);
   assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 23);
+});
 
+Deno.test("wallbox amps when battery not full and not charging", () => {
+  const state = createDefaultState();
   state.batteryPower = 0;
   state.pvInverterPower = 1000;
   state.batterySOC = 90;
+  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Manual);
   state.wallboxPower.set(WallboxLocation.Outside, 0);
   assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 0);
 });

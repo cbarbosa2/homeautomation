@@ -80,7 +80,7 @@ export function calculateTargetAmpsAndPriority(
   // we need to account for that when calculating the secondary wallbox.
   let consumptionAmpsIncrease = Math.max(
     0,
-    (primaryTargetAmps ?? 0) +
+    (primaryTargetAmps ?? 0) -
       powerToAmps(state.wallboxPower.get(primaryWallboxLocation) ?? 0)
   );
 
