@@ -10,7 +10,7 @@ export interface SystemState {
   wallboxVictronStatus: Map<WallboxLocation, WallboxStatus>;
 }
 
-const TARGET_AMPS_MIN_START = 8;
+const TARGET_AMPS_MIN_START = 10;
 const TARGET_AMPS_MAX_HISTORY = 3;
 
 /**
