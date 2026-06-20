@@ -5,6 +5,7 @@ export const MAX_GRID_AMPS = 28;
 export const BATTERY_FULL_BUMP_AMPS = 8;
 export const DETECT_SUN_MIN_PV_POWER = 200;
 export const MIN_BATTERY_CHARGE_POWER = 200;
+export const BATTERY_SOC_HIGH = 95;
 export const MAX_BATTERY_CHARGE_POWER = MAX_GRID_AMPS * SYSTEM_VOLTAGE;
 export const MAX_AMPS_PER_LOCATION = new Map([
   [WallboxLocation.Inside, 18],
