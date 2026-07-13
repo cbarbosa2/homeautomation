@@ -36,7 +36,7 @@ export class SetSocLimitTask {
     const chargeEfficiency = 0.95;
     const minDaylightConsumptionKwh = 2;
     const maxDaylightConsumptionKwh = 15;
-    const minSOCPercent = this.isWinterSeason() ? 30 : 5;
+    const minSOCPercent = this.isWinterSeason() ? 30 : 10;
     const maxSOCPercent = 85;
     const batteryCapacityKwh = 40;
 
