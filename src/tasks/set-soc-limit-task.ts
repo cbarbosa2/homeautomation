@@ -3,6 +3,8 @@ import { logInfo } from "../logger.ts";
 import { MqttClient } from "../mqtt-client.ts";
 import { Temporal } from "../temporal.ts";
 
+const DAYLIGHT_MIN_SOC_PERCENT = 5;
+
 export class SetSocLimitTask {
   private mqttClient: MqttClient;
   private readonly topic =
@@ -13,7 +15,7 @@ export class SetSocLimitTask {
   }
 
   public executeInMorning(): Promise<void> {
-    return this.publishValue(5);
+    return this.publishValue(DAYLIGHT_MIN_SOC_PERCENT);
   }
 
   public executeInEvening(): Promise<void> {
