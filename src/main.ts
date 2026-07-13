@@ -14,11 +14,11 @@ import { globals, WallboxLocation } from "./globals.ts";
 import { loadPersistentStorage } from "./persistent-storage.ts";
 import { runCommands } from "./power-controller/power-controller.ts";
 import { CommandBuilder } from "./power-controller/command-builder.ts";
+import { DYNAMIC_POWER_INTERVAL_SECONDS } from "./power-controller/power-constants.ts";
 import { setupWallSwitchHandler } from "./charge-mode/wall-switch-handler.ts";
 import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
 
 const AWAKE_MQTT_INTERVAL_SECONDS = 30;
-const DYNAMIC_POWER_INTERVAL_SECONDS = 5;
 
 class HomeAutomationApp {
   private mqttClient: MqttClient;

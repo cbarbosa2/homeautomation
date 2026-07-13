@@ -1,6 +1,7 @@
 import { WallboxLocation } from "../globals.ts";
 import { SYSTEM_VOLTAGE } from "../utils.ts";
 
+export const DYNAMIC_POWER_INTERVAL_SECONDS = 1;
 export const MAX_GRID_AMPS = 28;
 export const BATTERY_FULL_BUMP_AMPS = 8;
 export const DETECT_SUN_MIN_PV_POWER = 200;

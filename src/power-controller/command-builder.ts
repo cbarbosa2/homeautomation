@@ -1,7 +1,7 @@
 import { WallboxLocation, WallboxStatus } from "../globals.ts";
 import { powerToAmps } from "../utils.ts";
 import { CalculatedTargetResults as SystemTargetValues } from "./dynamic-power-calculator.ts";
-import { WALLBOX_MIN_CHARGE_AMPS } from "./power-constants.ts";
+import { DYNAMIC_POWER_INTERVAL_SECONDS, WALLBOX_MIN_CHARGE_AMPS } from "./power-constants.ts";
 import { CommandType, PowerCommand } from "./power-controller.ts";
 
 export interface SystemState {
@@ -11,7 +11,7 @@ export interface SystemState {
 }
 
 const TARGET_AMPS_MIN_START = 10;
-const TARGET_AMPS_MAX_HISTORY = 3;
+const TARGET_AMPS_MAX_HISTORY = 15 / DYNAMIC_POWER_INTERVAL_SECONDS;
 
 /**
  * CommandBuilder generates power control commands for wallboxes and battery based on target power values.
