@@ -1,3 +1,4 @@
 .env
 logs/
 build-timestamp.txt
+docs-temp/

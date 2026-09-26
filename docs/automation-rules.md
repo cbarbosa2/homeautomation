@@ -6,6 +6,8 @@ Manage overnight battery charging when daytime solar energy is insufficient, and
 
 SOC means the home battery's state of charge. SOC margins are percentage points. All times use **Europe/Lisbon**, including daylight-saving changes. Night runs from 22:00 inclusive to 08:00 exclusive; remaining hours until 08:00 are rounded up to whole hours.
 
+Remaining hours use actual elapsed time until the next Lisbon 08:00, including any daylight-saving clock change.
+
 “Solar surplus” is excess solar power available after household consumption, diverted to a wallbox instead of battery charging. “Maximum possible” means the highest power allowed by charger limits, grid capacity, and wallbox priority.
 
 | Mode | Behavior |
@@ -27,9 +29,19 @@ Release priority when that vehicle is fully charged, disconnected, encounters an
 
 A pause caused only by insufficient available power retains priority while the charger's mode conditions still apply.
 
+When charging-start order cannot be distinguished, including both vehicles already charging at service startup, Inside wins the tie. Priority is not persisted across restarts.
+
+Eligible automatic wallboxes receive power in priority order; battery charging receives the remainder. This order also applies within the conservative 12 A shared budget.
+
 ## Overnight battery target
 
 At **22:01**, set the battery's minimum SOC using tomorrow's Forecast.Solar estimate and current SOC. At **08:00**, reset minimum SOC to **5%**.
+
+Use a forecast for the required Lisbon calendar date fetched no more than **six hours** ago. A forecast of zero is valid; a missing or invalid forecast is not.
+
+If current SOC or the required forecast is unavailable or stale at the evening adjustment, retain the existing minimum SOC and retry **every five minutes until midnight**, stopping after success. Keep forecast fetching hourly. Retries retain the original forecast target date and use current SOC and remaining hours at the time of the successful retry. If none succeeds, retain the existing minimum until the normal morning reset.
+
+Do not catch up scheduled SOC adjustments missed while the service was stopped. Pending retries are held in memory and discarded on restart.
 
 The evening calculation uses a **40 kWh** battery, **95%** charging efficiency, and **2–15 kWh** expected daytime consumption. The seasonal floor is **30% from October 15 through February**, otherwise **10%**; the ceiling is **85%**.
 
@@ -54,3 +66,5 @@ This reserves energy for the next day while allowing overnight consumption and l
 Keep grid current below **28 A**, leaving a **2 A margin** beneath the installation's 30 A limit. Continuously monitor grid power and adjust automatic wallbox charging and the battery's maximum charging power. Grid protection takes precedence over automatic requests for maximum charging power; Manual wallboxes are exempt from intervention.
 
 When readings required for control are missing or stale, use a conservative **12 A shared budget** for automatic wallbox and battery charging. This is a cap, not permission to bypass mode conditions; Manual wallboxes remain exempt. Resume normal allocation when valid readings return.
+
+Actively refresh required device telemetry every **30 seconds**. Treat readings as stale after **60 seconds** without a valid refresh. This device-telemetry threshold does not apply to the external solar forecast.
