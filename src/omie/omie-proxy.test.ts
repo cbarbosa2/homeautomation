@@ -35,15 +35,14 @@ Deno.test("parseOmieResponse should parse OMIE data correctly", () => {
   assertEquals(firstEntry.date.day, 14); // Previous day due to -1 hour offset
   assertEquals(firstEntry.date.hour, 23); // Period 1 becomes hour 0, then -1 = 23
 
-  // Check that price has been processed through the formula
-  // Original price was 22.98, should be transformed
-  const expectedRawPrice = ((22.98 + 0.09) * (1 + 0.16) + 1.49 * 10) * 1.23;
-  const expectedPrice = Math.round(expectedRawPrice / 10);
-  assertEquals(firstEntry.price, expectedPrice);
+  // The average OMIE price is 22.9875 EUR/MWh; the night price rounds
+  // to 38 cents/kWh after applying the formula.
+  assertEquals(firstEntry.price, 38);
 
   // Check last entry
   const lastEntry = result[result.length - 1]!;
   assertEquals(lastEntry.date.hour, 9);
+  assertEquals(lastEntry.price, 45);
 
   // Verify entries are sorted by date
   for (let i = 1; i < result.length; i++) {
@@ -53,6 +52,33 @@ Deno.test("parseOmieResponse should parse OMIE data correctly", () => {
     );
     assertEquals(comparison <= 0, true, "Entries should be sorted by date");
   }
+});
+
+Deno.test("parseOmieResponse applies tariffs at Portugal hour boundaries", () => {
+  // OMIE periods are quarter-hours in Spain time, one hour ahead.
+  const response = [
+    "15/11/2025;5;100;100", // 00:00 Portugal
+    "15/11/2025;33;100;100", // 07:00 Portugal
+    "15/11/2025;37;100;100", // 08:00 Portugal
+    "15/11/2025;89;100;100", // 21:00 Portugal
+    "15/11/2025;93;100;100", // 22:00 Portugal
+    "16/11/2025;1;100;100", // 23:00 Portugal
+  ].join("\n");
+
+  const result = parseOmieResponse(
+    response,
+    new Temporal.PlainDateTime(2025, 11, 15),
+  );
+
+  // At 0.1 EUR/kWh OMIE, night is 47.2548 cents and day is 54.431 cents.
+  assertEquals(result.map((entry) => [entry.date.hour, entry.price]), [
+    [0, 47],
+    [7, 47],
+    [8, 54],
+    [21, 54],
+    [22, 47],
+    [23, 47],
+  ]);
 });
 
 Deno.test("parseOmieResponse should filter entries before startOfToday", () => {
