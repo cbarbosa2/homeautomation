@@ -13,7 +13,10 @@ import { MqttToPrometheusTask } from "./tasks/mqtt-to-prometheus-task.ts";
 import { SetSocLimitTask } from "./tasks/set-soc-limit-task.ts";
 import { calculateTargetAmpsAndPriority } from "./power-controller/dynamic-power-calculator.ts";
 import { globals, WallboxLocation } from "./globals.ts";
-import { loadPersistentStorage } from "./persistent-storage.ts";
+import {
+  flushPersistentStorage,
+  loadPersistentStorage,
+} from "./persistent-storage.ts";
 import { runCommands } from "./power-controller/power-controller.ts";
 import { CommandBuilder } from "./power-controller/command-builder.ts";
 import { DYNAMIC_POWER_INTERVAL } from "./power-controller/power-constants.ts";
@@ -120,10 +123,15 @@ class HomeAutomationApp {
     try {
       const data = await loadPersistentStorage();
       if (data.inside != undefined) {
-        setChargeMode(this.metrics, WallboxLocation.Inside, data.inside, false);
+        await setChargeMode(
+          this.metrics,
+          WallboxLocation.Inside,
+          data.inside,
+          false,
+        );
       }
       if (data.outside != undefined) {
-        setChargeMode(
+        await setChargeMode(
           this.metrics,
           WallboxLocation.Outside,
           data.outside,
@@ -144,6 +152,7 @@ class HomeAutomationApp {
         scheduler.terminateAll();
         await this.mqttClient.disconnect();
         await this.httpServer.stop();
+        await flushPersistentStorage();
         await logInfo("✅ Shutdown complete");
         Deno.exit(0);
       } catch (error) {

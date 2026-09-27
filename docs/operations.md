@@ -15,6 +15,8 @@ Use [.env.example](../.env.example) as the configuration template; [constants.ts
 | `VICTRON_PORTAL_ID` | Required Victron portal ID used in MQTT topics; a single topic segment without wildcards. |
 | `VICTRON_INSTALLATION_ID` | Required positive decimal VRM installation ID used for forecast API requests. |
 | `JSONBIN_ID` | Remote storage identifier for persisted charge modes. |
+| `JSONBIN_ACCESS_KEY` | JSONBin access key with Bins Read and Update permissions. |
+| `JSONBIN_MASTER_KEY` | Alternative JSONBin master key; access key takes precedence when both are configured. |
 
 `HTTP_TIMEOUT` remains in the configuration but is not used by current request code. Logging settings are listed in `.env.example`.
 
@@ -76,3 +78,10 @@ DVCC is disabled on this installation (confirmed by the operator), so this contr
 applies. A received
 settings echo alone is not evidence of physical curtailment. No live hardware
 commands are part of automated validation.
+
+Charge-mode changes apply immediately. The dashboard reports success only after
+JSONBin confirms the save; failures show that the mode may revert after restart.
+Physical switch save failures are logged. Writes are serialized and pending writes
+are drained during graceful shutdown. Requests time out after 30 seconds.
+Configure a JSONBin credential in the service's `.env` before restarting; the bin
+ID alone does not authorize writes. See the [JSONBin update API](https://jsonbin.io/api-reference/bins/update).

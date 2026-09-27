@@ -1,7 +1,7 @@
 import { HTTP_PORT } from "./constants.ts";
-import { logInfo, logError as _error, logError } from "./logger.ts";
+import { logError, logError as _error, logInfo } from "./logger.ts";
 import { scheduler } from "./task-scheduler.ts";
-import { globals, WallboxLocation, WallboxChargeMode } from "./globals.ts";
+import { globals, WallboxChargeMode, WallboxLocation } from "./globals.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
 
@@ -135,7 +135,7 @@ export class HttpServer {
       if (!taskName) {
         return new Response(
           JSON.stringify({ success: false, error: "Missing taskName" }),
-          { status: 400, headers: { "Content-Type": "application/json" } }
+          { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
 
@@ -146,18 +146,16 @@ export class HttpServer {
     } catch (error) {
       return new Response(
         JSON.stringify({ success: false, error: String(error) }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
+        { status: 500, headers: { "Content-Type": "application/json" } },
       );
     }
   }
 
   private handleGetWallboxChargeMode(): Response {
     // Return current charge mode for inside and outside
-    const inside =
-      globals.wallboxChargeMode.get(WallboxLocation.Inside) ??
+    const inside = globals.wallboxChargeMode.get(WallboxLocation.Inside) ??
       WallboxChargeMode.Off;
-    const outside =
-      globals.wallboxChargeMode.get(WallboxLocation.Outside) ??
+    const outside = globals.wallboxChargeMode.get(WallboxLocation.Outside) ??
       WallboxChargeMode.Off;
     return new Response(JSON.stringify({ Inside: inside, Outside: outside }), {
       headers: { "Content-Type": "application/json" },
@@ -165,7 +163,7 @@ export class HttpServer {
   }
 
   private async handleSetWallboxChargeMode(
-    request: Request
+    request: Request,
   ): Promise<Response> {
     try {
       const body = await request.json();
@@ -183,11 +181,11 @@ export class HttpServer {
             success: false,
             error: "Invalid location or value",
           }),
-          { status: 400, headers: { "Content-Type": "application/json" } }
+          { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
 
-      setChargeMode(this.metrics, location, value);
+      await setChargeMode(this.metrics, location, value);
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { "Content-Type": "application/json" },
@@ -195,7 +193,7 @@ export class HttpServer {
     } catch (error) {
       return new Response(
         JSON.stringify({ success: false, error: String(error) }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
+        { status: 500, headers: { "Content-Type": "application/json" } },
       );
     }
   }

@@ -2,14 +2,14 @@ import { globals, WallboxChargeMode, WallboxLocation } from "../globals.ts";
 import { savePersistentStorage } from "../persistent-storage.ts";
 import { METRICS } from "../prometheus/metrics.ts";
 import { PrometheusMetrics } from "../prometheus/prometheus.ts";
-import { logInfo, logWarn, logError } from "../logger.ts";
+import { logError, logInfo, logWarn } from "../logger.ts";
 
-export function setChargeMode(
+export async function setChargeMode(
   metrics: PrometheusMetrics,
   location: WallboxLocation,
   mode: WallboxChargeMode,
-  persistSetting: boolean = true
-): void {
+  persistSetting: boolean = true,
+): Promise<void> {
   if (!Object.values(WallboxChargeMode).includes(mode)) {
     logWarn(`Mode ${mode} is not a valid WallboxChargeMode`);
     return;
@@ -25,19 +25,20 @@ export function setChargeMode(
   metrics.setGauge(gauge, mode);
 
   logInfo(
-    `set mode ${WallboxChargeMode[mode]}(${mode}) in gauge ${gauge.name}`
+    `set mode ${WallboxChargeMode[mode]}(${mode}) in gauge ${gauge.name}`,
   );
 
   if (persistSetting) {
-    savePersistentStorage({
-      inside:
-        globals.wallboxChargeMode.get(WallboxLocation.Inside) ??
+    await savePersistentStorage({
+      inside: globals.wallboxChargeMode.get(WallboxLocation.Inside) ??
         WallboxChargeMode.SunOnly,
-      outside:
-        globals.wallboxChargeMode.get(WallboxLocation.Outside) ??
+      outside: globals.wallboxChargeMode.get(WallboxLocation.Outside) ??
         WallboxChargeMode.SunOnly,
     }).catch((error) => {
       logError(`❌ Failed to save persistent storage: ${String(error)}`);
+      throw new Error(
+        "Mode applied, but could not be saved. It may revert after restart.",
+      );
     });
   }
 }

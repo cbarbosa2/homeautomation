@@ -2,6 +2,21 @@
 
 import { JSONBIN_ID } from "./constants.ts";
 
+function storageHeaders(): Headers {
+  const headers = new Headers({ "Content-Type": "application/json" });
+  const accessKey = Deno.env.get("JSONBIN_ACCESS_KEY");
+  const masterKey = Deno.env.get("JSONBIN_MASTER_KEY");
+  if (accessKey) headers.set("X-Access-Key", accessKey);
+  else if (masterKey) headers.set("X-Master-Key", masterKey);
+  return headers;
+}
+
+let pendingSave: Promise<void> = Promise.resolve();
+
+export function flushPersistentStorage(): Promise<void> {
+  return pendingSave;
+}
+
 const BIN_BASE_URL = "https://api.jsonbin.io/v3/b/";
 
 interface StorageValueResponse {
@@ -23,10 +38,9 @@ export async function loadPersistentStorage(): Promise<StorageValueResponse> {
     BIN_BASE_URL + JSONBIN_ID + "/latest?meta=false",
     {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }
+      headers: storageHeaders(),
+      signal: AbortSignal.timeout(30000),
+    },
   );
   if (!response.ok) throw new Error(`Failed to load: ${response.status}`);
   return await response.json();
@@ -37,15 +51,21 @@ export async function loadPersistentStorage(): Promise<StorageValueResponse> {
  * @param {any} value The value to save
  * @returns {Promise<void>}
  */
-export async function savePersistentStorage(
-  value: StorageValueRequest
+export function savePersistentStorage(
+  value: StorageValueRequest,
 ): Promise<void> {
-  const response = await fetch(BIN_BASE_URL + JSONBIN_ID, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(value),
+  const body = JSON.stringify(value);
+  const save = pendingSave.then(async () => {
+    const response = await fetch(BIN_BASE_URL + JSONBIN_ID, {
+      method: "PUT",
+      headers: storageHeaders(),
+      signal: AbortSignal.timeout(30000),
+      body,
+    });
+    await response.body?.cancel();
+    if (!response.ok) throw new Error(`Failed to save: ${response.status}`);
   });
-  if (!response.ok) throw new Error(`Failed to save: ${response.status}`);
+  // Keep later writes running after a failure; return the rejection to its caller.
+  pendingSave = save.catch(() => {});
+  return save;
 }

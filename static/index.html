@@ -227,12 +227,12 @@
             body: JSON.stringify({ location, value }),
           });
           const result = await response.json();
-          if (result.success) {
+          if (response.ok && result.success) {
             document.getElementById("charge-mode-status").textContent =
               "Updated successfully!";
           } else {
             document.getElementById("charge-mode-status").textContent =
-              "Failed to update.";
+              result.error || "Failed to update.";
           }
         } catch (error) {
           document.getElementById("charge-mode-status").textContent =
