@@ -31,6 +31,9 @@ export async function runCommands(
   commands: PowerCommand[],
   mqttClient: Pick<MqttClient, "publishJson">,
   enabled = POWER_CONTROL_ENABLED,
+  modeAt: (location: WallboxLocation) => WallboxChargeMode | undefined = (
+    location,
+  ) => globals.wallboxChargeMode.get(location),
 ) {
   for (const command of commands) {
     const location = command.type === CommandType.InsideCurrent ||
@@ -42,7 +45,7 @@ export async function runCommands(
       : undefined;
     if (
       location !== undefined &&
-      globals.wallboxChargeMode.get(location) === WallboxChargeMode.Manual
+      modeAt(location) === WallboxChargeMode.Manual
     ) continue;
     const topic = getTopic(command);
     if (topic && enabled) {

@@ -45,7 +45,6 @@ export enum WallboxLocation {
 
 export interface GlobalState {
   solarForecastByDate: SolarForecasts;
-  primaryWallboxLocation: WallboxLocation | undefined;
   // Display-only values in Wh; control uses the dated forecast map.
   solarForecastNextDays: number[];
   victronNextDays: number[];
@@ -69,7 +68,6 @@ export interface GlobalState {
  */
 export const globals: GlobalState = {
   solarForecastByDate: new SolarForecasts(),
-  primaryWallboxLocation: undefined,
   solarForecastNextDays: [],
   victronNextDays: [],
   omieEntries: [],

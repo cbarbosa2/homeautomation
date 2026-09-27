@@ -4,21 +4,20 @@ import { logError, logInfo } from "./logger.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { HttpServer } from "./http-server.ts";
 import { controlTelemetry } from "./control-telemetry.ts";
-import { lisbonTime, systemClock, timeUntilMorning } from "./lisbon-clock.ts";
+import { systemClock } from "./lisbon-clock.ts";
+import { POWER_CONTROL_ENABLED } from "./constants.ts";
 import { MqttAwakeTask } from "./tasks/mqtt-awake-task.ts";
 import { LoadForecastTask } from "./tasks/load-forecast-task.ts";
 import { LoadOmieTask } from "./tasks/load-omie-task.ts";
 import { scheduler } from "./task-scheduler.ts";
 import { MqttToPrometheusTask } from "./tasks/mqtt-to-prometheus-task.ts";
 import { SetSocLimitTask } from "./tasks/set-soc-limit-task.ts";
-import { calculateTargetAmpsAndPriority } from "./power-controller/dynamic-power-calculator.ts";
 import { globals, WallboxLocation } from "./globals.ts";
 import {
   flushPersistentStorage,
   loadPersistentStorage,
 } from "./persistent-storage.ts";
-import { runCommands } from "./power-controller/power-controller.ts";
-import { CommandBuilder } from "./power-controller/command-builder.ts";
+import { AutomaticChargingCycle } from "./power-controller/automatic-charging-cycle.ts";
 import { DYNAMIC_POWER_INTERVAL } from "./power-controller/power-constants.ts";
 import { setupWallSwitchHandler } from "./charge-mode/wall-switch-handler.ts";
 import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
@@ -76,29 +75,15 @@ class HomeAutomationApp {
       return mqttAwakeTask.execute();
     });
 
-    const powerCommandGenerator = new CommandBuilder();
+    const chargingCycle = new AutomaticChargingCycle({
+      telemetry: () => controlTelemetry.snapshot(),
+      modes: () => globals.wallboxChargeMode,
+      clock: systemClock,
+      publisher: this.mqttClient,
+      enabled: POWER_CONTROL_ENABLED,
+    });
     scheduler.interval("Dynamic power", DYNAMIC_POWER_INTERVAL, () => {
-      const now = systemClock();
-      const inputState = {
-        ...controlTelemetry.snapshot(),
-        timeOfDay: lisbonTime(now).toPlainTime(),
-        remainingNight: timeUntilMorning(now),
-      };
-
-      const result = calculateTargetAmpsAndPriority(inputState);
-
-      if (result.priorityDecision.kind === "clear") {
-        globals.primaryWallboxLocation = undefined;
-      } else if (result.priorityDecision.kind === "set") {
-        globals.primaryWallboxLocation = result.priorityDecision.location;
-      }
-
-      const commands = powerCommandGenerator.createCommandsFromPowerSettings(
-        inputState,
-        result,
-      );
-
-      return runCommands(commands, this.mqttClient);
+      return chargingCycle.tick();
     });
 
     const loadForecastTask = new LoadForecastTask(this.metrics);
