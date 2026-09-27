@@ -23,7 +23,7 @@ export async function fetchOmie(): Promise<string> {
 
 export function parseOmieResponse(
   response: string,
-  startOfToday: Temporal.PlainDateTime
+  startOfToday: Temporal.PlainDateTime,
 ): OmieEntry[] {
   const entries: OmieEntry[] = [];
   const lines = response.split("\n");
@@ -45,13 +45,12 @@ export function parseOmieResponse(
   });
 
   const resultEntries = averagedEntries.map((entry) => {
-    const tar = entry.date.hour >= 22 || entry.date.hour < 8
-      ? TAR_NIGHT
-      : TAR_DAY;
+    const tar =
+      entry.date.hour >= 22 || entry.date.hour < 8 ? TAR_NIGHT : TAR_DAY;
 
     // Convert OMIE from EUR/MWh to EUR/kWh before applying the formula.
     const omie = entry.price / 1000;
-    const formulaResult = (omie * 1.16 + 0.314 + tar) * 1.06;
+    const formulaResult = (omie * 1.16 + 0.0314 + tar) * 1.06;
 
     // convert to cents per kWh
     return { date: entry.date, price: Math.round(formulaResult * 100) };
@@ -94,7 +93,7 @@ function parseDate(input: string): Temporal.PlainDate | undefined {
       return new Temporal.PlainDate(
         parseInt(parts[2]!),
         parseInt(parts[1]!),
-        parseInt(parts[0]!)
+        parseInt(parts[0]!),
       );
     }
   } catch (_ex) {

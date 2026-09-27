@@ -37,13 +37,13 @@ Deno.test("parseOmieResponse should parse OMIE data correctly", () => {
   assertEquals(firstEntry.date.hour, 23); // Period 1 becomes hour 0, then -1 = 23
 
   // The average OMIE price is 22.9875 EUR/MWh; the night price rounds
-  // to 38 cents/kWh after applying the formula.
-  assertEquals(firstEntry.price, 38);
+  // to 8 cents/kWh after applying the formula.
+  assertEquals(firstEntry.price, 8);
 
   // Check last entry
   const lastEntry = result[result.length - 1]!;
   assertEquals(lastEntry.date.hour, 9);
-  assertEquals(lastEntry.price, 45);
+  assertEquals(lastEntry.price, 15);
 
   // Verify entries are sorted by date
   for (let i = 1; i < result.length; i++) {
@@ -71,14 +71,14 @@ Deno.test("parseOmieResponse applies tariffs at Portugal hour boundaries", () =>
     new Temporal.PlainDateTime(2025, 11, 15),
   );
 
-  // At 0.1 EUR/kWh OMIE, night is 47.2548 cents and day is 54.431 cents.
+  // At 0.1 EUR/kWh OMIE, night is 17.2992 cents and day is 24.4754 cents.
   assertEquals(result.map((entry) => [entry.date.hour, entry.price]), [
-    [0, 47],
-    [7, 47],
-    [8, 54],
-    [21, 54],
-    [22, 47],
-    [23, 47],
+    [0, 17],
+    [7, 17],
+    [8, 24],
+    [21, 24],
+    [22, 17],
+    [23, 17],
   ]);
 });
 
