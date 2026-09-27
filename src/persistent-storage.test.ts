@@ -72,3 +72,27 @@ Deno.test("saves stay ordered and continue after a failed write", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+Deno.test("writes use the master key to disable versioning even when an access key exists", async () => {
+  const originalFetch = globalThis.fetch;
+  const keys = ["JSONBIN_ACCESS_KEY", "JSONBIN_MASTER_KEY"];
+  const previous = keys.map((key) => Deno.env.get(key));
+  Deno.env.set(keys[0]!, "test-access");
+  Deno.env.set(keys[1]!, "test-master");
+  globalThis.fetch = (_input, init) => {
+    const headers = new Headers(init?.headers);
+    assertEquals(headers.get("X-Master-Key"), "test-master");
+    assertEquals(headers.get("X-Access-Key"), null);
+    assertEquals(headers.get("X-Bin-Versioning"), "false");
+    return Promise.resolve(Response.json({}));
+  };
+  try {
+    await savePersistentStorage({ inside: 2, outside: 2 });
+  } finally {
+    globalThis.fetch = originalFetch;
+    keys.forEach((key, i) => {
+      if (previous[i] === undefined) Deno.env.delete(key);
+      else Deno.env.set(key, previous[i]!);
+    });
+  }
+});

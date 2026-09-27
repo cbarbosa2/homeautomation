@@ -16,7 +16,7 @@ Use [.env.example](../.env.example) as the configuration template; [constants.ts
 | `VICTRON_INSTALLATION_ID` | Required positive decimal VRM installation ID used for forecast API requests. |
 | `JSONBIN_ID` | Remote storage identifier for persisted charge modes. |
 | `JSONBIN_ACCESS_KEY` | JSONBin access key with Bins Read and Update permissions. |
-| `JSONBIN_MASTER_KEY` | Alternative JSONBin master key; access key takes precedence when both are configured. |
+| `JSONBIN_MASTER_KEY` | JSONBin master key; preferred for writes to disable versioning on public bins. Reads prefer the access key. |
 
 `HTTP_TIMEOUT` remains in the configuration but is not used by current request code. Logging settings are listed in `.env.example`.
 
@@ -85,3 +85,7 @@ Physical switch save failures are logged. Writes are serialized and pending writ
 are drained during graceful shutdown. Requests time out after 30 seconds.
 Configure a JSONBin credential in the service's `.env` before restarting; the bin
 ID alone does not authorize writes. See the [JSONBin update API](https://jsonbin.io/api-reference/bins/update).
+
+Settings writes send `X-Bin-Versioning: false` to avoid exhausting bin versions.
+Public bins require the master key to honor this header. Configure
+`JSONBIN_MASTER_KEY` for public bins; existing history is not deleted.

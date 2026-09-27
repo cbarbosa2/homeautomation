@@ -2,11 +2,13 @@
 
 import { JSONBIN_ID } from "./constants.ts";
 
-function storageHeaders(): Headers {
+function storageHeaders(write = false): Headers {
   const headers = new Headers({ "Content-Type": "application/json" });
   const accessKey = Deno.env.get("JSONBIN_ACCESS_KEY");
   const masterKey = Deno.env.get("JSONBIN_MASTER_KEY");
-  if (accessKey) headers.set("X-Access-Key", accessKey);
+  if (write) headers.set("X-Bin-Versioning", "false");
+  if (write && masterKey) headers.set("X-Master-Key", masterKey);
+  else if (accessKey) headers.set("X-Access-Key", accessKey);
   else if (masterKey) headers.set("X-Master-Key", masterKey);
   return headers;
 }
@@ -58,7 +60,7 @@ export function savePersistentStorage(
   const save = pendingSave.then(async () => {
     const response = await fetch(BIN_BASE_URL + JSONBIN_ID, {
       method: "PUT",
-      headers: storageHeaders(),
+      headers: storageHeaders(true),
       signal: AbortSignal.timeout(30000),
       body,
     });
