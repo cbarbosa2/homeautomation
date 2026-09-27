@@ -1,7 +1,11 @@
 import { SolarForecasts } from "../solar-forecasts.ts";
 import { Temporal } from "../temporal.ts";
 import { lisbonTime, systemClock } from "../lisbon-clock.ts";
-import { FORECAST_SOLAR_API_KEY, VICTRON_API_KEY } from "../constants.ts";
+import {
+  FORECAST_SOLAR_API_KEY,
+  VICTRON_API_KEY,
+  VICTRON_INSTALLATION_ID,
+} from "../constants.ts";
 import { globals } from "../globals.ts";
 import { logError } from "../logger.ts";
 import { METRICS } from "../prometheus/metrics.ts";
@@ -11,10 +15,10 @@ export class LoadForecastTask {
   private readonly forecastSolarApiUrl =
     `https://api.forecast.solar/${FORECAST_SOLAR_API_KEY}/estimate/watthours/day/41.081591/-8.643748/13/12/8.2`;
   private readonly victronApiUrl =
-    `https://vrmapi.victronenergy.com/v2/installations/176724/stats?type=custom&attributeCodes[]=vrm_pv_charger_yield_fc&interval=days`;
-  private metrics: PrometheusMetrics;
+    `https://vrmapi.victronenergy.com/v2/installations/${VICTRON_INSTALLATION_ID}/stats?type=custom&attributeCodes[]=vrm_pv_charger_yield_fc&interval=days`;
+  private metrics: Pick<PrometheusMetrics, "setGauge">;
 
-  constructor(metrics: PrometheusMetrics) {
+  constructor(metrics: Pick<PrometheusMetrics, "setGauge">) {
     this.metrics = metrics;
 
     this.execute();

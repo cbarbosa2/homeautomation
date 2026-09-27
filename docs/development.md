@@ -25,6 +25,8 @@ See [operations.md](operations.md) for configuration. [bootstrap.ts](../src/boot
 
 [deno.json](../deno.json) is the source of truth for tasks, permissions, dependencies, and compiler settings.
 
+The test task supplies synthetic Victron identifiers, so tests do not require a private `.env`. When invoking `deno test` directly, set `VICTRON_PORTAL_ID=test-portal` and `VICTRON_INSTALLATION_ID=123456` in the test environment.
+
 ## Date and time
 
 Use Temporal for all date/time-related types in application code and tests. Import it through [src/temporal.ts](../src/temporal.ts).

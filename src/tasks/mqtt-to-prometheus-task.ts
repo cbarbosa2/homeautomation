@@ -1,14 +1,18 @@
-import { controlTelemetry, VICTRON_PORTAL_ID } from "../control-telemetry.ts";
+import { VICTRON_PORTAL_ID } from "../constants.ts";
+import { controlTelemetry } from "../control-telemetry.ts";
 import { events, globals, WallboxLocation } from "../globals.ts";
 import { MqttClient } from "../mqtt-client.ts";
 import { MetricInfo, METRICS } from "../prometheus/metrics.ts";
 import { PrometheusMetrics } from "../prometheus/prometheus.ts";
 
 export class MqttToPrometheusTask {
-  private metrics: PrometheusMetrics;
-  private mqttClient: MqttClient;
+  private metrics: Pick<PrometheusMetrics, "setGauge">;
+  private mqttClient: Pick<MqttClient, "subscribeWithHandler">;
 
-  constructor(mqttClient: MqttClient, metrics: PrometheusMetrics) {
+  constructor(
+    mqttClient: Pick<MqttClient, "subscribeWithHandler">,
+    metrics: Pick<PrometheusMetrics, "setGauge">,
+  ) {
     this.mqttClient = mqttClient;
     this.metrics = metrics;
   }
@@ -21,115 +25,115 @@ export class MqttToPrometheusTask {
       );
     }
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/battery/512/System/MaxCellVoltage",
+      `N/${VICTRON_PORTAL_ID}/battery/512/System/MaxCellVoltage`,
       METRICS.GAUGES.ESS_BATTERY_MAX_CELL_VOLTAGE,
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/battery/512/System/MinCellVoltage",
+      `N/${VICTRON_PORTAL_ID}/battery/512/System/MinCellVoltage`,
       METRICS.GAUGES.ESS_BATTERY_MIN_CELL_VOLTAGE,
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/battery/512/Dc/0/Current",
+      `N/${VICTRON_PORTAL_ID}/battery/512/Dc/0/Current`,
       METRICS.GAUGES.ESS_BATTERY_CURRENT,
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/battery/512/Dc/0/Power",
+      `N/${VICTRON_PORTAL_ID}/battery/512/Dc/0/Power`,
       METRICS.GAUGES.ESS_BATTERY_POWER,
       (value) => {
         globals.batteryPower = value;
       },
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/settings/0/Settings/CGwacs/MaxChargePower",
+      `N/${VICTRON_PORTAL_ID}/settings/0/Settings/CGwacs/MaxChargePower`,
       METRICS.GAUGES.ESS_BATTERY_MAX_CHARGE_POWER,
       (value) => {
         globals.batteryMaxChargePower = value;
       },
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/battery/512/Dc/0/Voltage",
+      `N/${VICTRON_PORTAL_ID}/battery/512/Dc/0/Voltage`,
       METRICS.GAUGES.ESS_BATTERY_VOLTAGE,
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/battery/512/Dc/0/Temperature",
+      `N/${VICTRON_PORTAL_ID}/battery/512/Dc/0/Temperature`,
       METRICS.GAUGES.ESS_BATTERY_TEMPERATURE,
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/battery/512/Soc",
+      `N/${VICTRON_PORTAL_ID}/battery/512/Soc`,
       METRICS.GAUGES.ESS_BATTERY_SOC,
       (value) => {
         globals.batterySOC = value;
       },
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/system/0/Ac/Grid/L1/Power",
+      `N/${VICTRON_PORTAL_ID}/system/0/Ac/Grid/L1/Power`,
       METRICS.GAUGES.ESS_GRID_POWER,
       (value) => {
         globals.gridPower = value;
       },
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/system/0/Ac/Consumption/L1/Power",
+      `N/${VICTRON_PORTAL_ID}/system/0/Ac/Consumption/L1/Power`,
       METRICS.GAUGES.ESS_CONSUMPTION_POWER,
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/settings/0/Settings/CGwacs/BatteryLife/MinimumSocLimit",
+      `N/${VICTRON_PORTAL_ID}/settings/0/Settings/CGwacs/BatteryLife/MinimumSocLimit`,
       METRICS.GAUGES.ESS_BATTERY_MIN_SOC,
       (value) => {
         globals.batteryMinSOC = value;
       },
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/system/0/Ac/PvOnGrid/L1/Power",
+      `N/${VICTRON_PORTAL_ID}/system/0/Ac/PvOnGrid/L1/Power`,
       METRICS.GAUGES.ESS_PV_INVERTER_POWER,
       (value) => {
         globals.pvInverterPower = value;
       },
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/system/0/Dc/Pv/Power",
+      `N/${VICTRON_PORTAL_ID}/system/0/Dc/Pv/Power`,
       METRICS.GAUGES.ESS_PV_CHARGER_POWER,
       (value) => {
         globals.pvChargerPower = value;
       },
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/evcharger/40/Ac/Power",
+      `N/${VICTRON_PORTAL_ID}/evcharger/40/Ac/Power`,
       METRICS.GAUGES.ESS_WALLBOX_INSIDE_POWER,
       (value) => {
         globals.wallboxPower.set(WallboxLocation.Inside, value ?? 0);
       },
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/evcharger/41/Ac/Power",
+      `N/${VICTRON_PORTAL_ID}/evcharger/41/Ac/Power`,
       METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_POWER,
       (value) => {
         globals.wallboxPower.set(WallboxLocation.Outside, value ?? 0);
       },
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/evcharger/40/Status",
+      `N/${VICTRON_PORTAL_ID}/evcharger/40/Status`,
       METRICS.GAUGES.ESS_WALLBOX_INSIDE_STATUS,
       (value) => {
         globals.wallboxVictronStatus.set(WallboxLocation.Inside, value ?? 0);
       },
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/evcharger/41/Status",
+      `N/${VICTRON_PORTAL_ID}/evcharger/41/Status`,
       METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_STATUS,
       (value) => {
         globals.wallboxVictronStatus.set(WallboxLocation.Outside, value ?? 0);
       },
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/evcharger/40/Current",
+      `N/${VICTRON_PORTAL_ID}/evcharger/40/Current`,
       METRICS.GAUGES.ESS_WALLBOX_INSIDE_CURRENT,
       (value) => {
         globals.wallboxCurrent.set(WallboxLocation.Inside, value ?? 0);
       },
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/evcharger/40/SetCurrent",
+      `N/${VICTRON_PORTAL_ID}/evcharger/40/SetCurrent`,
       METRICS.GAUGES.ESS_WALLBOX_INSIDE_SET_CURRENT,
       (value) => {
         globals.wallboxSetCurrent.set(WallboxLocation.Inside, value ?? 0);
@@ -137,14 +141,14 @@ export class MqttToPrometheusTask {
       },
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/evcharger/41/Current",
+      `N/${VICTRON_PORTAL_ID}/evcharger/41/Current`,
       METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_CURRENT,
       (value) => {
         globals.wallboxCurrent.set(WallboxLocation.Outside, value ?? 0);
       },
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/evcharger/41/SetCurrent",
+      `N/${VICTRON_PORTAL_ID}/evcharger/41/SetCurrent`,
       METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_SET_CURRENT,
       (value) => {
         globals.wallboxSetCurrent.set(WallboxLocation.Outside, value ?? 0);
@@ -152,7 +156,7 @@ export class MqttToPrometheusTask {
       },
     );
     this.subscribeAndAssignToGauge(
-      "N/102c6b9cfab9/temperature/24/Temperature",
+      `N/${VICTRON_PORTAL_ID}/temperature/24/Temperature`,
       METRICS.GAUGES.ESS_SHED_TEMPERATURE,
     );
     this.mqttClient.subscribeWithHandler(

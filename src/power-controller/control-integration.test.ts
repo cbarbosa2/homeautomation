@@ -1,10 +1,10 @@
+import { VICTRON_PORTAL_ID } from "../constants.ts";
 import { Temporal } from "../temporal.ts";
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import {
   CONTROL_PATHS,
   ControlTelemetry,
   REFRESH_PATHS,
-  VICTRON_PORTAL_ID,
   wallboxPath,
 } from "../control-telemetry.ts";
 import {

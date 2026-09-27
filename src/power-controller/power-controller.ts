@@ -1,5 +1,5 @@
 import { globals, WallboxChargeMode, WallboxLocation } from "../globals.ts";
-import { POWER_CONTROL_ENABLED } from "../constants.ts";
+import { POWER_CONTROL_ENABLED, VICTRON_PORTAL_ID } from "../constants.ts";
 import { logInfo } from "../logger.ts";
 import { MqttClient } from "../mqtt-client.ts";
 
@@ -55,7 +55,7 @@ export async function runCommands(
 }
 
 function getTopic(command: PowerCommand): string | undefined {
-  const BASE = "W/102c6b9cfab9/";
+  const BASE = `W/${VICTRON_PORTAL_ID}/`;
   switch (command.type) {
     case CommandType.InsideCurrent:
       return `${BASE}evcharger/40/SetCurrent`;

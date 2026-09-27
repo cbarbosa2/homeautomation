@@ -12,9 +12,13 @@ Use [.env.example](../.env.example) as the configuration template; [constants.ts
 | `HTTP_PORT` | HTTP server port; defaults to 1881. |
 | `POWER_CONTROL_ENABLED` | Set to `true` to publish generated wallbox and battery power commands; otherwise those commands are logged only. Scheduled minimum-SOC updates are separate and still publish. |
 | `FORECAST_SOLAR_API_KEY`, `VICTRON_API_KEY` | Solar forecast API credentials. |
+| `VICTRON_PORTAL_ID` | Required Victron portal ID used in MQTT topics; a single topic segment without wildcards. |
+| `VICTRON_INSTALLATION_ID` | Required positive decimal VRM installation ID used for forecast API requests. |
 | `JSONBIN_ID` | Remote storage identifier for persisted charge modes. |
 
 `HTTP_TIMEOUT` remains in the configuration but is not used by current request code. Logging settings are listed in `.env.example`.
+
+Store both Victron identifiers in the ignored `.env` file, never in tracked source or documentation. They have no defaults; missing or invalid values stop startup before network connections. The portal ID and numeric installation ID are separate values. On `bee.local`, configuration lives in `/home/carlos/homeautomation/.env`; keep it owned by `carlos` with mode `0600`. Configure both identifiers before deploying code that requires them. Environment changes take effect on the next service start.
 
 ## Monitoring
 
@@ -29,7 +33,7 @@ The health endpoint returns `OK`; it does not verify MQTT connectivity or extern
 ## Automation telemetry and timing
 
 Control readings are refreshed every 30 seconds using explicit empty MQTT reads
-on `R/102c6b9cfab9/<path>`. The exact list is in
+on `R/<VICTRON_PORTAL_ID>/<path>`. The exact list is in
 [control-telemetry.ts](../src/control-telemetry.ts): grid power, battery power/SOC,
 minimum SOC and maximum charge power, both PV sources, and each wallbox's power,
 status, SetCurrent and StartStop. Keepalive does not renew these timestamps.

@@ -1,5 +1,6 @@
+import { VICTRON_PORTAL_ID } from "../constants.ts";
 import { MqttClient } from "../mqtt-client.ts";
-import { REFRESH_PATHS, VICTRON_PORTAL_ID } from "../control-telemetry.ts";
+import { REFRESH_PATHS } from "../control-telemetry.ts";
 
 export class MqttAwakeTask {
   constructor(private mqttClient: Pick<MqttClient, "publish">) {}

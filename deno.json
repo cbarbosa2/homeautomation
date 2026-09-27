@@ -5,7 +5,7 @@
     "check": "deno check src/*.ts && deno task test",
     "lint": "deno lint src/",
     "fmt": "deno fmt src/",
-    "test": "deno test --allow-net --allow-read --allow-write --allow-env --unstable-cron",
+    "test": "VICTRON_PORTAL_ID=test-portal VICTRON_INSTALLATION_ID=123456 deno test --allow-net --allow-read --allow-write --allow-env --unstable-cron",
     "analyze": "deno task check && deno task lint",
     "compile": "deno check src/**/*.ts"
   },

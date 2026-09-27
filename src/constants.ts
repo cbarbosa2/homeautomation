@@ -1,5 +1,11 @@
 import { Temporal } from "./temporal.ts";
 import { systemClock } from "./lisbon-clock.ts";
+import { readVictronConfig } from "./victron-config.ts";
+
+const victron = readVictronConfig((name) => Deno.env.get(name));
+export const VICTRON_PORTAL_ID = victron.portalId;
+export const VICTRON_INSTALLATION_ID = victron.installationId;
+
 // MQTT Configuration
 export const MQTT_BROKER_URL = Deno.env.get("MQTT_BROKER_URL") ||
   "mqtt://localhost:1883";

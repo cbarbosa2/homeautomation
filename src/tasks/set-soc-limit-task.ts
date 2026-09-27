@@ -1,3 +1,4 @@
+import { VICTRON_PORTAL_ID } from "../constants.ts";
 import { globals } from "../globals.ts";
 import { SolarForecasts } from "../solar-forecasts.ts";
 import { CONTROL_PATHS, controlTelemetry } from "../control-telemetry.ts";
@@ -39,7 +40,7 @@ interface EveningInputs {
 }
 export class SetSocLimitTask {
   private readonly topic =
-    "W/102c6b9cfab9/settings/0/Settings/CGwacs/BatteryLife/MinimumSocLimit";
+    `W/${VICTRON_PORTAL_ID}/settings/0/Settings/CGwacs/BatteryLife/MinimumSocLimit`;
   private lastMinute: Temporal.Instant;
   private pending:
     | {
