@@ -1,3 +1,5 @@
+import { Clock, systemClock } from "../lisbon-clock.ts";
+import { Temporal } from "../temporal.ts";
 import { isCharging, wallboxAmps } from "./wallbox-policy.ts";
 import {
   WallboxChargeMode as Mode,
@@ -25,20 +27,20 @@ export interface SystemState {
   wallboxChargeMode?: Map<L, Mode>;
   wallboxSetCurrent?: Map<L, number>;
   wallboxStartStop?: Map<L, number>;
-  observedAt?: Map<string, number>;
+  observedAt?: Map<string, Temporal.Instant>;
 }
 type Device = L | "battery";
 interface Reservation {
   watts: number;
   target: number;
-  since: number;
+  since: Temporal.Instant | undefined;
 }
 
 /** Reductions are immediate. Increases wait for smoothing and device feedback. */
 export class CommandBuilder {
   private history = new Map<L, number[]>();
   private reservations = new Map<Device, Reservation>();
-  constructor(private now: () => number = Date.now) {}
+  constructor(private now: Clock = systemClock) {}
 
   public createCommandsFromPowerSettings(
     state: SystemState,
@@ -171,16 +173,19 @@ export class CommandBuilder {
         wallboxPath(device, "SetCurrent"),
         wallboxPath(device, "StartStop"),
       ];
-    const fresh = paths.every((p) =>
-      (state.observedAt?.get(p) ?? -Infinity) > (old?.since ?? -Infinity)
-    );
+    const fresh = paths.every((p) => {
+      const observedAt = state.observedAt?.get(p);
+      return observedAt !== undefined &&
+        (old?.since === undefined ||
+          Temporal.Instant.compare(observedAt, old.since) > 0);
+    });
     if (!old) {
       // Without telemetry metadata (pure callers), retain measured consumption.
       const watts = Math.max(
         measured,
         (state.observedAt || setting !== undefined) ? configured : 0,
       );
-      this.reservations.set(device, { watts, target: watts, since: -Infinity });
+      this.reservations.set(device, { watts, target: watts, since: undefined });
     } else if (fresh && configured <= old.target && measured <= old.target) {
       old.watts = Math.max(configured, measured);
     } else {

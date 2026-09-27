@@ -1,3 +1,5 @@
+import { SolarForecasts } from "../solar-forecasts.ts";
+import { Temporal } from "../temporal.ts";
 import { lisbonTime, systemClock } from "../lisbon-clock.ts";
 import { FORECAST_SOLAR_API_KEY, VICTRON_API_KEY } from "../constants.ts";
 import { globals } from "../globals.ts";
@@ -62,15 +64,15 @@ export class LoadForecastTask {
       /^\d{4}-\d{2}-\d{2}$/.test(date) && typeof value === "number" &&
       Number.isFinite(value) && value >= 0
     );
-    globals.solarForecastByDate = new Map(
+    globals.solarForecastByDate = new SolarForecasts(
       entries.map((
         [date, wattHours],
-      ) => [date, { wattHours, fetchedAt: now.epochMilliseconds }]),
+      ) => [Temporal.PlainDate.from(date), { wattHours, fetchedAt: now }]),
     );
     return Array.from(
       { length: 4 },
       (_, index) =>
-        globals.solarForecastByDate.get(today.add({ days: index }).toString())
+        globals.solarForecastByDate.get(today.add({ days: index }))
           ?.wattHours ?? 0,
     );
   }

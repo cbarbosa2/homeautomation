@@ -4,7 +4,7 @@ export const systemClock: Clock = () => Temporal.Now.instant();
 export function lisbonTime(instant: Temporal.Instant) {
   return instant.toZonedDateTimeISO("Europe/Lisbon");
 }
-export function hoursUntilMorning(instant: Temporal.Instant): number {
+export function timeUntilMorning(instant: Temporal.Instant): Temporal.Duration {
   const local = lisbonTime(instant);
   let morning = local.with({
     hour: 8,
@@ -17,7 +17,9 @@ export function hoursUntilMorning(instant: Temporal.Instant): number {
   if (Temporal.ZonedDateTime.compare(morning, local) <= 0) {
     morning = morning.add({ days: 1 });
   }
-  return Math.ceil(
-    (morning.epochMilliseconds - instant.epochMilliseconds) / 3_600_000,
-  );
+  return instant.until(morning.toInstant()).round({
+    largestUnit: "hours",
+    smallestUnit: "hours",
+    roundingMode: "ceil",
+  });
 }

@@ -1,7 +1,9 @@
+import { Clock, systemClock } from "./lisbon-clock.ts";
+import { Temporal } from "./temporal.ts";
 import { globals, WallboxLocation as L, WallboxStatus } from "./globals.ts";
 import { finite } from "./power-controller/dynamic-power-calculator.ts";
 
-export const PORTAL = "102c6b9cfab9";
+export const VICTRON_PORTAL_ID = "102c6b9cfab9";
 export const CONTROL_PATHS = {
   gridPower: "system/0/Ac/Grid/L1/Power",
   batterySOC: "battery/512/Soc",
@@ -25,35 +27,36 @@ export const REFRESH_PATHS = [
 
 /** Validity belongs to each reading; a keepalive is not a measurement. */
 export class ControlTelemetry {
-  private readings = new Map<string, { value: number; at: number }>();
+  private readings = new Map<string, { value: number; at: Temporal.Instant }>();
   private previousStatus = new Map<L, number>();
-  private starts = new Map<L, number>();
-  constructor(private now: () => number = Date.now) {}
+  private starts = new Map<L, Temporal.Instant>();
+  constructor(private now: Clock = systemClock) {}
 
   record(topic: string, payload: unknown): void {
-    const path = topic.replace(`N/${PORTAL}/`, "");
+    const path = topic.replace(`N/${VICTRON_PORTAL_ID}/`, "");
     if (!REFRESH_PATHS.includes(path)) return;
-    const value =
+    const rawValue =
       payload !== null && typeof payload === "object" && "value" in payload
         ? payload.value
         : undefined;
     if (
-      !finite(value) ||
+      !finite(rawValue) ||
       ((path.endsWith("Soc") || path.endsWith("SocLimit")) &&
-        (value < 0 || value > 100)) ||
+        (rawValue < 0 || rawValue > 100)) ||
       (path.endsWith("Status") &&
         (![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24]
-          .includes(value))) ||
-      (path.endsWith("StartStop") && value !== 0 && value !== 1) ||
+          .includes(rawValue))) ||
+      (path.endsWith("StartStop") && rawValue !== 0 && rawValue !== 1) ||
       ((path.includes("evcharger/") &&
         (path.endsWith("Ac/Power") || path.endsWith("SetCurrent"))) &&
-        value < 0) ||
+        rawValue < 0) ||
       ((path === CONTROL_PATHS.pvInverterPower ||
-        path === CONTROL_PATHS.pvChargerPower) && value < 0)
+        path === CONTROL_PATHS.pvChargerPower) && rawValue < 0)
     ) {
       this.readings.delete(path);
       return;
     }
+    const value: number = rawValue;
     this.readings.set(path, { value, at: this.now() });
     for (const l of [L.Inside, L.Outside]) {
       if (path !== wallboxPath(l, "Status")) continue;
@@ -61,7 +64,12 @@ export class ControlTelemetry {
         value === WallboxStatus.Charging && this.previousStatus.get(l) !== value
       ) {
         // Both charging on first observation have indistinguishable start order.
-        this.starts.set(l, this.previousStatus.has(l) ? this.now() : 0);
+        this.starts.set(
+          l,
+          this.previousStatus.has(l)
+            ? this.now()
+            : Temporal.Instant.fromEpochMilliseconds(0),
+        );
       }
       this.previousStatus.set(l, value);
     }
@@ -71,8 +79,9 @@ export class ControlTelemetry {
   }
   value(path: string): number | undefined {
     const reading = this.readings.get(path);
-    return reading && this.now() - reading.at <= 60_000 &&
-        this.now() >= reading.at
+    const now = this.now();
+    return reading && Temporal.Instant.compare(now, reading.at) >= 0 &&
+        Temporal.Instant.compare(now, reading.at.add({ seconds: 60 })) <= 0
       ? reading.value
       : undefined;
   }

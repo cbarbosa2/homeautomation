@@ -1,3 +1,4 @@
+import { Temporal } from "../temporal.ts";
 import { assertEquals } from "@std/assert";
 import {
   WallboxChargeMode as Mode,
@@ -24,7 +25,7 @@ export function state(): InputState {
       S.Connected,
     ]]),
     wallboxChargeMode: new Map([[L.Inside, Mode.On], [L.Outside, Mode.On]]),
-    hourOfDay: 12,
+    timeOfDay: Temporal.PlainTime.from("12:00"),
   };
 }
 
@@ -122,12 +123,18 @@ Deno.test("first observed start owns priority, with Inside winning indistinguish
     L.Outside,
     S.Charging,
   ]]);
-  input.chargingStartedAt = new Map([[L.Inside, 20], [L.Outside, 10]]);
+  input.chargingStartedAt = new Map([[
+    L.Inside,
+    Temporal.Instant.fromEpochMilliseconds(20),
+  ], [L.Outside, Temporal.Instant.fromEpochMilliseconds(10)]]);
   assertEquals(
     calculateTargetAmpsAndPriority(input).priorityDecision,
     { kind: "set", location: L.Outside },
   );
-  input.chargingStartedAt.set(L.Inside, 10);
+  input.chargingStartedAt.set(
+    L.Inside,
+    Temporal.Instant.fromEpochMilliseconds(10),
+  );
   assertEquals(
     calculateTargetAmpsAndPriority(input).priorityDecision,
     { kind: "set", location: L.Inside },
@@ -189,15 +196,20 @@ Deno.test("mode SOC boundaries and night boundaries follow strict documented mar
   }
   const input = state();
   input.wallboxChargeMode.set(L.Inside, Mode.ESSOnly);
-  input.hourOfDay = 23.5;
-  input.remainingNightHours = 9;
+  input.timeOfDay = Temporal.PlainTime.from("23:30");
+  input.remainingNight = Temporal.Duration.from({ hours: 9 });
   input.batterySOC = 38;
   assertEquals(calculateTargetAmpsAndPriority(input).insideWallboxAmps, 0);
   input.batterySOC = 38.01;
   assertEquals(calculateTargetAmpsAndPriority(input).insideWallboxAmps, 20);
   input.wallboxChargeMode.set(L.Inside, Mode.Night);
-  for (const [hour, amps] of [[21.99, 0], [22, 20], [7.99, 20], [8, 0]]) {
-    input.hourOfDay = hour!;
+  for (
+    const [hour, amps] of [["21:59:24", 0], ["22:00", 20], ["07:59:24", 20], [
+      "08:00",
+      0,
+    ]] as const
+  ) {
+    input.timeOfDay = Temporal.PlainTime.from(hour);
     assertEquals(calculateTargetAmpsAndPriority(input).insideWallboxAmps, amps);
   }
 });

@@ -1,3 +1,4 @@
+import { Temporal } from "../temporal.ts";
 import { assertEquals } from "@std/assert";
 import {
   calculateTargetAmpsAndPriority,
@@ -34,7 +35,7 @@ function createDefaultState(): InputState {
       [WallboxLocation.Inside, WallboxChargeMode.SunOnly],
       [WallboxLocation.Outside, WallboxChargeMode.SunOnly],
     ]),
-    hourOfDay: 12,
+    timeOfDay: Temporal.PlainTime.from("12:00"),
   };
 }
 
@@ -57,7 +58,7 @@ Deno.test("calculateTargetAmpsAndPriority Off disables charging", () => {
 Deno.test("calculateTargetAmpsAndPriority Night mode off-peak", () => {
   const state = createDefaultState();
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Night);
-  state.hourOfDay = 23;
+  state.timeOfDay = Temporal.PlainTime.from("23:00");
   const result = calculateTargetAmpsAndPriority(state);
   assertEquals(typeof result.insideWallboxAmps, "number");
 });
@@ -79,7 +80,7 @@ Deno.test("batteryChargePower with moderate grid power", () => {
     ...createDefaultState(),
     gridPower: 2000,
     batteryMinSOC: 55,
-    hourOfDay: 23,
+    timeOfDay: Temporal.PlainTime.from("23:00"),
   };
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Off);
   state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Off);
@@ -93,7 +94,7 @@ Deno.test("batteryChargePower with no grid power", () => {
     ...createDefaultState(),
     gridPower: 0,
     batteryMinSOC: 55,
-    hourOfDay: 23,
+    timeOfDay: Temporal.PlainTime.from("23:00"),
   };
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Off);
   state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Off);
@@ -109,7 +110,7 @@ Deno.test("batteryChargePower with high grid power", () => {
     ...createDefaultState(),
     gridPower: 7000,
     batteryMinSOC: 55,
-    hourOfDay: 23,
+    timeOfDay: Temporal.PlainTime.from("23:00"),
   };
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Off);
   state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Off);
@@ -124,7 +125,7 @@ Deno.test("batteryChargePower with car charging", () => {
   const state = {
     ...createDefaultState(),
     gridPower: 18 * 240,
-    hourOfDay: 23,
+    timeOfDay: Temporal.PlainTime.from("23:00"),
     batterySOC: 5,
   };
   state.wallboxPower.set(WallboxLocation.Inside, 18 * 240);
@@ -189,7 +190,7 @@ Deno.test("On mode uses shared fallback when PV telemetry is unavailable", () =>
     WallboxLocation.Inside,
     WallboxStatus.Connected,
   );
-  state.hourOfDay = 20;
+  state.timeOfDay = Temporal.PlainTime.from("20:00");
   // set maximum amps for inside wallbox
   assertEquals(calculateTargetAmpsAndPriority(state).insideWallboxAmps, 12);
 });

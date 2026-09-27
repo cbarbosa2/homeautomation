@@ -1,9 +1,10 @@
+import { Temporal } from "../temporal.ts";
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import {
   CONTROL_PATHS,
   ControlTelemetry,
-  PORTAL,
   REFRESH_PATHS,
+  VICTRON_PORTAL_ID,
   wallboxPath,
 } from "../control-telemetry.ts";
 import {
@@ -17,10 +18,10 @@ import { calculateTargetAmpsAndPriority } from "./dynamic-power-calculator.ts";
 import { CommandType, PowerCommand, runCommands } from "./power-controller.ts";
 
 function installation() {
-  let now = 1000;
+  let now = Temporal.Instant.from("2026-09-27T12:00:00Z");
   const telemetry = new ControlTelemetry(() => now);
   const record = (path: string, value: unknown) =>
-    telemetry.record(`N/${PORTAL}/${path}`, { value });
+    telemetry.record(`N/${VICTRON_PORTAL_ID}/${path}`, { value });
   const values = new Map<string, number>(REFRESH_PATHS.map((p) => [p, 0]));
   values.set(CONTROL_PATHS.batterySOC, 50);
   values.set(CONTROL_PATHS.batteryMinSOC, 20);
@@ -37,7 +38,7 @@ function installation() {
   const input = () => ({
     ...telemetry.snapshot(),
     wallboxChargeMode: modes,
-    hourOfDay: 12,
+    timeOfDay: Temporal.PlainTime.from("12:00"),
   });
   const tick = () =>
     builder.createCommandsFromPowerSettings(
@@ -52,8 +53,8 @@ function installation() {
     modes,
     input,
     tick,
-    advance: (ms = 1000) => {
-      now += ms;
+    advance: (duration = Temporal.Duration.from({ seconds: 1 })) => {
+      now = now.add(duration);
     },
   };
 }
@@ -116,7 +117,7 @@ Deno.test("released capacity waits for fresh device confirmation before transfer
 Deno.test("stale, invalid, disconnected and recovered readings change shared allocation", () => {
   const h = installation();
   assertEquals(calculateTargetAmpsAndPriority(h.input()).insideWallboxAmps, 20);
-  h.advance(60_001);
+  h.advance(Temporal.Duration.from({ seconds: 60, milliseconds: 1 }));
   assertEquals(
     calculateTargetAmpsAndPriority(h.input()).batteryChargePower,
     2880,
@@ -133,6 +134,18 @@ Deno.test("stale, invalid, disconnected and recovered readings change shared all
   h.telemetry.invalidate();
   assertEquals(h.telemetry.value(CONTROL_PATHS.gridPower), undefined);
 });
+Deno.test("telemetry freshness includes exactly 60 seconds and rejects future readings", () => {
+  let now = Temporal.Instant.from("2026-09-27T12:00:00Z");
+  const recordedAt = now;
+  const telemetry = new ControlTelemetry(() => now);
+  telemetry.record(CONTROL_PATHS.gridPower, { value: 100 });
+  now = recordedAt.add({ seconds: 60 });
+  assertEquals(telemetry.value(CONTROL_PATHS.gridPower), 100);
+  now = now.add({ nanoseconds: 1 });
+  assertEquals(telemetry.value(CONTROL_PATHS.gridPower), undefined);
+  now = recordedAt.subtract({ nanoseconds: 1 });
+  assertEquals(telemetry.value(CONTROL_PATHS.gridPower), undefined);
+});
 Deno.test("telemetry preserves actual start order and startup ties", () => {
   const h = installation();
   h.advance();
@@ -146,7 +159,12 @@ Deno.test("telemetry preserves actual start order and startup ties", () => {
   const startup = new ControlTelemetry();
   startup.record(wallboxPath(L.Outside, "Status"), { value: S.Charging });
   startup.record(wallboxPath(L.Inside, "Status"), { value: S.Charging });
-  assertEquals([...startup.snapshot().chargingStartedAt.values()], [0, 0]);
+  assertEquals(
+    [...startup.snapshot().chargingStartedAt.values()].map((at) =>
+      at.toString()
+    ),
+    ["1970-01-01T00:00:00Z", "1970-01-01T00:00:00Z"],
+  );
 });
 Deno.test("Manual gate is checked again during asynchronous publication", async () => {
   const previous = globals.wallboxChargeMode.get(L.Inside)!;

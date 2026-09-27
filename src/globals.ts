@@ -1,3 +1,4 @@
+import { SolarForecasts } from "./solar-forecasts.ts";
 import { EventEmitter } from "./event-emitter.ts";
 import { Temporal } from "./temporal.ts";
 
@@ -42,13 +43,8 @@ export enum WallboxLocation {
   Outside,
 }
 
-export interface SolarForecast {
-  wattHours: number;
-  fetchedAt: number;
-}
-
 export interface GlobalState {
-  solarForecastByDate: Map<string, SolarForecast>;
+  solarForecastByDate: SolarForecasts;
   primaryWallboxLocation: WallboxLocation | undefined;
   // Display-only values in Wh; control uses the dated forecast map.
   solarForecastNextDays: number[];
@@ -72,7 +68,7 @@ export interface GlobalState {
  * Most values are read from MQTT, but not all.
  */
 export const globals: GlobalState = {
-  solarForecastByDate: new Map(),
+  solarForecastByDate: new SolarForecasts(),
   primaryWallboxLocation: undefined,
   solarForecastNextDays: [],
   victronNextDays: [],

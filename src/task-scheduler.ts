@@ -1,3 +1,4 @@
+import { Temporal } from "./temporal.ts";
 import { logError, logInfo } from "./logger.ts";
 
 export interface TaskInfo {
@@ -44,17 +45,19 @@ export class TaskScheduler {
   }
 
   /**
-   * Schedule a task to run at intervals based on seconds
+   * Schedule a task to run at the given interval
    * @param name - Unique name for the task
-   * @param intervalSeconds - Interval in seconds
+   * @param duration - Time between executions
    * @param handler - Function to execute
    */
   interval(
     name: string,
-    intervalSeconds: number,
+    duration: Temporal.Duration,
     handler: () => Promise<void> | void,
   ): void {
-    logInfo(`⏰ Scheduling task "${name}" every ${intervalSeconds} seconds`);
+    logInfo(
+      `⏰ Scheduling task "${name}" every ${duration.total("seconds")} seconds`,
+    );
 
     let running = false;
     const intervalHandler = async () => {
@@ -75,11 +78,14 @@ export class TaskScheduler {
     intervalHandler();
 
     // Then schedule recurring
-    const intervalId = setInterval(intervalHandler, intervalSeconds * 1000);
+    const intervalId = setInterval(
+      intervalHandler,
+      duration.total("milliseconds"),
+    );
     this.scheduledTasks.set(name, {
       name,
       type: "interval",
-      schedule: `Every ${intervalSeconds}s`,
+      schedule: `Every ${duration.total("seconds")}s`,
       handler: intervalHandler,
       intervalId,
     });

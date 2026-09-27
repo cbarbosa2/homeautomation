@@ -1,4 +1,4 @@
-import { controlTelemetry, PORTAL } from "../control-telemetry.ts";
+import { controlTelemetry, VICTRON_PORTAL_ID } from "../control-telemetry.ts";
 import { events, globals, WallboxLocation } from "../globals.ts";
 import { MqttClient } from "../mqtt-client.ts";
 import { MetricInfo, METRICS } from "../prometheus/metrics.ts";
@@ -16,7 +16,7 @@ export class MqttToPrometheusTask {
   subscribeTopics(): void {
     for (const instance of [40, 41]) {
       this.mqttClient.subscribeWithHandler(
-        `N/${PORTAL}/evcharger/${instance}/StartStop`,
+        `N/${VICTRON_PORTAL_ID}/evcharger/${instance}/StartStop`,
         (topic, data) => controlTelemetry.record(topic, data),
       );
     }

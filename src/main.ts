@@ -1,9 +1,10 @@
+import { Temporal } from "./temporal.ts";
 import { MqttClient } from "./mqtt-client.ts";
 import { logError, logInfo } from "./logger.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { HttpServer } from "./http-server.ts";
 import { controlTelemetry } from "./control-telemetry.ts";
-import { hoursUntilMorning, lisbonTime, systemClock } from "./lisbon-clock.ts";
+import { lisbonTime, systemClock, timeUntilMorning } from "./lisbon-clock.ts";
 import { MqttAwakeTask } from "./tasks/mqtt-awake-task.ts";
 import { LoadForecastTask } from "./tasks/load-forecast-task.ts";
 import { LoadOmieTask } from "./tasks/load-omie-task.ts";
@@ -15,11 +16,11 @@ import { globals, WallboxLocation } from "./globals.ts";
 import { loadPersistentStorage } from "./persistent-storage.ts";
 import { runCommands } from "./power-controller/power-controller.ts";
 import { CommandBuilder } from "./power-controller/command-builder.ts";
-import { DYNAMIC_POWER_INTERVAL_SECONDS } from "./power-controller/power-constants.ts";
+import { DYNAMIC_POWER_INTERVAL } from "./power-controller/power-constants.ts";
 import { setupWallSwitchHandler } from "./charge-mode/wall-switch-handler.ts";
 import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
 
-const AWAKE_MQTT_INTERVAL_SECONDS = 30;
+const AWAKE_MQTT_INTERVAL = Temporal.Duration.from({ seconds: 30 });
 
 class HomeAutomationApp {
   private mqttClient: MqttClient;
@@ -68,16 +69,17 @@ class HomeAutomationApp {
     readMqttTask.subscribeTopics();
 
     const mqttAwakeTask = new MqttAwakeTask(this.mqttClient);
-    scheduler.interval("Awake MQTT", AWAKE_MQTT_INTERVAL_SECONDS, () => {
+    scheduler.interval("Awake MQTT", AWAKE_MQTT_INTERVAL, () => {
       return mqttAwakeTask.execute();
     });
 
     const powerCommandGenerator = new CommandBuilder();
-    scheduler.interval("Dynamic power", DYNAMIC_POWER_INTERVAL_SECONDS, () => {
+    scheduler.interval("Dynamic power", DYNAMIC_POWER_INTERVAL, () => {
+      const now = systemClock();
       const inputState = {
         ...controlTelemetry.snapshot(),
-        hourOfDay: lisbonTime(systemClock()).hour,
-        remainingNightHours: hoursUntilMorning(systemClock()),
+        timeOfDay: lisbonTime(now).toPlainTime(),
+        remainingNight: timeUntilMorning(now),
       };
 
       const result = calculateTargetAmpsAndPriority(inputState);

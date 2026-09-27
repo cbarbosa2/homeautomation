@@ -15,9 +15,9 @@ Deno.test("Lisbon summer evening uses a real zero forecast and current SOC", asy
     () => now,
     () => ({
       soc: 0,
-      forecast: new Map([["2026-07-02", {
+      forecast: new SolarForecasts([[Temporal.PlainDate.from("2026-07-02"), {
         wattHours: 0,
-        fetchedAt: now.epochMilliseconds,
+        fetchedAt: now,
       }]]),
     }),
   );
@@ -28,8 +28,8 @@ Deno.test("Lisbon summer evening uses a real zero forecast and current SOC", asy
 
 import { assertRejects } from "@std/assert";
 import { calculateEveningSOC } from "./set-soc-limit-task.ts";
-import { hoursUntilMorning } from "../lisbon-clock.ts";
-import { SolarForecast } from "../globals.ts";
+import { timeUntilMorning } from "../lisbon-clock.ts";
+import { SolarForecasts } from "../solar-forecasts.ts";
 
 Deno.test("hours to Lisbon morning round up actual elapsed time across DST", () => {
   for (
@@ -40,7 +40,12 @@ Deno.test("hours to Lisbon morning round up actual elapsed time across DST", () 
       ["2026-01-01T23:30:00Z", 9],
       ["2026-01-02T07:59:00Z", 1],
     ] as const
-  ) assertEquals(hoursUntilMorning(Temporal.Instant.from(time)), hours);
+  ) {
+    assertEquals(
+      timeUntilMorning(Temporal.Instant.from(time)).toString(),
+      Temporal.Duration.from({ hours }).toString(),
+    );
+  }
 });
 Deno.test("SOC examples enforce seasonal floors, efficiency, consumption and ceiling", () => {
   for (
@@ -64,7 +69,7 @@ Deno.test("SOC examples enforce seasonal floors, efficiency, consumption and cei
 Deno.test("missing evening inputs retry every five minutes with current SOC and fixed forecast date", async () => {
   let now = Temporal.Instant.from("2026-01-01T22:00:00Z");
   let soc: number | undefined = undefined;
-  const forecast = new Map<string, SolarForecast>();
+  const forecast = new SolarForecasts();
   const values: unknown[] = [];
   const task = new SetSocLimitTask(
     {
@@ -80,9 +85,9 @@ Deno.test("missing evening inputs retry every five minutes with current SOC and 
   await task.tick();
   assertEquals(values, []);
   soc = 90;
-  forecast.set("2026-01-02", {
+  forecast.set(Temporal.PlainDate.from("2026-01-02"), {
     wattHours: 0,
-    fetchedAt: now.epochMilliseconds,
+    fetchedAt: now,
   });
   now = now.add({ minutes: 4 });
   await task.tick();
@@ -96,9 +101,9 @@ Deno.test("missing evening inputs retry every five minutes with current SOC and 
 });
 Deno.test("forecasts expire after six hours, accept zero and select tomorrow by date", async () => {
   const now = Temporal.Instant.from("2026-07-31T21:01:00Z");
-  const forecast = new Map<string, SolarForecast>([["2026-07-31", {
+  const forecast = new SolarForecasts([[Temporal.PlainDate.from("2026-07-31"), {
     wattHours: 0,
-    fetchedAt: now.epochMilliseconds,
+    fetchedAt: now,
   }]]);
   const values: unknown[] = [];
   const task = new SetSocLimitTask(
@@ -112,14 +117,19 @@ Deno.test("forecasts expire after six hours, accept zero and select tomorrow by 
     () => ({ soc: 0, forecast }),
   );
   assertEquals(await task.executeInEvening(), false);
-  forecast.set("2026-08-01", {
+  forecast.set(Temporal.PlainDate.from("2026-08-01"), {
     wattHours: 0,
-    fetchedAt: now.epochMilliseconds - 21_600_001,
+    fetchedAt: now.add({ nanoseconds: 1 }),
   });
   assertEquals(await task.executeInEvening(), false);
-  forecast.set("2026-08-01", {
+  forecast.set(Temporal.PlainDate.from("2026-08-01"), {
     wattHours: 0,
-    fetchedAt: now.epochMilliseconds - 21_600_000,
+    fetchedAt: now.subtract({ hours: 6, milliseconds: 1 }),
+  });
+  assertEquals(await task.executeInEvening(), false);
+  forecast.set(Temporal.PlainDate.from("2026-08-01"), {
+    wattHours: 0,
+    fetchedAt: now.subtract({ hours: 6 }),
   });
   assertEquals(await task.executeInEvening(), true);
   assertEquals(values, [47.5]);
@@ -138,9 +148,9 @@ Deno.test("retries stop at midnight and the running service resets at Lisbon 08:
     () => now,
     () => ({
       soc,
-      forecast: new Map([["2026-07-02", {
+      forecast: new SolarForecasts([[Temporal.PlainDate.from("2026-07-02"), {
         wattHours: 0,
-        fetchedAt: now.epochMilliseconds,
+        fetchedAt: now,
       }]]),
     }),
   );
@@ -174,9 +184,9 @@ Deno.test("restart does not catch up evening or morning actions or resume retrie
       () => now,
       () => ({
         soc: 50,
-        forecast: new Map([["2026-01-02", {
+        forecast: new SolarForecasts([[Temporal.PlainDate.from("2026-01-02"), {
           wattHours: 0,
-          fetchedAt: now.epochMilliseconds,
+          fetchedAt: now,
         }]]),
       }),
     );
@@ -201,9 +211,9 @@ Deno.test("winter schedule awaits publication failure and retries the evening jo
     () => now,
     () => ({
       soc: 0,
-      forecast: new Map([["2026-01-02", {
+      forecast: new SolarForecasts([[Temporal.PlainDate.from("2026-01-02"), {
         wattHours: 0,
-        fetchedAt: now.epochMilliseconds,
+        fetchedAt: now,
       }]]),
     }),
   );
@@ -216,4 +226,24 @@ Deno.test("winter schedule awaits publication failure and retries the evening jo
   now = Temporal.Instant.from("2026-01-02T08:00:00Z");
   await task.tick();
   assertEquals(values, [67.5, 5]);
+});
+
+Deno.test("SOC schedule ignores repeated minutes and a backward clock", async () => {
+  let now = Temporal.Instant.from("2026-01-02T07:59:59Z");
+  const values: unknown[] = [];
+  const task = new SetSocLimitTask({
+    publishJson: (_, data) => {
+      values.push(data["value"]);
+      return Promise.resolve();
+    },
+  }, () => now);
+  now = now.add({ seconds: 1 });
+  await task.tick();
+  now = now.add({ seconds: 30 });
+  await task.tick();
+  now = now.subtract({ minutes: 1 });
+  await task.tick();
+  now = now.add({ minutes: 1 });
+  await task.tick();
+  assertEquals(values, [5]);
 });

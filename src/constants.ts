@@ -1,20 +1,25 @@
+import { Temporal } from "./temporal.ts";
+import { systemClock } from "./lisbon-clock.ts";
 // MQTT Configuration
-export const MQTT_BROKER_URL =
-  Deno.env.get("MQTT_BROKER_URL") || "mqtt://localhost:1883";
+export const MQTT_BROKER_URL = Deno.env.get("MQTT_BROKER_URL") ||
+  "mqtt://localhost:1883";
 export const MQTT_USERNAME = Deno.env.get("MQTT_USERNAME") || "";
 export const MQTT_PASSWORD = Deno.env.get("MQTT_PASSWORD") || "";
 export const MQTT_CLIENT_ID =
-  (Deno.env.get("MQTT_CLIENT_ID") || `homeautomation`) + `-${Date.now()}`;
+  (Deno.env.get("MQTT_CLIENT_ID") || `homeautomation`) +
+  `-${systemClock().epochMilliseconds}`;
 
 // HTTP Configuration
-export const HTTP_TIMEOUT = parseInt(Deno.env.get("HTTP_TIMEOUT") || "30000");
+export const HTTP_TIMEOUT = Temporal.Duration.from({
+  milliseconds: parseInt(Deno.env.get("HTTP_TIMEOUT") || "30000"),
+});
 export const HTTP_PORT = parseInt(Deno.env.get("HTTP_PORT") || "1881");
 
 export const POWER_CONTROL_ENABLED =
   Deno.env.get("POWER_CONTROL_ENABLED") === "true";
 
-export const FORECAST_SOLAR_API_KEY =
-  Deno.env.get("FORECAST_SOLAR_API_KEY") || "";
+export const FORECAST_SOLAR_API_KEY = Deno.env.get("FORECAST_SOLAR_API_KEY") ||
+  "";
 
 export const VICTRON_API_KEY = Deno.env.get("VICTRON_API_KEY") || "";
 

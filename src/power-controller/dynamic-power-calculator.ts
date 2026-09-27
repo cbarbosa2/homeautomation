@@ -1,3 +1,4 @@
+import { Temporal } from "../temporal.ts";
 import { canCharge, wallboxAmps } from "./wallbox-policy.ts";
 import {
   WallboxChargeMode as Mode,
@@ -31,9 +32,9 @@ export interface InputState {
   wallboxPower: Map<Location, number>;
   wallboxVictronStatus: Map<Location, Status>;
   wallboxChargeMode: Map<Location, Mode>;
-  chargingStartedAt?: Map<Location, number>;
-  hourOfDay: number;
-  remainingNightHours?: number;
+  chargingStartedAt?: Map<Location, Temporal.Instant>;
+  timeOfDay: Temporal.PlainTime;
+  remainingNight?: Temporal.Duration;
 }
 export function finite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
@@ -90,8 +91,12 @@ export function calculateTargetAmpsAndPriority(
       eligible(l) && state.wallboxVictronStatus.get(l) === Status.Charging
     );
     started.sort((a, b) =>
-      (state.chargingStartedAt?.get(a) ?? 0) -
-      (state.chargingStartedAt?.get(b) ?? 0)
+      Temporal.Instant.compare(
+        state.chargingStartedAt?.get(a) ??
+          Temporal.Instant.fromEpochMilliseconds(0),
+        state.chargingStartedAt?.get(b) ??
+          Temporal.Instant.fromEpochMilliseconds(0),
+      )
     );
     primary = started[0];
   }
@@ -140,11 +145,18 @@ function request(
   if (
     mode === Mode.Off || !canCharge(state.wallboxVictronStatus.get(location))
   ) return "off";
-  const night = state.hourOfDay >= 22 || state.hourOfDay < 8;
+  const night = Temporal.PlainTime.compare(state.timeOfDay, "22:00") >= 0 ||
+    Temporal.PlainTime.compare(state.timeOfDay, "08:00") < 0;
   const soc = state.batterySOC;
   const min = state.batteryMinSOC;
-  const hours = state.remainingNightHours ??
-    Math.ceil((32 - state.hourOfDay) % 24);
+  let remainingNight = state.remainingNight;
+  if (remainingNight === undefined) {
+    remainingNight = state.timeOfDay.until("08:00");
+    if (remainingNight.sign < 0) {
+      remainingNight = remainingNight.add({ hours: 24 });
+    }
+  }
+  const hours = Math.ceil(remainingNight.total("hours"));
   if (
     mode === Mode.On || (finite(soc) && soc >= 95) ||
     (mode === Mode.Night && night) ||
