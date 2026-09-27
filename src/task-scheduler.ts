@@ -20,7 +20,7 @@ export class TaskScheduler {
   cron(
     name: string,
     cronExpression: string,
-    handler: () => Promise<void> | void
+    handler: () => Promise<void> | void,
   ): void {
     logInfo(`⏰ Scheduling task "${name}" with cron: ${cronExpression}`);
 
@@ -52,17 +52,22 @@ export class TaskScheduler {
   interval(
     name: string,
     intervalSeconds: number,
-    handler: () => Promise<void> | void
+    handler: () => Promise<void> | void,
   ): void {
     logInfo(`⏰ Scheduling task "${name}" every ${intervalSeconds} seconds`);
 
+    let running = false;
     const intervalHandler = async () => {
+      if (running) return;
+      running = true;
       try {
         logInfo(`🔄 Executing scheduled task: ${name}`);
         await handler();
         logInfo(`✅ Completed scheduled task: ${name}`);
       } catch (error) {
         logError(`❌ Error in scheduled task "${name}":`, error);
+      } finally {
+        running = false;
       }
     };
 

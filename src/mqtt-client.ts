@@ -1,10 +1,11 @@
+import { controlTelemetry } from "./control-telemetry.ts";
 import mqtt from "mqtt";
 import type { MqttClient as MqttClientType } from "mqtt";
 import {
   MQTT_BROKER_URL,
-  MQTT_USERNAME,
-  MQTT_PASSWORD,
   MQTT_CLIENT_ID,
+  MQTT_PASSWORD,
+  MQTT_USERNAME,
 } from "./constants.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { logError, logInfo, logWarn } from "./logger.ts";
@@ -25,7 +26,7 @@ export class MqttClient {
   async connect(): Promise<void> {
     logInfo(`🔌 Connecting to MQTT broker: ${MQTT_BROKER_URL}`);
 
-    return new Promise((resolve, reject) => {
+    return await new Promise((resolve, reject) => {
       try {
         this.client = mqtt.connect(MQTT_BROKER_URL, {
           clientId: MQTT_CLIENT_ID,
@@ -47,7 +48,13 @@ export class MqttClient {
           reject(error);
         });
 
+        this.client.on("close", () => {
+          this.isConnected = false;
+          controlTelemetry.invalidate();
+        });
+
         this.client.on("offline", () => {
+          controlTelemetry.invalidate();
           logWarn("⚠️ MQTT client offline");
           this.isConnected = false;
           this.metrics.recordMqttConnection(false);
@@ -68,7 +75,7 @@ export class MqttClient {
 
   async disconnect(): Promise<void> {
     if (this.client && this.isConnected) {
-      return new Promise((resolve) => {
+      return await new Promise((resolve) => {
         this.client!.end(false, {}, () => {
           logInfo("📤 Disconnected from MQTT broker");
           this.isConnected = false;
@@ -83,7 +90,7 @@ export class MqttClient {
       throw new Error("MQTT client not connected");
     }
 
-    return new Promise((resolve, reject) => {
+    return await new Promise((resolve, reject) => {
       this.client!.subscribe(topic, (error) => {
         if (error) {
           logError(`❌ Failed to subscribe to ${topic}:`, error);
@@ -100,13 +107,13 @@ export class MqttClient {
     topic: string,
     message: string,
     retain = false,
-    log = false
+    log = false,
   ): Promise<void> {
     if (!this.client || !this.isConnected) {
       throw new Error("MQTT client not connected");
     }
 
-    return new Promise((resolve, reject) => {
+    return await new Promise((resolve, reject) => {
       this.client!.publish(topic, message, { retain }, (error) => {
         if (error) {
           logError(`❌ Failed to publish to ${topic}:`, error);
@@ -160,7 +167,7 @@ export class MqttClient {
   async publishJson(
     topic: string,
     data: Record<string, unknown>,
-    retain = false
+    retain = false,
   ): Promise<void> {
     const message = JSON.stringify(data);
     await this.publish(topic, message, retain);
@@ -173,7 +180,7 @@ export class MqttClient {
    */
   addTopicHandler(
     topicPattern: string,
-    handler: (topic: string, data: unknown) => void
+    handler: (topic: string, data: unknown) => void,
   ): void {
     this.topicHandlers.set(topicPattern, handler);
     logInfo(`📋 Added handler for topic pattern: ${topicPattern}`);
@@ -198,7 +205,7 @@ export class MqttClient {
    */
   async subscribeWithHandler(
     topic: string,
-    handler: (topic: string, data: unknown) => void
+    handler: (topic: string, data: unknown) => void,
   ): Promise<void> {
     this.addTopicHandler(topic, handler);
     await this.subscribe(topic);

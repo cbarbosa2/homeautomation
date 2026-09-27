@@ -1,9 +1,10 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { parseOmieResponse } from "./omie-proxy.ts";
 import { Temporal } from "../temporal.ts";
 
 // Test data that simulates OMIE CSV format
-const sampleOmieData = `OMIE - Mercado de electricidad;Fecha Emisión :14/11/2025 - 13:10;;15/11/2025;Precios y volúmenes del mercado diario;;;;
+const sampleOmieData =
+  `OMIE - Mercado de electricidad;Fecha Emisión :14/11/2025 - 13:10;;15/11/2025;Precios y volúmenes del mercado diario;;;;
 
 Fecha;Periodo;Precio marginal en el sistema español (EUR/MWh);Precio marginal en el sistema portugués (EUR/MWh);Potencia total de compra sistema español (MW);Potencia total de venta sistema español (MW);Potencia total de compra sistema portugués (MW);Potencia total de venta sistema portugués (MW);Potencia total de compra del mercado Ibérico (MW);Potencia total de venta del mercado Ibérico (MW);Potencia total con bilaterales del mercado Ibérico (MW);
 15/11/2025;1;31,5;31,5;19027,4;18635,4;5871,2;5267,6;24898,6;23903;32041,3;
@@ -48,7 +49,7 @@ Deno.test("parseOmieResponse should parse OMIE data correctly", () => {
   for (let i = 1; i < result.length; i++) {
     const comparison = Temporal.PlainDateTime.compare(
       result[i - 1]!.date,
-      result[i]!.date
+      result[i]!.date,
     );
     assertEquals(comparison <= 0, true, "Entries should be sorted by date");
   }
@@ -82,7 +83,8 @@ Deno.test("parseOmieResponse applies tariffs at Portugal hour boundaries", () =>
 });
 
 Deno.test("parseOmieResponse should filter entries before startOfToday", () => {
-  const response = `15/11/2025;1;31,5;31,5;19027,4;18635,4;5871,2;5267,6;24898,6;23903;32041,3;
+  const response =
+    `15/11/2025;1;31,5;31,5;19027,4;18635,4;5871,2;5267,6;24898,6;23903;32041,3;
 16/11/2025;5;25,0;25,0;19027,4;18635,4;5871,2;5267,6;24898,6;23903;32041,3;`;
 
   // Set startOfToday to 16/11/2025, so 15/11/2025 entries should be filtered out

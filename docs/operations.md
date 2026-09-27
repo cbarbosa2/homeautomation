@@ -25,3 +25,50 @@ With the default port:
 - Health: <http://localhost:1881/health>
 
 The health endpoint returns `OK`; it does not verify MQTT connectivity or external services. Metrics include process metrics, MQTT message counts and connection status, errors, and device/energy telemetry. Definitions are in [metrics.ts](../src/prometheus/metrics.ts); registration is in [prometheus.ts](../src/prometheus/prometheus.ts).
+
+## Automation telemetry and timing
+
+Control readings are refreshed every 30 seconds using explicit empty MQTT reads
+on `R/102c6b9cfab9/<path>`. The exact list is in
+[control-telemetry.ts](../src/control-telemetry.ts): grid power, battery power/SOC,
+minimum SOC and maximum charge power, both PV sources, and each wallbox's power,
+status, SetCurrent and StartStop. Keepalive does not renew these timestamps.
+Missing, malformed, nonfinite, or more than 60-second-old readings are unavailable;
+a broker disconnect invalidates all control readings immediately. Allocation uses
+one 12 A budget until required readings return, with wallboxes ahead of battery.
+Mode conditions still apply and Manual loads are never controlled.
+
+Automatic increases reserve capacity until fresh device settings and measured
+power confirm reductions. This includes pending starts and battery limits;
+charging can remain paused while acknowledgements are unavailable. Reductions
+bypass smoothing; wallbox increases use the minimum target over 15 control ticks.
+The single-phase power model uses the existing installation convention of 240 V,
+rounding current and battery limits down. Grid measurements include Manual loads.
+Solar availability is bounded by total AC/DC PV and the energy balance
+`automatic wallbox power + signed battery power - grid import`, so grid-funded
+battery charging is not reused as solar surplus.
+
+SOC actions run at Lisbon 22:01 and 08:00, including DST. The evening job requires
+fresh battery SOC and tomorrow's date-specific Forecast.Solar result (Wh, fetched
+within six hours). Missing inputs retain the existing target and retry every five
+minutes until Lisbon midnight. Restarting discards retries and does not catch up
+missed actions. Forecast fetching remains hourly.
+
+### Device protocol assumptions
+
+[Victron's MQTT protocol](https://github.com/victronenergy/dbus-flashmq/blob/master/README.md)
+documents explicit reads for static settings.
+[EV charger status definitions](https://github.com/victronenergy/node-red-contrib-victron/blob/master/src/services/services.json)
+identify 8–14 as faults. Unknown/reserved states and RFID waiting cannot authorize
+charging. Connected/waiting, low-SOC and power/phase transition states may retain
+eligibility; charging status supplies start history. Full and disconnected
+vehicles release priority.
+
+The existing battery output is `Settings/CGwacs/MaxChargePower`, in watts;
+zero is a bounded limit (the unrestricted setting is -1), as represented in
+[Victron's settings schema](https://github.com/victronenergy/venus-docker/blob/master/settings.xml).
+Victron's device definitions mark this legacy control as unused with DVCC enabled.
+DVCC is disabled on this installation (confirmed by the operator), so this control
+applies. A received
+settings echo alone is not evidence of physical curtailment. No live hardware
+commands are part of automated validation.

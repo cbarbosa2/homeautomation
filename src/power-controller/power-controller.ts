@@ -1,3 +1,4 @@
+import { globals, WallboxChargeMode, WallboxLocation } from "../globals.ts";
 import { POWER_CONTROL_ENABLED } from "../constants.ts";
 import { logInfo } from "../logger.ts";
 import { MqttClient } from "../mqtt-client.ts";
@@ -26,12 +27,27 @@ export interface PowerCommand {
  * Commands can be simulated (logged without execution) when POWER_CONTROL_ENABLED is false,
  * useful for testing and development without affecting actual hardware.
  */
-export function runCommands(commands: PowerCommand[], mqttClient: MqttClient) {
+export async function runCommands(
+  commands: PowerCommand[],
+  mqttClient: Pick<MqttClient, "publishJson">,
+  enabled = POWER_CONTROL_ENABLED,
+) {
   for (const command of commands) {
+    const location = command.type === CommandType.InsideCurrent ||
+        command.type === CommandType.InsideStartStop
+      ? WallboxLocation.Inside
+      : command.type === CommandType.OutsideCurrent ||
+          command.type === CommandType.OutsideStartStop
+      ? WallboxLocation.Outside
+      : undefined;
+    if (
+      location !== undefined &&
+      globals.wallboxChargeMode.get(location) === WallboxChargeMode.Manual
+    ) continue;
     const topic = getTopic(command);
-    if (topic && POWER_CONTROL_ENABLED) {
+    if (topic && enabled) {
       logInfo("Running command: " + JSON.stringify(command));
-      mqttClient.publishJson(topic, { value: command.value });
+      await mqttClient.publishJson(topic, { value: command.value });
     } else {
       logInfo("Simulating (disabled) command: " + JSON.stringify(command));
     }

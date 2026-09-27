@@ -1,8 +1,9 @@
 import { MqttClient } from "./mqtt-client.ts";
-import { logInfo, logError } from "./logger.ts";
+import { logError, logInfo } from "./logger.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { HttpServer } from "./http-server.ts";
-import { Temporal } from "./temporal.ts";
+import { controlTelemetry } from "./control-telemetry.ts";
+import { hoursUntilMorning, lisbonTime, systemClock } from "./lisbon-clock.ts";
 import { MqttAwakeTask } from "./tasks/mqtt-awake-task.ts";
 import { LoadForecastTask } from "./tasks/load-forecast-task.ts";
 import { LoadOmieTask } from "./tasks/load-omie-task.ts";
@@ -29,7 +30,6 @@ class HomeAutomationApp {
     this.metrics = new PrometheusMetrics();
     this.mqttClient = new MqttClient(this.metrics);
     this.httpServer = new HttpServer(this.metrics);
-    this.loadPersistedSettings();
   }
 
   async start(): Promise<void> {
@@ -42,6 +42,7 @@ class HomeAutomationApp {
 /_/ /_/\\____/_/  /_/_____/  /_/  |_\\____/ /_/  \\____/_/  /_/_/  |_/_/ /___/\\____/_/ |_/   
 `);
 
+      await this.loadPersistedSettings();
       await this.mqttClient.connect();
       this.httpServer.start();
 
@@ -53,61 +54,64 @@ class HomeAutomationApp {
       this.setupGracefulShutdown();
     } catch (error) {
       await logError(
-        `❌ Failed to start Home Automation System: ${String(error)}`
+        `❌ Failed to start Home Automation System: ${String(error)}`,
       );
       Deno.exit(1);
     }
   }
 
   private setupScheduledTasks() {
+    const readMqttTask = new MqttToPrometheusTask(
+      this.mqttClient,
+      this.metrics,
+    );
+    readMqttTask.subscribeTopics();
+
     const mqttAwakeTask = new MqttAwakeTask(this.mqttClient);
     scheduler.interval("Awake MQTT", AWAKE_MQTT_INTERVAL_SECONDS, () => {
-      mqttAwakeTask.execute();
+      return mqttAwakeTask.execute();
     });
 
     const powerCommandGenerator = new CommandBuilder();
     scheduler.interval("Dynamic power", DYNAMIC_POWER_INTERVAL_SECONDS, () => {
       const inputState = {
-        ...globals,
-        hourOfDay: Temporal.Now.plainDateTimeISO().hour,
+        ...controlTelemetry.snapshot(),
+        hourOfDay: lisbonTime(systemClock()).hour,
+        remainingNightHours: hoursUntilMorning(systemClock()),
       };
 
       const result = calculateTargetAmpsAndPriority(inputState);
 
-      globals.primaryWallboxLocation =
-        result.newPrimaryWallboxLocation ?? globals.primaryWallboxLocation;
+      if (result.priorityDecision.kind === "clear") {
+        globals.primaryWallboxLocation = undefined;
+      } else if (result.priorityDecision.kind === "set") {
+        globals.primaryWallboxLocation = result.priorityDecision.location;
+      }
 
       const commands = powerCommandGenerator.createCommandsFromPowerSettings(
-        globals,
-        result
+        inputState,
+        result,
       );
 
-      runCommands(commands, this.mqttClient);
+      return runCommands(commands, this.mqttClient);
     });
 
     const loadForecastTask = new LoadForecastTask(this.metrics);
     scheduler.cron("Load forecast solar", "0 * * * *", () => {
-      loadForecastTask.execute();
+      return loadForecastTask.execute();
     });
 
     const loadOmieTask = new LoadOmieTask(this.metrics);
     scheduler.cron("Load omie", "0 * * * *", () => {
-      loadOmieTask.execute();
+      return loadOmieTask.execute();
     });
-
-    const readMqttTask = new MqttToPrometheusTask(
-      this.mqttClient,
-      this.metrics
-    );
-    readMqttTask.subscribeTopics();
 
     const setSocLimitTask = new SetSocLimitTask(this.mqttClient);
-    scheduler.cron("Set SOC limit in morning", "0 8 * * *", () => {
-      setSocLimitTask.executeInMorning();
-    });
-    scheduler.cron("Set SOC limit in evening", "1 22 * * *", () => {
-      setSocLimitTask.executeInEvening();
-    });
+    scheduler.cron(
+      "Lisbon SOC schedule",
+      "* * * * *",
+      () => setSocLimitTask.tick(),
+    );
   }
 
   private async loadPersistedSettings(): Promise<void> {
@@ -121,7 +125,7 @@ class HomeAutomationApp {
           this.metrics,
           WallboxLocation.Outside,
           data.outside,
-          false
+          false,
         );
       }
       await logInfo("💾 Persistent storage loaded successfully");

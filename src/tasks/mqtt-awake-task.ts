@@ -1,15 +1,12 @@
-import { randomInt } from "node:crypto";
 import { MqttClient } from "../mqtt-client.ts";
+import { PORTAL, REFRESH_PATHS } from "../control-telemetry.ts";
 
 export class MqttAwakeTask {
-  private mqttClient: MqttClient;
-  private readonly topic = "R/102c6b9cfab9/system/0/Serial";
-
-  constructor(mqttClient: MqttClient) {
-    this.mqttClient = mqttClient;
-  }
-
+  constructor(private mqttClient: Pick<MqttClient, "publish">) {}
   public async execute(): Promise<void> {
-    await this.mqttClient.publish(this.topic, randomInt(10000000).toString());
+    await this.mqttClient.publish(`R/${PORTAL}/keepalive`, "");
+    for (const path of REFRESH_PATHS) {
+      await this.mqttClient.publish(`R/${PORTAL}/${path}`, "");
+    }
   }
 }

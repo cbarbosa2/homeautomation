@@ -1,3 +1,4 @@
+import { controlTelemetry, PORTAL } from "../control-telemetry.ts";
 import { events, globals, WallboxLocation } from "../globals.ts";
 import { MqttClient } from "../mqtt-client.ts";
 import { MetricInfo, METRICS } from "../prometheus/metrics.ts";
@@ -13,113 +14,119 @@ export class MqttToPrometheusTask {
   }
 
   subscribeTopics(): void {
+    for (const instance of [40, 41]) {
+      this.mqttClient.subscribeWithHandler(
+        `N/${PORTAL}/evcharger/${instance}/StartStop`,
+        (topic, data) => controlTelemetry.record(topic, data),
+      );
+    }
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/battery/512/System/MaxCellVoltage",
-      METRICS.GAUGES.ESS_BATTERY_MAX_CELL_VOLTAGE
+      METRICS.GAUGES.ESS_BATTERY_MAX_CELL_VOLTAGE,
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/battery/512/System/MinCellVoltage",
-      METRICS.GAUGES.ESS_BATTERY_MIN_CELL_VOLTAGE
+      METRICS.GAUGES.ESS_BATTERY_MIN_CELL_VOLTAGE,
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/battery/512/Dc/0/Current",
-      METRICS.GAUGES.ESS_BATTERY_CURRENT
+      METRICS.GAUGES.ESS_BATTERY_CURRENT,
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/battery/512/Dc/0/Power",
       METRICS.GAUGES.ESS_BATTERY_POWER,
       (value) => {
         globals.batteryPower = value;
-      }
+      },
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/settings/0/Settings/CGwacs/MaxChargePower",
       METRICS.GAUGES.ESS_BATTERY_MAX_CHARGE_POWER,
       (value) => {
         globals.batteryMaxChargePower = value;
-      }
+      },
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/battery/512/Dc/0/Voltage",
-      METRICS.GAUGES.ESS_BATTERY_VOLTAGE
+      METRICS.GAUGES.ESS_BATTERY_VOLTAGE,
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/battery/512/Dc/0/Temperature",
-      METRICS.GAUGES.ESS_BATTERY_TEMPERATURE
+      METRICS.GAUGES.ESS_BATTERY_TEMPERATURE,
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/battery/512/Soc",
       METRICS.GAUGES.ESS_BATTERY_SOC,
       (value) => {
         globals.batterySOC = value;
-      }
+      },
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/system/0/Ac/Grid/L1/Power",
       METRICS.GAUGES.ESS_GRID_POWER,
       (value) => {
         globals.gridPower = value;
-      }
+      },
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/system/0/Ac/Consumption/L1/Power",
-      METRICS.GAUGES.ESS_CONSUMPTION_POWER
+      METRICS.GAUGES.ESS_CONSUMPTION_POWER,
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/settings/0/Settings/CGwacs/BatteryLife/MinimumSocLimit",
       METRICS.GAUGES.ESS_BATTERY_MIN_SOC,
       (value) => {
         globals.batteryMinSOC = value;
-      }
+      },
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/system/0/Ac/PvOnGrid/L1/Power",
       METRICS.GAUGES.ESS_PV_INVERTER_POWER,
       (value) => {
         globals.pvInverterPower = value;
-      }
+      },
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/system/0/Dc/Pv/Power",
       METRICS.GAUGES.ESS_PV_CHARGER_POWER,
       (value) => {
         globals.pvChargerPower = value;
-      }
+      },
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/40/Ac/Power",
       METRICS.GAUGES.ESS_WALLBOX_INSIDE_POWER,
       (value) => {
         globals.wallboxPower.set(WallboxLocation.Inside, value ?? 0);
-      }
+      },
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/41/Ac/Power",
       METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_POWER,
       (value) => {
         globals.wallboxPower.set(WallboxLocation.Outside, value ?? 0);
-      }
+      },
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/40/Status",
       METRICS.GAUGES.ESS_WALLBOX_INSIDE_STATUS,
       (value) => {
         globals.wallboxVictronStatus.set(WallboxLocation.Inside, value ?? 0);
-      }
+      },
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/41/Status",
       METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_STATUS,
       (value) => {
         globals.wallboxVictronStatus.set(WallboxLocation.Outside, value ?? 0);
-      }
+      },
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/40/Current",
       METRICS.GAUGES.ESS_WALLBOX_INSIDE_CURRENT,
       (value) => {
         globals.wallboxCurrent.set(WallboxLocation.Inside, value ?? 0);
-      }
+      },
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/40/SetCurrent",
@@ -127,14 +134,14 @@ export class MqttToPrometheusTask {
       (value) => {
         globals.wallboxSetCurrent.set(WallboxLocation.Inside, value ?? 0);
         events.wallboxCurrentInsideUpdated.emit(value ?? 0);
-      }
+      },
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/41/Current",
       METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_CURRENT,
       (value) => {
         globals.wallboxCurrent.set(WallboxLocation.Outside, value ?? 0);
-      }
+      },
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/evcharger/41/SetCurrent",
@@ -142,11 +149,11 @@ export class MqttToPrometheusTask {
       (value) => {
         globals.wallboxSetCurrent.set(WallboxLocation.Outside, value ?? 0);
         events.wallboxCurrentOutsideUpdated.emit(value ?? 0);
-      }
+      },
     );
     this.subscribeAndAssignToGauge(
       "N/102c6b9cfab9/temperature/24/Temperature",
-      METRICS.GAUGES.ESS_SHED_TEMPERATURE
+      METRICS.GAUGES.ESS_SHED_TEMPERATURE,
     );
     this.mqttClient.subscribeWithHandler(
       "shellyplusi4-083af2013a04/events/rpc",
@@ -154,19 +161,27 @@ export class MqttToPrometheusTask {
         events.wallSwitchUpdated.emit(
           data as {
             params: { events: { id: number; event: string }[] };
-          }
+          },
         );
-      }
+      },
     );
   }
 
   private subscribeAndAssignToGauge(
     topic: string,
     gaugeInfo: MetricInfo,
-    handler?: (payloadValue: number | undefined) => void
+    handler?: (payloadValue: number | undefined) => void,
   ): void {
     this.mqttClient.subscribeWithHandler(topic, (_, data) => {
-      const payload = data as { value: number | undefined };
+      controlTelemetry.record(topic, data);
+      const raw = data !== null && typeof data === "object" && "value" in data
+        ? data.value
+        : undefined;
+      const payload = {
+        value: typeof raw === "number" && Number.isFinite(raw)
+          ? raw
+          : undefined,
+      };
       this.metrics.setGauge(gaugeInfo, payload.value ?? 0);
       if (handler) {
         // log(`Handling MQTT topic ${topic} with value ${payload.value}`);

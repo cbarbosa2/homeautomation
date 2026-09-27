@@ -42,9 +42,15 @@ export enum WallboxLocation {
   Outside,
 }
 
+export interface SolarForecast {
+  wattHours: number;
+  fetchedAt: number;
+}
+
 export interface GlobalState {
+  solarForecastByDate: Map<string, SolarForecast>;
   primaryWallboxLocation: WallboxLocation | undefined;
-  // holds the value in kWh per day, index 0 is current day, index 1 is tomorrow, plus index 2 and 3
+  // Display-only values in Wh; control uses the dated forecast map.
   solarForecastNextDays: number[];
   victronNextDays: number[];
   omieEntries: OmieEntry[];
@@ -66,6 +72,7 @@ export interface GlobalState {
  * Most values are read from MQTT, but not all.
  */
 export const globals: GlobalState = {
+  solarForecastByDate: new Map(),
   primaryWallboxLocation: undefined,
   solarForecastNextDays: [],
   victronNextDays: [],
