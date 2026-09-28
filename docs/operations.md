@@ -39,8 +39,10 @@ on `R/<VICTRON_PORTAL_ID>/<path>`. The exact list is in
 [control-telemetry.ts](../src/control-telemetry.ts): grid power, battery power/SOC,
 minimum SOC and maximum charge power, both PV sources, and each wallbox's power,
 status, SetCurrent and StartStop. Keepalive does not renew these timestamps.
-Missing, malformed, nonfinite, or more than 60-second-old readings are unavailable;
-a broker disconnect invalidates all control readings immediately. Allocation uses
+Missing, malformed, nonfinite, or more than 60-second-old readings are unavailable.
+Missing PV inverter power counts as zero at any hour, since the inverter may not
+report when sunlight is insufficient. A broker disconnect invalidates all control
+readings immediately. Allocation uses
 one 12 A budget until required readings return, with wallboxes ahead of battery.
 Mode conditions still apply and Manual loads are never controlled.
 

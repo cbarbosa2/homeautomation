@@ -67,4 +67,8 @@ Keep grid current below **28 A**, leaving a **2 A margin** beneath the installat
 
 When readings required for control are missing or stale, use a conservative **12 A shared budget** for automatic wallbox and battery charging. This is a cap, not permission to bypass mode conditions; Manual wallboxes remain exempt. Resume normal allocation when valid readings return.
 
+Treat missing PV inverter power as zero, including during the day. The inverter
+may stop reporting when sunlight is insufficient; all other required readings
+still need to be fresh for normal allocation.
+
 Actively refresh required device telemetry every **30 seconds**. Treat readings as stale after **60 seconds** without a valid refresh. This device-telemetry threshold does not apply to the external solar forecast.

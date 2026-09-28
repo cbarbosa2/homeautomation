@@ -211,6 +211,27 @@ Deno.test("cycle uses one conservative budget and recovers after fresh readings"
   assert(has(await h.settle(), inside("SetCurrent"), 20));
 });
 
+Deno.test("cycle treats missing PV inverter power as zero", async () => {
+  const night = installation();
+  night.setTime("2026-09-27T21:00:00Z"); // 22:00 in Lisbon
+  night.modes.set(L.Inside, Mode.Night);
+  night.modes.set(L.Outside, Mode.Off);
+  night.values.delete(P.pvInverterPower);
+  night.refresh();
+  assert(has(await night.tick(), inside("SetCurrent"), 20));
+
+  const day = installation();
+  day.values.delete(P.pvInverterPower);
+  day.telemetry.record(P.pvInverterPower, { value: null });
+  day.modes.set(L.Outside, Mode.Off);
+  assert(has(await day.tick(), inside("SetCurrent"), 20));
+
+  const missingGrid = installation();
+  missingGrid.modes.set(L.Outside, Mode.Off);
+  missingGrid.telemetry.record(P.gridPower, { value: null });
+  assert(has(await missingGrid.tick(), inside("SetCurrent"), 12));
+});
+
 Deno.test("conservative allocation still enforces solar eligibility and funds battery last", async () => {
   const h = installation();
   h.modes.set(L.Inside, Mode.SunOnly);

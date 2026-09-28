@@ -86,6 +86,7 @@ export class ControlTelemetry {
       : undefined;
   }
   snapshot() {
+    const pvInverterPower = this.value(CONTROL_PATHS.pvInverterPower);
     const map = (field: string) =>
       new Map([L.Inside, L.Outside].flatMap((l) => {
         const value = this.value(wallboxPath(l, field));
@@ -94,6 +95,7 @@ export class ControlTelemetry {
     return {
       ...globals,
       telemetryValid: REFRESH_PATHS.every((path) =>
+        path === CONTROL_PATHS.pvInverterPower ||
         this.value(path) !== undefined
       ),
       gridPower: this.value(CONTROL_PATHS.gridPower),
@@ -101,7 +103,7 @@ export class ControlTelemetry {
       batteryPower: this.value(CONTROL_PATHS.batteryPower),
       batteryMinSOC: this.value(CONTROL_PATHS.batteryMinSOC),
       batteryMaxChargePower: this.value(CONTROL_PATHS.batteryMaxChargePower),
-      pvInverterPower: this.value(CONTROL_PATHS.pvInverterPower),
+      pvInverterPower: pvInverterPower ?? 0,
       pvChargerPower: this.value(CONTROL_PATHS.pvChargerPower),
       wallboxPower: map("Ac/Power"),
       wallboxVictronStatus: map("Status"),
