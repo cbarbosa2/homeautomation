@@ -70,23 +70,31 @@ class HomeAutomationApp {
     const bmwVin = Deno.env.get("BMW_CARDATA_VIN")?.trim();
     const bmwContainerId = Deno.env.get("BMW_CARDATA_CONTAINER_ID")?.trim();
     if (bmwClientId && bmwVin && bmwContainerId) {
+      let loadingBmwSoc = false;
       scheduler.cron("Load BMW i3 SOC", "5 * * * *", async () => {
-        const value = await loadVehicleSoc(
-          bmwClientId,
-          bmwVin,
-          bmwContainerId,
-        );
-        if (value) {
-          this.metrics.setGauge(
-            METRICS.GAUGES.BMW_I3_SOC,
-            value.percent,
+        if (loadingBmwSoc) return;
+        loadingBmwSoc = true;
+        try {
+          const value = await loadVehicleSoc(
+            bmwClientId,
+            bmwVin,
+            bmwContainerId,
           );
-          this.metrics.setGauge(
-            METRICS.GAUGES.BMW_I3_SOC_TIMESTAMP,
-            value.observedAt.epochMilliseconds / 1000,
-          );
+          if (value) {
+            this.metrics.setGauge(
+              METRICS.GAUGES.BMW_I3_SOC,
+              value.percent,
+            );
+            this.metrics.setGauge(
+              METRICS.GAUGES.BMW_I3_SOC_TIMESTAMP,
+              value.observedAt.epochMilliseconds / 1000,
+            );
+          }
+        } finally {
+          loadingBmwSoc = false;
         }
       });
+      void scheduler.triggerTask("Load BMW i3 SOC");
     }
     const readMqttTask = new MqttToPrometheusTask(
       this.mqttClient,
