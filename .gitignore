@@ -1,4 +1,6 @@
 .env
+.bmw-cardata-tokens.json
+.bmw-cardata-tokens.json.tmp
 logs/
 build-timestamp.txt
 docs-temp/

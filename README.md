@@ -7,7 +7,7 @@ A Deno service controlling a home battery and two EV wallboxes through MQTT. It 
 - [Automation rules](docs/automation-rules.md): charging modes, priority, battery targets, and grid protection.
 - [Architecture](docs/architecture.md): components, scheduling, and application lifecycle.
 - [Development](docs/development.md): commands, tests, and Temporal conventions.
-- [Operations](docs/operations.md): configuration, monitoring, and device assumptions.
+- [Operations](docs/operations.md): configuration, [BMW CarData setup](docs/operations.md#bmw-cardata-setup), monitoring, and device assumptions.
 
 ## Quick Start
 
@@ -40,6 +40,8 @@ Install Deno and clone this repository. Run commands from the repository root so
    ```bash
    deno task start
    ```
+
+To show BMW i3 SOC, complete the optional [BMW CarData setup](docs/operations.md#bmw-cardata-setup) on the host running the service before starting it.
 
 ## Development and Tests
 
@@ -114,7 +116,7 @@ bash deploy-local.sh
 
 This stops the service, copies files with rsync, and starts it again. It excludes dotfiles, logs, `node_modules`, and deployment scripts. It does not refresh the build timestamp.
 
-Both scripts type-check locally before deployment. Neither transfers your local `.env`; update `/home/carlos/homeautomation/.env` separately before deploying changes that require new configuration. After deployment, check the service status and journal; a script's completion message alone does not establish application health.
+Both scripts type-check locally before deployment. Neither transfers your local `.env` or BMW CarData token file. To enable BMW SOC on the server, follow [BMW CarData setup](docs/operations.md#bmw-cardata-setup) on `bee.local` after the code is deployed. Update `/home/carlos/homeautomation/.env` separately before deploying changes that require new configuration. After deployment, check the service status and journal; a script's completion message alone does not establish application health.
 
 For noninteractive deployment, configure sudo on the server with `sudo visudo`. Confirm the systemctl path using `command -v systemctl`; for `/usr/bin/systemctl`, a rule limited to the commands used by these scripts is:
 

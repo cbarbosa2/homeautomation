@@ -187,6 +187,12 @@
           style="color: white; text-align: center; margin-top: 1rem"
         ></div>
       </div>
+      <div class="task-card" style="margin: 2rem 0">
+        <div class="task-name">BMW i3 · SOC</div>
+        <p id="bmw-soc" style="margin-top: 0.75rem; color: #4a5568">
+          Sem dados
+        </p>
+      </div>
       <div class="footer">
         <p>
           <a href="/metrics">View Metrics</a> |
@@ -199,6 +205,20 @@
     </div>
 
     <script>
+      async function loadBmwSoc() {
+        const label = document.getElementById("bmw-soc");
+        try {
+          const response = await fetch("/api/bmw-soc");
+          if (!response.ok) throw new Error("Falha na leitura");
+          const value = await response.json();
+          label.textContent = value
+            ? `${value.percent}% · leitura BMW: ${new Date(value.observedAt).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })}`
+            : "Sem dados";
+        } catch (_) {
+          label.textContent = "Não foi possível obter os dados";
+        }
+      }
+
       async function loadChargeModes() {
         try {
           const response = await fetch("/api/wallbox-charge-mode");
@@ -318,6 +338,8 @@
 
       loadTasks();
       loadChargeModes();
+      loadBmwSoc();
+      setInterval(loadBmwSoc, 60000);
     </script>
   </body>
 </html>

@@ -21,6 +21,8 @@ import { AutomaticChargingCycle } from "./power-controller/automatic-charging-cy
 import { DYNAMIC_POWER_INTERVAL } from "./power-controller/power-constants.ts";
 import { setupWallSwitchHandler } from "./charge-mode/wall-switch-handler.ts";
 import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
+import { loadVehicleSoc } from "./bmw-cardata.ts";
+import { METRICS } from "./prometheus/metrics.ts";
 
 const AWAKE_MQTT_INTERVAL = Temporal.Duration.from({ seconds: 30 });
 
@@ -64,6 +66,28 @@ class HomeAutomationApp {
   }
 
   private setupScheduledTasks() {
+    const bmwClientId = Deno.env.get("BMW_CARDATA_CLIENT_ID")?.trim();
+    const bmwVin = Deno.env.get("BMW_CARDATA_VIN")?.trim();
+    const bmwContainerId = Deno.env.get("BMW_CARDATA_CONTAINER_ID")?.trim();
+    if (bmwClientId && bmwVin && bmwContainerId) {
+      scheduler.cron("Load BMW i3 SOC", "5 * * * *", async () => {
+        const value = await loadVehicleSoc(
+          bmwClientId,
+          bmwVin,
+          bmwContainerId,
+        );
+        if (value) {
+          this.metrics.setGauge(
+            METRICS.GAUGES.BMW_I3_SOC,
+            value.percent,
+          );
+          this.metrics.setGauge(
+            METRICS.GAUGES.BMW_I3_SOC_TIMESTAMP,
+            value.observedAt.epochMilliseconds / 1000,
+          );
+        }
+      });
+    }
     const readMqttTask = new MqttToPrometheusTask(
       this.mqttClient,
       this.metrics,

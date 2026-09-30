@@ -93,6 +93,17 @@ export const METRICS = {
       title: "Battery State of Charge",
       description: "Battery state of charge as percentage",
     },
+    BMW_I3_SOC: {
+      name: "bmw_i3_soc",
+      title: "BMW i3 SOC",
+      description:
+        "BMW i3 state of charge from the most recent CarData reading, percent",
+    },
+    BMW_I3_SOC_TIMESTAMP: {
+      name: "bmw_i3_soc_timestamp_seconds",
+      title: "BMW i3 SOC Timestamp",
+      description: "BMW timestamp for the selected SOC reading, Unix seconds",
+    },
     ESS_GRID_POWER: {
       name: "ess_grid_power",
       title: "Grid Power",

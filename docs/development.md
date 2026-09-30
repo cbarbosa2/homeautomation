@@ -17,6 +17,7 @@ See [operations.md](operations.md) for configuration. [bootstrap.ts](../src/boot
 | --- | --- |
 | `deno task dev` | Run with automatic reload. |
 | `deno task start` | Run in production mode. |
+| `deno task bmw:setup` | Authorize BMW CarData and configure the vehicle SOC container on this host. See [BMW CarData setup](operations.md#bmw-cardata-setup). |
 | `deno check src/*.ts` | Type-check top-level source files and their imports. |
 | `deno task test` | Run tests. |
 | `deno task check` | Type-check, then run tests. |

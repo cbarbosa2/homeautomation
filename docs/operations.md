@@ -17,10 +17,20 @@ Use [.env.example](../.env.example) as the configuration template; [constants.ts
 | `JSONBIN_ID` | Remote storage identifier for persisted charge modes. |
 | `JSONBIN_ACCESS_KEY` | JSONBin access key with Bins Read and Update permissions. |
 | `JSONBIN_MASTER_KEY` | JSONBin master key; preferred for writes to disable versioning on public bins. Reads prefer the access key. |
+| `BMW_CARDATA_CLIENT_ID` | Owner API client ID from the BMW CarData portal. Optional until BMW setup is complete. |
+| `BMW_CARDATA_VIN`, `BMW_CARDATA_CONTAINER_ID` | Filled by `deno task bmw:setup` after owner authorization; enable hourly vehicle SOC reads. |
 
 `HTTP_TIMEOUT` remains in the configuration but is not used by current request code. Logging settings are listed in `.env.example`.
 
 Store both Victron identifiers in the ignored `.env` file, never in tracked source or documentation. They have no defaults; missing or invalid values stop startup before network connections. The portal ID and numeric installation ID are separate values. On `bee.local`, configuration lives in `/home/carlos/homeautomation/.env`; keep it owned by `carlos` with mode `0600`. Configure both identifiers before deploying code that requires them. Environment changes take effect on the next service start.
+
+## BMW CarData setup
+
+Set `BMW_CARDATA_CLIENT_ID` in the ignored `.env` file and subscribe that client to **CarData API** in the BMW customer portal. Run `deno task bmw:setup` from the repository root. Open the verification URL printed by the command and authorize the device using the displayed code. The setup command selects the only PRIMARY vehicle on the account, creates or reuses a container for `vehicle.drivetrain.electricEngine.charging.level`, `vehicle.powertrain.electric.battery.stateOfCharge.displayed`, and `vehicle.drivetrain.batteryManagement.header`, saves the VIN and container ID in `.env`, and stores rotating tokens in the ignored `.bmw-cardata-tokens.json` file. If there is more than one PRIMARY vehicle, set `BMW_CARDATA_VIN` in `.env` before rerunning setup. Keep both files private with mode `0600`.
+
+Restart the service after setup. It reads the three SOC fields hourly at minute 05 and selects the valid value with the most recent BMW timestamp. It exposes the SOC at `/api/bmw-soc`, in the dashboard, and as `bmw_i3_soc` with `bmw_i3_soc_timestamp_seconds`. The timestamp is essential because vehicle updates can lag behind API polling. The service does not use this SOC to control charging. If the refresh token expires after prolonged downtime, rerun setup to authorize again. See the [BMW CarData integration guide](https://bmw-cardata.bmwgroup.com/customer/public/api-documentation).
+
+Run setup on each host where the service will read BMW data. The deployment scripts do not transfer `.env` or `.bmw-cardata-tokens.json`; on `bee.local`, set the client ID in `/home/carlos/homeautomation/.env` and run `deno task bmw:setup` from `/home/carlos/homeautomation`. The setup script is not part of normal service startup.
 
 ## Monitoring
 

@@ -4,6 +4,7 @@ import { scheduler } from "./task-scheduler.ts";
 import { globals, WallboxChargeMode, WallboxLocation } from "./globals.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
+import { getVehicleSoc } from "./bmw-cardata.ts";
 
 export class HttpServer {
   private server: Deno.HttpServer | null = null;
@@ -45,6 +46,21 @@ export class HttpServer {
       // Task API endpoints
       if (url.pathname === "/api/tasks") {
         return this.handleGetTasks();
+      }
+
+      if (
+        url.pathname === "/api/bmw-soc" && request.method === "GET"
+      ) {
+        const value = getVehicleSoc();
+        return Response.json(
+          value
+            ? {
+              percent: value.percent,
+              observedAt: value.observedAt.toString(),
+              source: value.source,
+            }
+            : null,
+        );
       }
 
       if (url.pathname === "/api/trigger" && request.method === "POST") {
