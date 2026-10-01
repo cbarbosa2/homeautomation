@@ -19,6 +19,8 @@ Remaining hours use actual elapsed time until the next Lisbon 08:00, including a
 | On | Charge at maximum possible power at any time. |
 | Manual | Send no automatic current or start/stop commands to this wallbox, including for grid protection. The user is responsible for its current and grid impact. |
 
+The inside wallbox charges the BMW i3. In Sun Only, ESS Only, and Night modes, stop it when a BMW SOC reading of at least 80% is available and no more than 90 minutes old. Missing or older readings do not interrupt charging. On and Manual modes are not subject to this limit. BMW telemetry may lag, so 80% is an approximate cutoff.
+
 For example, at 23:00 the ESS Only night condition requires SOC above minimum SOC + 18 percentage points.
 
 ## Wallbox priority

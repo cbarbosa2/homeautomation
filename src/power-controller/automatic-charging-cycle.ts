@@ -1,4 +1,5 @@
 import { WallboxChargeMode, WallboxLocation } from "../globals.ts";
+import { VehicleSoc } from "../bmw-cardata.ts";
 import { Clock, lisbonTime, timeUntilMorning } from "../lisbon-clock.ts";
 import { MqttClient } from "../mqtt-client.ts";
 import { CommandBuilder, SystemState } from "./command-builder.ts";
@@ -7,6 +8,9 @@ import {
   InputState,
 } from "./dynamic-power-calculator.ts";
 import { runCommands } from "./power-controller.ts";
+import { Temporal } from "../temporal.ts";
+
+const VEHICLE_SOC_MAX_AGE = Temporal.Duration.from({ minutes: 90 });
 
 type Readings = Omit<
   InputState & SystemState,
@@ -19,6 +23,7 @@ type Readings = Omit<
 interface Dependencies {
   telemetry: () => Readings;
   modes: () => Map<WallboxLocation, WallboxChargeMode>;
+  vehicleSoc?: () => VehicleSoc | undefined;
   clock: Clock;
   publisher: Pick<MqttClient, "publishJson">;
   enabled: boolean;
@@ -39,10 +44,21 @@ export class AutomaticChargingCycle {
     if (this.running) return;
     this.running = true;
     try {
-      const { telemetry, modes, clock, publisher, enabled } = this.dependencies;
+      const { telemetry, modes, vehicleSoc, clock, publisher, enabled } =
+        this.dependencies;
       const now = clock();
+      const vehicleReading = vehicleSoc?.();
+      const vehicleSOC = vehicleReading &&
+          Temporal.Instant.compare(vehicleReading.observedAt, now) <= 0 &&
+          Temporal.Instant.compare(
+              vehicleReading.observedAt.add(VEHICLE_SOC_MAX_AGE),
+              now,
+            ) >= 0
+        ? vehicleReading.percent
+        : undefined;
       const state = {
         ...telemetry(),
+        vehicleSOC,
         primaryWallboxLocation: this.primary,
         wallboxChargeMode: modes(),
         timeOfDay: lisbonTime(now).toPlainTime(),

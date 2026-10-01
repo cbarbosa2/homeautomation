@@ -24,6 +24,9 @@ const has = (writes: Write[], path: string, value: number) =>
 
 function installation(enabled = true, startupCharging = false) {
   let now = Temporal.Instant.from("2026-09-27T12:00:00Z");
+  let vehicleSoc:
+    | { percent: number; observedAt: Temporal.Instant; source: string }
+    | undefined;
   const telemetry = new ControlTelemetry(() => now);
   const values = new Map<string, number>(REFRESH_PATHS.map((p) => [p, 0]));
   values.set(P.batterySOC, 50);
@@ -49,6 +52,7 @@ function installation(enabled = true, startupCharging = false) {
       return telemetry.snapshot();
     },
     modes: () => modes,
+    vehicleSoc: () => vehicleSoc,
     clock: () => now,
     enabled,
     publisher: {
@@ -83,6 +87,13 @@ function installation(enabled = true, startupCharging = false) {
     setTime: (value: string) => {
       now = Temporal.Instant.from(value);
     },
+    setVehicleSoc: (percent: number | undefined, ageMinutes = 0) => {
+      vehicleSoc = percent === undefined ? undefined : {
+        percent,
+        observedAt: now.subtract({ minutes: ageMinutes }),
+        source: "test",
+      };
+    },
     onPublish: (callback: typeof onPublish) => {
       onPublish = callback;
     },
@@ -103,6 +114,21 @@ function installation(enabled = true, startupCharging = false) {
     },
   };
 }
+
+Deno.test("cycle stops the inside BMW at 80% and ignores unavailable readings", async () => {
+  const h = installation();
+  h.modes.set(L.Inside, Mode.Night);
+  h.modes.set(L.Outside, Mode.Off);
+  h.setTime("2026-09-27T21:00:00Z");
+  h.refresh();
+  assert(has(await h.tick(), inside("StartStop"), 1));
+  h.setVehicleSoc(80);
+  assert(has(await h.tick(), inside("StartStop"), 0));
+  h.setVehicleSoc(undefined);
+  assert(has(await h.settle(), inside("StartStop"), 1));
+  h.setVehicleSoc(80, 91);
+  assert(!has(await h.tick(), inside("StartStop"), 0));
+});
 
 Deno.test("cycle stops a pending start before telemetry arrives", async () => {
   const h = installation();

@@ -46,12 +46,13 @@ export class ControlTelemetry {
       (path.endsWith("Status") &&
         (![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24]
           .includes(rawValue))) ||
-      (path.endsWith("StartStop") && rawValue !== 0 && rawValue !== 1) ||
+      (path.endsWith("StartStop") && ![0, 1].includes(rawValue)) ||
       ((path.includes("evcharger/") &&
         (path.endsWith("Ac/Power") || path.endsWith("SetCurrent"))) &&
         rawValue < 0) ||
-      ((path === CONTROL_PATHS.pvInverterPower ||
-        path === CONTROL_PATHS.pvChargerPower) && rawValue < 0)
+      ([CONTROL_PATHS.pvInverterPower, CONTROL_PATHS.pvChargerPower].includes(
+        path,
+      ) && rawValue < 0)
     ) {
       this.readings.delete(path);
       return;

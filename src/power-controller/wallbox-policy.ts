@@ -10,15 +10,25 @@ import {
 } from "./power-constants.ts";
 
 export function canCharge(status: Status | undefined): boolean {
-  return status === Status.Connected || status === Status.Charging ||
-    status === Status.WaitingForStart || status === Status.StartCharging ||
-    status === Status.WaitingForSun || status === Status.LowSOC ||
-    status === Status.StopCharging || status === Status.ChargingLimit ||
-    status === Status.SwitchingTo1Phase || status === Status.SwitchingTo3Phase;
+  return status !== undefined && [
+    Status.Connected,
+    Status.Charging,
+    Status.WaitingForStart,
+    Status.StartCharging,
+    Status.WaitingForSun,
+    Status.LowSOC,
+    Status.StopCharging,
+    Status.ChargingLimit,
+    Status.SwitchingTo1Phase,
+    Status.SwitchingTo3Phase,
+  ].includes(status);
 }
 export function isCharging(status: Status | undefined): boolean {
-  return status === Status.Charging ||
-    status === Status.SwitchingTo1Phase || status === Status.SwitchingTo3Phase;
+  return status !== undefined && [
+    Status.Charging,
+    Status.SwitchingTo1Phase,
+    Status.SwitchingTo3Phase,
+  ].includes(status);
 }
 
 /** Whole amps only; insufficient start power must not reserve any budget. */

@@ -36,11 +36,12 @@ export async function runCommands(
   ) => globals.wallboxChargeMode.get(location),
 ) {
   for (const command of commands) {
-    const location = command.type === CommandType.InsideCurrent ||
-        command.type === CommandType.InsideStartStop
+    const location = [CommandType.InsideCurrent, CommandType.InsideStartStop]
+        .includes(command.type)
       ? WallboxLocation.Inside
-      : command.type === CommandType.OutsideCurrent ||
-          command.type === CommandType.OutsideStartStop
+      : [CommandType.OutsideCurrent, CommandType.OutsideStartStop].includes(
+          command.type,
+        )
       ? WallboxLocation.Outside
       : undefined;
     if (

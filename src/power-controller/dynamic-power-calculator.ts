@@ -22,6 +22,7 @@ export interface CalculatedTargetResults {
 }
 export interface InputState {
   telemetryValid?: boolean;
+  vehicleSOC?: number | undefined;
   primaryWallboxLocation: Location | undefined;
   gridPower: number | undefined;
   batteryMinSOC: number | undefined;
@@ -144,6 +145,11 @@ function request(
   if (mode === Mode.Manual) return "manual";
   if (
     mode === Mode.Off || !canCharge(state.wallboxVictronStatus.get(location))
+  ) return "off";
+  if (
+    location === Location.Inside &&
+    [Mode.SunOnly, Mode.ESSOnly, Mode.Night].includes(mode) &&
+    finite(state.vehicleSOC) && state.vehicleSOC >= 80
   ) return "off";
   const night = Temporal.PlainTime.compare(state.timeOfDay, "22:00") >= 0 ||
     Temporal.PlainTime.compare(state.timeOfDay, "08:00") < 0;

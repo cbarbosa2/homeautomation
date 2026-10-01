@@ -21,7 +21,7 @@ import { AutomaticChargingCycle } from "./power-controller/automatic-charging-cy
 import { DYNAMIC_POWER_INTERVAL } from "./power-controller/power-constants.ts";
 import { setupWallSwitchHandler } from "./charge-mode/wall-switch-handler.ts";
 import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
-import { loadVehicleSoc } from "./bmw-cardata.ts";
+import { getVehicleSoc, loadVehicleSoc } from "./bmw-cardata.ts";
 import { METRICS } from "./prometheus/metrics.ts";
 
 const AWAKE_MQTT_INTERVAL = Temporal.Duration.from({ seconds: 30 });
@@ -71,7 +71,7 @@ class HomeAutomationApp {
     const bmwContainerId = Deno.env.get("BMW_CARDATA_CONTAINER_ID")?.trim();
     if (bmwClientId && bmwVin && bmwContainerId) {
       let loadingBmwSoc = false;
-      scheduler.cron("Load BMW i3 SOC", "5 * * * *", async () => {
+      scheduler.cron("Load BMW i3 SOC", "5,35 * * * *", async () => {
         if (loadingBmwSoc) return;
         loadingBmwSoc = true;
         try {
@@ -110,6 +110,7 @@ class HomeAutomationApp {
     const chargingCycle = new AutomaticChargingCycle({
       telemetry: () => controlTelemetry.snapshot(),
       modes: () => globals.wallboxChargeMode,
+      vehicleSoc: getVehicleSoc,
       clock: systemClock,
       publisher: this.mqttClient,
       enabled: POWER_CONTROL_ENABLED,
