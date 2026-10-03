@@ -5,5 +5,6 @@ This is a Deno home automation service controlling a battery and two wallboxes t
 - **Automation behavior:** Read [docs/automation-rules.md](docs/automation-rules.md) before changing or reviewing charging modes, power allocation, priority, battery targets, or grid protection. It defines intended behavior; implementation may differ.
 - **Architecture:** Read [docs/architecture.md](docs/architecture.md) when locating code or changing service interactions, scheduling, or application lifecycle.
 - **Development:** Read [docs/development.md](docs/development.md) before setting up, running, or validating the application.
+- **Formatting:** After editing TypeScript, run `deno fmt` on the changed files. Review the result for a blank line between top-level declarations and functions, and between distinct blocks of logic; `deno fmt` does not add those blank lines.
 - **Date and time:** Read the [Temporal conventions](docs/development.md#date-and-time) before adding, changing, or reviewing date/time types or logic.
 - **Configuration and monitoring:** Read [docs/operations.md](docs/operations.md) when changing environment settings, MQTT connectivity, HTTP endpoints, or metrics.
