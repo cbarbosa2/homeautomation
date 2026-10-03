@@ -1,5 +1,5 @@
 import { WallboxChargeMode, WallboxLocation } from "../globals.ts";
-import { VehicleSoc } from "../bmw-cardata.ts";
+import { VehicleSoc } from "../bmw-cardata/bmw-cardata.ts";
 import { Clock, lisbonTime, timeUntilMorning } from "../lisbon-clock.ts";
 import { MqttClient } from "../mqtt-client.ts";
 import { CommandBuilder, SystemState } from "./command-builder.ts";

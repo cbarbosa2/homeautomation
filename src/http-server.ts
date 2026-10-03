@@ -4,7 +4,7 @@ import { scheduler } from "./task-scheduler.ts";
 import { globals, WallboxChargeMode, WallboxLocation } from "./globals.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
-import { getVehicleSoc } from "./bmw-cardata.ts";
+import { getVehicleSoc } from "./bmw-cardata/bmw-cardata.ts";
 
 export class HttpServer {
   private server: Deno.HttpServer | null = null;

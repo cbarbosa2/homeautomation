@@ -4,7 +4,7 @@ import {
   BMW_TOKEN_URL,
   bmwApi,
   saveBmwTokens,
-} from "../src/bmw-cardata.ts";
+} from "../src/bmw-cardata/bmw-cardata.ts";
 
 await load({ export: true });
 const clientId = Deno.env.get("BMW_CARDATA_CLIENT_ID")?.trim();

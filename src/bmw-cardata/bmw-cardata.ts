@@ -1,5 +1,5 @@
-import { Temporal } from "./temporal.ts";
-import { systemClock } from "./lisbon-clock.ts";
+import { Temporal } from "../temporal.ts";
+import { systemClock } from "../lisbon-clock.ts";
 
 export const BMW_SOC_DESCRIPTORS = [
   "vehicle.drivetrain.electricEngine.charging.level",

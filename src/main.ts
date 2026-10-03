@@ -21,7 +21,7 @@ import { AutomaticChargingCycle } from "./power-controller/automatic-charging-cy
 import { DYNAMIC_POWER_INTERVAL } from "./power-controller/power-constants.ts";
 import { setupWallSwitchHandler } from "./charge-mode/wall-switch-handler.ts";
 import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
-import { getVehicleSoc, loadVehicleSoc } from "./bmw-cardata.ts";
+import { getVehicleSoc, loadVehicleSoc } from "./bmw-cardata/bmw-cardata.ts";
 import { METRICS } from "./prometheus/metrics.ts";
 
 const AWAKE_MQTT_INTERVAL = Temporal.Duration.from({ seconds: 30 });
