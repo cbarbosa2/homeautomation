@@ -5,7 +5,7 @@ import {
   WallboxLocation as Location,
   WallboxStatus as Status,
 } from "../globals.ts";
-import { SYSTEM_VOLTAGE } from "../utils.ts";
+import { finite, SYSTEM_VOLTAGE } from "../utils.ts";
 import { MAX_BATTERY_CHARGE_POWER, MAX_GRID_AMPS } from "./power-constants.ts";
 
 export const LOCATIONS = [Location.Inside, Location.Outside];
@@ -36,9 +36,6 @@ export interface InputState {
   chargingStartedAt?: Map<Location, Temporal.Instant>;
   timeOfDay: Temporal.PlainTime;
   remainingNight?: Temporal.Duration;
-}
-export function finite(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value);
 }
 /** Allocate each watt once. Missing inputs never provide evidence for a mode. */
 export function calculateTargetAmpsAndPriority(

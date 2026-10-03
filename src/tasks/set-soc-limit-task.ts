@@ -10,7 +10,7 @@ import {
 } from "../lisbon-clock.ts";
 import { MqttClient } from "../mqtt-client.ts";
 import { Temporal } from "../temporal.ts";
-import { finite } from "../power-controller/dynamic-power-calculator.ts";
+import { finite } from "../utils.ts";
 
 export function calculateEveningSOC(
   soc: number,

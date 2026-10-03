@@ -7,3 +7,7 @@ export function ampsToPower(amps: number) {
 }
 
 export const SYSTEM_VOLTAGE = 240;
+
+export function finite(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}

@@ -2,7 +2,7 @@ import { VICTRON_PORTAL_ID } from "./constants.ts";
 import { Clock, systemClock } from "./lisbon-clock.ts";
 import { Temporal } from "./temporal.ts";
 import { globals, WallboxLocation as L, WallboxStatus } from "./globals.ts";
-import { finite } from "./power-controller/dynamic-power-calculator.ts";
+import { finite } from "./utils.ts";
 
 export const CONTROL_PATHS = {
   gridPower: "system/0/Ac/Grid/L1/Power",
