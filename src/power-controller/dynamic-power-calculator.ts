@@ -9,6 +9,7 @@ import { finite, SYSTEM_VOLTAGE } from "../utils.ts";
 import { MAX_BATTERY_CHARGE_POWER, MAX_GRID_AMPS } from "./power-constants.ts";
 
 export const LOCATIONS = [Location.Inside, Location.Outside];
+
 enum ChargingRequest {
   Maximum = "maximum",
   Solar = "solar",
@@ -20,6 +21,7 @@ export type PriorityDecision = { kind: "retain" } | { kind: "clear" } | {
   kind: "set";
   location: Location;
 };
+
 export interface CalculatedTargetResults {
   insideWallboxAmps: number | undefined;
   outsideWallboxAmps: number | undefined;
@@ -27,9 +29,10 @@ export interface CalculatedTargetResults {
   priorityDecision: PriorityDecision;
   sharedBudgetWatts?: number;
 }
+
 export interface InputState {
   telemetryValid?: boolean;
-  vehicleSOC?: number | undefined;
+  insideVehicleSOC?: number | undefined;
   primaryWallboxLocation: Location | undefined;
   gridPower: number | undefined;
   batteryMinSOC: number | undefined;
@@ -44,6 +47,7 @@ export interface InputState {
   timeOfDay: Temporal.PlainTime;
   remainingNight?: Temporal.Duration;
 }
+
 /** Allocate each watt once. Missing inputs never provide evidence for a mode. */
 export function calculateTargetAmpsAndPriority(
   state: InputState,
@@ -85,6 +89,7 @@ export function calculateTargetAmpsAndPriority(
     )
     : 0;
   const requests = new Map(LOCATIONS.map((l) => [l, request(state, l)]));
+
   let primary = state.primaryWallboxLocation;
   const eligible = (l: Location) =>
     requests.get(l) !== ChargingRequest.Off &&
@@ -106,6 +111,7 @@ export function calculateTargetAmpsAndPriority(
     );
     primary = started[0];
   }
+
   const order = primary === Location.Outside
     ? [Location.Outside, Location.Inside]
     : LOCATIONS;
@@ -128,6 +134,7 @@ export function calculateTargetAmpsAndPriority(
     remaining -= amps * SYSTEM_VOLTAGE;
     remainingSolar = Math.max(0, remainingSolar - amps * SYSTEM_VOLTAGE);
   }
+
   return {
     insideWallboxAmps: targets.get(Location.Inside),
     outsideWallboxAmps: targets.get(Location.Outside),
@@ -142,6 +149,7 @@ export function calculateTargetAmpsAndPriority(
       : { kind: "set", location: primary },
   };
 }
+
 function request(
   state: InputState,
   location: Location,
@@ -154,8 +162,9 @@ function request(
   if (
     location === Location.Inside &&
     [Mode.SunOnly, Mode.ESSOnly, Mode.Night].includes(mode) &&
-    finite(state.vehicleSOC) && state.vehicleSOC >= 80
+    finite(state.insideVehicleSOC) && state.insideVehicleSOC >= 80
   ) return ChargingRequest.Off;
+
   const night = Temporal.PlainTime.compare(state.timeOfDay, "22:00") >= 0 ||
     Temporal.PlainTime.compare(state.timeOfDay, "08:00") < 0;
   const soc = state.batterySOC;
@@ -167,6 +176,7 @@ function request(
       remainingNight = remainingNight.add({ hours: 24 });
     }
   }
+
   const hours = Math.ceil(remainingNight.total("hours"));
   if (
     mode === Mode.On || (finite(soc) && soc >= 95) ||
@@ -174,6 +184,7 @@ function request(
     (mode === Mode.ESSOnly && night && finite(soc) && finite(min) &&
       soc > min + 2 * hours)
   ) return ChargingRequest.Maximum;
+
   return finite(soc) && finite(min) && soc > min + 1
     ? ChargingRequest.Solar
     : ChargingRequest.Off;

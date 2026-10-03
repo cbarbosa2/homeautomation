@@ -23,7 +23,7 @@ type Readings = Omit<
 interface Dependencies {
   telemetry: () => Readings;
   modes: () => Map<WallboxLocation, WallboxChargeMode>;
-  vehicleSoc?: () => VehicleSoc | undefined;
+  insideVehicleSoc?: () => VehicleSoc | undefined;
   clock: Clock;
   publisher: Pick<MqttClient, "publishJson">;
   enabled: boolean;
@@ -44,21 +44,21 @@ export class AutomaticChargingCycle {
     if (this.running) return;
     this.running = true;
     try {
-      const { telemetry, modes, vehicleSoc, clock, publisher, enabled } =
+      const { telemetry, modes, insideVehicleSoc, clock, publisher, enabled } =
         this.dependencies;
       const now = clock();
-      const vehicleReading = vehicleSoc?.();
-      const vehicleSOC = vehicleReading &&
-          Temporal.Instant.compare(vehicleReading.observedAt, now) <= 0 &&
+      const insideVehicleReading = insideVehicleSoc?.();
+      const insideVehicleSOC = insideVehicleReading &&
+          Temporal.Instant.compare(insideVehicleReading.observedAt, now) <= 0 &&
           Temporal.Instant.compare(
-              vehicleReading.observedAt.add(VEHICLE_SOC_MAX_AGE),
+              insideVehicleReading.observedAt.add(VEHICLE_SOC_MAX_AGE),
               now,
             ) >= 0
-        ? vehicleReading.percent
+        ? insideVehicleReading.percent
         : undefined;
       const state = {
         ...telemetry(),
-        vehicleSOC,
+        insideVehicleSOC,
         primaryWallboxLocation: this.primary,
         wallboxChargeMode: modes(),
         timeOfDay: lisbonTime(now).toPlainTime(),

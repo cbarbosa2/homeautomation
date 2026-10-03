@@ -110,7 +110,7 @@ class HomeAutomationApp {
     const chargingCycle = new AutomaticChargingCycle({
       telemetry: () => controlTelemetry.snapshot(),
       modes: () => globals.wallboxChargeMode,
-      vehicleSoc: getVehicleSoc,
+      insideVehicleSoc: getVehicleSoc,
       clock: systemClock,
       publisher: this.mqttClient,
       enabled: POWER_CONTROL_ENABLED,

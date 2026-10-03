@@ -74,7 +74,7 @@ Deno.test("inside BMW charge limit applies only to automatic capped modes", () =
     const state = createDefaultState();
     state.pvInverterPower = 8000;
     state.batteryPower = 8000;
-    state.vehicleSOC = 80;
+    state.insideVehicleSOC = 80;
     state.wallboxChargeMode.set(WallboxLocation.Inside, mode);
     state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.On);
     assertEquals(calculateTargetAmpsAndPriority(state).insideWallboxAmps, 0);
@@ -83,11 +83,11 @@ Deno.test("inside BMW charge limit applies only to automatic capped modes", () =
       location: WallboxLocation.Outside,
     });
 
-    state.vehicleSOC = 79;
+    state.insideVehicleSOC = 79;
     assertEquals(calculateTargetAmpsAndPriority(state).insideWallboxAmps, 20);
-    state.vehicleSOC = undefined;
+    state.insideVehicleSOC = undefined;
     assertEquals(calculateTargetAmpsAndPriority(state).insideWallboxAmps, 20);
-    state.vehicleSOC = 80;
+    state.insideVehicleSOC = 80;
     state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.On);
     assertEquals(calculateTargetAmpsAndPriority(state).insideWallboxAmps, 20);
   }

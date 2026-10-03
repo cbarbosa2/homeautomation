@@ -24,7 +24,7 @@ const has = (writes: Write[], path: string, value: number) =>
 
 function installation(enabled = true, startupCharging = false) {
   let now = Temporal.Instant.from("2026-09-27T12:00:00Z");
-  let vehicleSoc:
+  let insideVehicleSoc:
     | { percent: number; observedAt: Temporal.Instant; source: string }
     | undefined;
   const telemetry = new ControlTelemetry(() => now);
@@ -52,7 +52,7 @@ function installation(enabled = true, startupCharging = false) {
       return telemetry.snapshot();
     },
     modes: () => modes,
-    vehicleSoc: () => vehicleSoc,
+    insideVehicleSoc: () => insideVehicleSoc,
     clock: () => now,
     enabled,
     publisher: {
@@ -87,8 +87,8 @@ function installation(enabled = true, startupCharging = false) {
     setTime: (value: string) => {
       now = Temporal.Instant.from(value);
     },
-    setVehicleSoc: (percent: number | undefined, ageMinutes = 0) => {
-      vehicleSoc = percent === undefined ? undefined : {
+    setInsideVehicleSoc: (percent: number | undefined, ageMinutes = 0) => {
+      insideVehicleSoc = percent === undefined ? undefined : {
         percent,
         observedAt: now.subtract({ minutes: ageMinutes }),
         source: "test",
@@ -122,11 +122,11 @@ Deno.test("cycle stops the inside BMW at 80% and ignores unavailable readings", 
   h.setTime("2026-09-27T21:00:00Z");
   h.refresh();
   assert(has(await h.tick(), inside("StartStop"), 1));
-  h.setVehicleSoc(80);
+  h.setInsideVehicleSoc(80);
   assert(has(await h.tick(), inside("StartStop"), 0));
-  h.setVehicleSoc(undefined);
+  h.setInsideVehicleSoc(undefined);
   assert(has(await h.settle(), inside("StartStop"), 1));
-  h.setVehicleSoc(80, 91);
+  h.setInsideVehicleSoc(80, 91);
   assert(!has(await h.tick(), inside("StartStop"), 0));
 });
 
