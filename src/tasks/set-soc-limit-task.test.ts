@@ -29,7 +29,7 @@ Deno.test("Lisbon summer evening uses a real zero forecast and current SOC", asy
 import { assertRejects } from "@std/assert";
 import { calculateEveningSOC } from "./set-soc-limit-task.ts";
 import { timeUntilMorning } from "../lisbon-clock.ts";
-import { SolarForecasts } from "../solar-forecasts.ts";
+import { SolarForecasts } from "../solar-forecasts/solar-forecasts.ts";
 
 Deno.test("hours to Lisbon morning round up actual elapsed time across DST", () => {
   for (

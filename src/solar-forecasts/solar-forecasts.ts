@@ -1,4 +1,4 @@
-import { Temporal } from "./temporal.ts";
+import { Temporal } from "../temporal.ts";
 
 export interface SolarForecast {
   wattHours: number;

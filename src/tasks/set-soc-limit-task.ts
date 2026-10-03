@@ -1,6 +1,6 @@
 import { VICTRON_PORTAL_ID } from "../constants.ts";
 import { globals } from "../globals.ts";
-import { SolarForecasts } from "../solar-forecasts.ts";
+import { SolarForecasts } from "../solar-forecasts/solar-forecasts.ts";
 import { CONTROL_PATHS, controlTelemetry } from "../control-telemetry.ts";
 import {
   Clock,

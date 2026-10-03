@@ -1,4 +1,4 @@
-import { SolarForecasts } from "./solar-forecasts.ts";
+import { SolarForecasts } from "./solar-forecasts/solar-forecasts.ts";
 import { EventEmitter } from "./event-emitter.ts";
 import { Temporal } from "./temporal.ts";
 

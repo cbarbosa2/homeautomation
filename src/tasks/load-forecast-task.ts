@@ -1,4 +1,4 @@
-import { SolarForecasts } from "../solar-forecasts.ts";
+import { SolarForecasts } from "../solar-forecasts/solar-forecasts.ts";
 import { Temporal } from "../temporal.ts";
 import { lisbonTime, systemClock } from "../lisbon-clock.ts";
 import {
