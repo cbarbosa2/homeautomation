@@ -9,6 +9,13 @@ import { finite, SYSTEM_VOLTAGE } from "../utils.ts";
 import { MAX_BATTERY_CHARGE_POWER, MAX_GRID_AMPS } from "./power-constants.ts";
 
 export const LOCATIONS = [Location.Inside, Location.Outside];
+enum ChargingRequest {
+  Maximum = "maximum",
+  Solar = "solar",
+  Off = "off",
+  Manual = "manual",
+}
+
 export type PriorityDecision = { kind: "retain" } | { kind: "clear" } | {
   kind: "set";
   location: Location;
@@ -80,7 +87,8 @@ export function calculateTargetAmpsAndPriority(
   const requests = new Map(LOCATIONS.map((l) => [l, request(state, l)]));
   let primary = state.primaryWallboxLocation;
   const eligible = (l: Location) =>
-    requests.get(l) !== "off" && requests.get(l) !== "manual";
+    requests.get(l) !== ChargingRequest.Off &&
+    requests.get(l) !== ChargingRequest.Manual;
   if (primary !== undefined && !eligible(primary)) {
     primary = LOCATIONS.find((l) => eligible(l));
   }
@@ -106,13 +114,13 @@ export function calculateTargetAmpsAndPriority(
   const targets = new Map<Location, number | undefined>();
   for (const l of order) {
     const modeRequest = requests.get(l);
-    if (modeRequest === "manual") {
+    if (modeRequest === ChargingRequest.Manual) {
       targets.set(l, undefined);
       continue;
     }
-    const available = modeRequest === "off"
+    const available = modeRequest === ChargingRequest.Off
       ? 0
-      : modeRequest === "solar"
+      : modeRequest === ChargingRequest.Solar
       ? Math.min(remaining, remainingSolar)
       : remaining;
     const amps = wallboxAmps(l, state.wallboxVictronStatus.get(l), available);
@@ -137,17 +145,17 @@ export function calculateTargetAmpsAndPriority(
 function request(
   state: InputState,
   location: Location,
-): "maximum" | "solar" | "off" | "manual" {
+): ChargingRequest {
   const mode = state.wallboxChargeMode.get(location) ?? Mode.SunOnly;
-  if (mode === Mode.Manual) return "manual";
+  if (mode === Mode.Manual) return ChargingRequest.Manual;
   if (
     mode === Mode.Off || !canCharge(state.wallboxVictronStatus.get(location))
-  ) return "off";
+  ) return ChargingRequest.Off;
   if (
     location === Location.Inside &&
     [Mode.SunOnly, Mode.ESSOnly, Mode.Night].includes(mode) &&
     finite(state.vehicleSOC) && state.vehicleSOC >= 80
-  ) return "off";
+  ) return ChargingRequest.Off;
   const night = Temporal.PlainTime.compare(state.timeOfDay, "22:00") >= 0 ||
     Temporal.PlainTime.compare(state.timeOfDay, "08:00") < 0;
   const soc = state.batterySOC;
@@ -165,6 +173,8 @@ function request(
     (mode === Mode.Night && night) ||
     (mode === Mode.ESSOnly && night && finite(soc) && finite(min) &&
       soc > min + 2 * hours)
-  ) return "maximum";
-  return finite(soc) && finite(min) && soc > min + 1 ? "solar" : "off";
+  ) return ChargingRequest.Maximum;
+  return finite(soc) && finite(min) && soc > min + 1
+    ? ChargingRequest.Solar
+    : ChargingRequest.Off;
 }
