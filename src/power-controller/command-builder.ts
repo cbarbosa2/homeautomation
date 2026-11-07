@@ -7,7 +7,7 @@ import {
   WallboxStatus,
 } from "../globals.ts";
 import { CONTROL_PATHS, wallboxPath } from "../control-telemetry.ts";
-import { SYSTEM_VOLTAGE } from "../utils.ts";
+import { SYSTEM_VOLTAGE } from "../utils/index.ts";
 import {
   CalculatedTargetResults,
   LOCATIONS,
@@ -34,6 +34,7 @@ interface Reservation {
   watts: number;
   target: number;
   since: Temporal.Instant | undefined;
+  pendingPeak: number;
 }
 
 /** Reductions are immediate. Increases wait for smoothing and device feedback. */
@@ -141,8 +142,15 @@ export class CommandBuilder {
         }
       }
       if (watts !== reservation.target) {
+        // Keep the first reduction timestamp while targets fluctuate. Device
+        // settings and measured power can be refreshed on different ticks.
+        if (reservation.target >= reservation.watts) {
+          reservation.since = this.now();
+          reservation.pendingPeak = watts;
+        } else {
+          reservation.pendingPeak = Math.max(reservation.pendingPeak, watts);
+        }
         reservation.target = watts;
-        reservation.since = this.now();
       }
       reservation.watts = Math.max(reservation.watts, watts);
     }
@@ -185,9 +193,17 @@ export class CommandBuilder {
         measured,
         (state.observedAt || setting !== undefined) ? configured : 0,
       );
-      this.reservations.set(device, { watts, target: watts, since: undefined });
-    } else if (fresh && configured <= old.target && measured <= old.target) {
-      old.watts = Math.max(configured, measured);
+      this.reservations.set(device, {
+        watts,
+        target: watts,
+        since: undefined,
+        pendingPeak: watts,
+      });
+    } else if (
+      fresh && old.target < old.watts && configured < old.watts &&
+      measured < old.watts
+    ) {
+      old.watts = Math.max(configured, measured, old.pendingPeak);
     } else {
       old.watts = Math.max(
         old.watts,

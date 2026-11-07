@@ -2,7 +2,7 @@ import {
   WallboxLocation as Location,
   WallboxStatus as Status,
 } from "../globals.ts";
-import { SYSTEM_VOLTAGE } from "../utils.ts";
+import { SYSTEM_VOLTAGE } from "../utils/index.ts";
 import {
   MAX_AMPS_PER_LOCATION,
   WALLBOX_MIN_CHARGE_AMPS,

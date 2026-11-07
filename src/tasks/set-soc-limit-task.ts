@@ -10,7 +10,7 @@ import {
 } from "../lisbon-clock.ts";
 import { MqttClient } from "../mqtt-client.ts";
 import { Temporal } from "../temporal.ts";
-import { finite } from "../utils.ts";
+import { finite } from "../utils/index.ts";
 
 export function calculateEveningSOC(
   soc: number,

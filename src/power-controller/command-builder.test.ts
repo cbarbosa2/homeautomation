@@ -1,8 +1,10 @@
-import { assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@std/assert";
+import { Temporal } from "../temporal.ts";
 import { WallboxLocation, WallboxStatus } from "../globals.ts";
+import { CONTROL_PATHS } from "../control-telemetry.ts";
 import { CalculatedTargetResults } from "./dynamic-power-calculator.ts";
 import { CommandBuilder, SystemState } from "./command-builder.ts";
-import { CommandType } from "./power-controller.ts";
+import { CommandType, PowerCommand } from "./power-controller.ts";
 
 function createSystemState(overrides?: Partial<SystemState>): SystemState {
   return {
@@ -207,5 +209,68 @@ Deno.test("Manual transition clears populated command history", () => {
   assertEquals(
     builder.createCommandsFromPowerSettings(state, createTargets()),
     [],
+  );
+});
+
+Deno.test("battery reduction releases capacity despite changing targets and staggered telemetry", () => {
+  let now = Temporal.Instant.from("2026-11-07T10:00:00Z");
+  const builder = new CommandBuilder(() => now);
+  const observedAt = new Map([
+    [CONTROL_PATHS.batteryMaxChargePower, now],
+    [CONTROL_PATHS.batteryPower, now],
+  ]);
+  const state = createSystemState({
+    batteryMaxChargePower: 6720,
+    batteryPower: 0,
+    wallboxVictronStatus: new Map([
+      [WallboxLocation.Inside, WallboxStatus.Disconnected],
+      [WallboxLocation.Outside, WallboxStatus.WaitingForStart],
+    ]),
+    wallboxPower: new Map([[WallboxLocation.Inside, 0], [
+      WallboxLocation.Outside,
+      0,
+    ]]),
+    wallboxSetCurrent: new Map([[WallboxLocation.Inside, 19], [
+      WallboxLocation.Outside,
+      7,
+    ]]),
+    wallboxStartStop: new Map([[WallboxLocation.Inside, 0], [
+      WallboxLocation.Outside,
+      0,
+    ]]),
+    observedAt,
+  });
+  const targets = createTargets({
+    insideWallboxAmps: 0,
+    outsideWallboxAmps: 30,
+    batteryChargePower: 200,
+    sharedBudgetWatts: 7200,
+  });
+
+  builder.createCommandsFromPowerSettings(state, targets);
+  let commands: PowerCommand[] = [];
+  for (let second = 1; second <= 47; second++) {
+    now = now.add({ seconds: 1 });
+    targets.batteryChargePower = 200 + second % 2;
+    if (second === 30) {
+      state.batteryMaxChargePower = 200;
+      observedAt.set(CONTROL_PATHS.batteryMaxChargePower, now);
+    }
+    if (second === 31) {
+      state.batteryPower = 720;
+      observedAt.set(CONTROL_PATHS.batteryPower, now);
+    }
+    commands = builder.createCommandsFromPowerSettings(state, targets);
+  }
+
+  assert(
+    commands.some((command) =>
+      command.type === CommandType.OutsideCurrent && command.value >= 10
+    ),
+  );
+  assert(
+    commands.some((command) =>
+      command.type === CommandType.OutsideStartStop && command.value === 1
+    ),
   );
 });

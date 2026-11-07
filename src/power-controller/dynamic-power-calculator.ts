@@ -5,7 +5,7 @@ import {
   WallboxLocation as Location,
   WallboxStatus as Status,
 } from "../globals.ts";
-import { finite, SYSTEM_VOLTAGE } from "../utils.ts";
+import { finite, SYSTEM_VOLTAGE } from "../utils/index.ts";
 import { MAX_BATTERY_CHARGE_POWER, MAX_GRID_AMPS } from "./power-constants.ts";
 
 export const LOCATIONS = [Location.Inside, Location.Outside];

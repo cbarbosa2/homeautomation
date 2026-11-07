@@ -1,6 +1,6 @@
 import { Temporal } from "../temporal.ts";
 import { WallboxLocation } from "../globals.ts";
-import { SYSTEM_VOLTAGE } from "../utils.ts";
+import { SYSTEM_VOLTAGE } from "../utils/index.ts";
 
 export const DYNAMIC_POWER_INTERVAL = Temporal.Duration.from({ seconds: 1 });
 export const MAX_GRID_AMPS = 28;
