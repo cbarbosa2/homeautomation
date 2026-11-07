@@ -70,10 +70,6 @@
         background: #bee3f8;
         color: #2c5282;
       }
-      .task-type.interval {
-        background: #c6f6d5;
-        color: #22543d;
-      }
       .task-schedule {
         font-family: "Monaco", "Courier New", monospace;
         font-size: 0.9rem;
@@ -282,7 +278,9 @@
         try {
           const response = await fetch("/api/tasks");
           if (!response.ok) throw new Error("Failed to load tasks");
-          const tasks = await response.json();
+          const tasks = (await response.json()).filter(
+            (task) => task.type !== "interval"
+          );
 
           const tasksContainer = document.getElementById("tasks");
           const loading = document.getElementById("loading");
