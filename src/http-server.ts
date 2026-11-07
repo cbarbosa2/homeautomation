@@ -10,6 +10,7 @@ import type { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
 import { getVehicleSoc } from "./bmw-cardata/bmw-cardata.ts";
 import { CONTROL_PATHS, controlTelemetry } from "./control-telemetry.ts";
+import { lisbonTime, systemClock } from "./lisbon-clock.ts";
 
 import {
   type BatteryDischargeStatus,
@@ -70,6 +71,13 @@ export class HttpServer {
           },
           { headers: { "Cache-Control": "no-store" } },
         );
+      }
+
+      if (
+        url.pathname === "/api/electricity-prices" &&
+        request.method === "GET"
+      ) {
+        return this.handleGetElectricityPrices();
       }
 
       if (url.pathname === "/api/bmw-soc" && request.method === "GET") {
@@ -175,6 +183,25 @@ export class HttpServer {
       logError(`Failed to read index.html: ${String(error)}`);
       return new Response("Dashboard not found", { status: 500 });
     }
+  }
+
+  private handleGetElectricityPrices(): Response {
+    const today = lisbonTime(systemClock()).toPlainDate();
+    const days = [today, today.add({ days: 1 })].map((date) => ({
+      date: date.toString(),
+      prices: Array.from({ length: 24 }, (_, hour) => {
+        const entry = globals.omieEntries.find(
+          (entry) =>
+            entry.date.toPlainDate().equals(date) && entry.date.hour === hour,
+        );
+        return entry && Number.isFinite(entry.price) ? entry.price : null;
+      }),
+    }));
+
+    return Response.json(
+      { timeZone: "Europe/Lisbon", days },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   private handleGetTasks(): Response {

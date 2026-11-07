@@ -11,6 +11,7 @@ import {
   type BatteryDischargeStatus,
 } from "./power-controller/battery-support-controller.ts";
 import { Temporal } from "./temporal.ts";
+import { globals } from "./globals.ts";
 
 // Exercise the real TCP adapter without starting MQTT or scheduled automation.
 test("Node HTTP adapter preserves dashboard, APIs, metrics and request bodies", async () => {
@@ -194,6 +195,82 @@ test("battery API reads live controller discharge status on every request", asyn
       deepStrictEqual((await response.json()).discharge, discharge);
     }
   } finally {
+    await server.stop();
+    metrics.getRegister().clear();
+  }
+});
+
+test("electricity prices API returns Lisbon days and nullable hourly tariff prices", async (context) => {
+  // Lisbon is already July 2 while UTC is still July 1.
+  let now = Temporal.Instant.from("2026-07-01T23:30:00Z");
+  context.mock.method(Temporal.Now, "instant", () => now);
+  const originalEntries = globals.omieEntries;
+  const metrics = new PrometheusMetrics();
+  const server = new HttpServer(metrics);
+  const port = await server.start(0);
+  const url = `http://127.0.0.1:${port}/api/electricity-prices`;
+  const read = async () => {
+    const response = await fetch(url);
+    equal(response.status, 200);
+    equal(response.headers.get("cache-control"), "no-store");
+    return response.json();
+  };
+  const empty = () => Array<number | null>(24).fill(null);
+
+  try {
+    globals.omieEntries = [];
+    deepStrictEqual(await read(), {
+      timeZone: "Europe/Lisbon",
+      days: [
+        { date: "2026-07-02", prices: empty() },
+        { date: "2026-07-03", prices: empty() },
+      ],
+    });
+    globals.omieEntries = [
+      ["2026-07-01T23:00", 99],
+      ["2026-07-02T00:00", 0],
+      ["2026-07-02T01:00", -3],
+      ["2026-07-02T02:00", NaN],
+      ["2026-07-02T03:00", Infinity],
+      ["2026-07-02T23:00", 18],
+      ["2026-07-03T00:00", 7],
+      ["2026-07-04T00:00", 100],
+    ].map(([date, price]) => ({
+      date: Temporal.PlainDateTime.from(String(date)),
+      price: Number(price),
+    }));
+    const today = empty();
+    today[0] = 0;
+    today[1] = -3;
+    today[23] = 18;
+    const tomorrow = empty();
+    tomorrow[0] = 7;
+    deepStrictEqual(await read(), {
+      timeZone: "Europe/Lisbon",
+      days: [
+        { date: "2026-07-02", prices: today },
+        { date: "2026-07-03", prices: tomorrow },
+      ],
+    });
+    now = Temporal.Instant.from("2026-07-02T23:00:00Z");
+    const nextTomorrow = empty();
+    nextTomorrow[0] = 100;
+    deepStrictEqual(await read(), {
+      timeZone: "Europe/Lisbon",
+      days: [
+        { date: "2026-07-03", prices: tomorrow },
+        { date: "2026-07-04", prices: nextTomorrow },
+      ],
+    });
+    // Winter dates use UTC+0 rather than a fixed summer offset.
+    now = Temporal.Instant.from("2026-11-07T23:30:00Z");
+    deepStrictEqual(
+      (await read()).days.map((day: { date: string }) => day.date),
+      ["2026-11-07", "2026-11-08"],
+    );
+    equal((await fetch(url, { method: "POST" })).status, 404);
+  } finally {
+    globals.omieEntries = originalEntries;
     await server.stop();
     metrics.getRegister().clear();
   }

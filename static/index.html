@@ -103,6 +103,25 @@
       .task-row .button { padding: 5px 10px; }
       .empty-state { padding: 14px 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
       .empty-state .button { margin-top: 12px; }
+      .price-charts { padding: 0 20px 14px; }
+      .price-day-heading { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 6px 36px; font-size: 11px; color: var(--muted); }
+      .price-day-label { display: flex; flex-wrap: wrap; gap: 2px 8px; }
+      .price-day-heading strong { color: var(--text); font-weight: 600; }
+      .price-plot { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 8px; }
+      .price-scale { position: relative; height: 80px; font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+      .price-scale span { position: absolute; right: 0; }
+      .price-scale span:last-child { bottom: 0; }
+      .price-bars { position: relative; display: grid; grid-template-columns: repeat(48, minmax(0, 1fr)); gap: 2px; height: 80px; background: #fafbf8; }
+      .price-baseline { position: absolute; left: 0; right: 0; height: 1px; background: #b7c5b9; pointer-events: none; }
+      .price-day-divider { position: absolute; left: 50%; top: 0; bottom: 0; border-left: 1px dashed #9aab9d; pointer-events: none; z-index: 1; }
+      .price-slot { position: relative; border: 0; padding: 0; background: transparent; color: var(--green); min-width: 0; }
+      .price-bar { position: absolute; left: 0; right: 0; border-radius: 2px; background: currentColor; min-height: 2px; }
+      .price-slot:hover, .price-slot:focus-visible { color: #174c36; }
+      .price-slot:focus-visible { outline-offset: 1px; z-index: 1; }
+      .price-hours { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); margin: 4px 0 0 36px; color: var(--muted); font-size: 10px; }
+      .price-detail { min-height: 18px; margin-top: 8px; color: var(--muted); font-size: 11px; }
+      .price-empty { padding: 6px 0; color: var(--muted); font-size: 12px; }
+      @media (max-width: 600px) { .price-charts { padding: 0 16px 12px; } .price-bars { gap: 1px; } }
       footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px 24px; padding: 4px 4px 16px; font-size: 11px; color: var(--muted); }
       footer nav { display: flex; gap: 20px; }
       footer a { color: var(--muted); text-underline-offset: 4px; }
@@ -181,6 +200,15 @@
           <p id="outside-feedback" class="feedback" role="status"></p>
         </form>
         <div class="section-note"><p>Set applies the mode and claims priority when eligible.</p><p id="priority-status" class="feedback" role="status">Loading priority…</p><p id="modes-status" class="feedback" role="status">Loading charge modes…</p><button id="retry-modes" class="button" type="button" hidden>Retry loading modes</button></div>
+      </section>
+
+      <section class="panel" aria-labelledby="prices-title">
+        <div class="section-header"><h2 id="prices-title">Electricity prices</h2><span class="label">c/kWh · Lisbon</span></div>
+        <div class="price-charts">
+          <p id="prices-status" class="feedback" role="status">Loading prices…</p>
+          <div id="price-days"></div>
+          <p id="price-detail" class="price-detail" role="status" hidden></p>
+        </div>
       </section>
 
       <section class="panel" aria-labelledby="automation-title">
@@ -285,6 +313,113 @@
           byId("bmw-observed").textContent = "Could not refresh BMW data.";
         } finally {
           setTimeout(loadBmwSoc, 60000);
+        }
+      }
+
+      function renderPrices(value) {
+        if (value?.timeZone !== "Europe/Lisbon" || value?.days?.length !== 2 ||
+            !value.days.every((day) => typeof day.date === "string" && Array.isArray(day.prices) && day.prices.length === 24)) {
+          throw new Error("Invalid price data");
+        }
+        const isPrice = (price) => typeof price === "number" && Number.isFinite(price);
+        const prices = value.days.flatMap((day) => day.prices).filter(isPrice);
+        const lower = Math.min(0, ...prices);
+        const upper = Math.max(1, ...prices);
+        const range = upper - lower;
+        const baseline = upper / range * 100;
+        const chart = byId("price-days");
+        chart.replaceChildren();
+        byId("price-detail").hidden = true;
+        byId("price-detail").textContent = "";
+        const heading = document.createElement("div");
+        heading.className = "price-day-heading";
+        value.days.forEach((day, index) => {
+          const label = document.createElement("div");
+          label.className = "price-day-label";
+          const name = document.createElement("strong");
+          name.textContent = index === 0 ? "Today" : "Tomorrow";
+          const date = document.createElement("span");
+          date.textContent = day.date;
+          label.append(name, date);
+          heading.append(label);
+        });
+        const plot = document.createElement("div");
+        plot.className = "price-plot";
+        const scale = document.createElement("div");
+        scale.className = "price-scale";
+        scale.setAttribute("aria-hidden", "true");
+        for (const bound of [upper, lower]) {
+          const tick = document.createElement("span");
+          tick.textContent = String(bound);
+          scale.append(tick);
+        }
+        const bars = document.createElement("div");
+        bars.className = "price-bars";
+        bars.setAttribute("role", "group");
+        bars.setAttribute("aria-label", "Today followed by tomorrow, hourly prices in cents per kWh");
+        const zero = document.createElement("span");
+        zero.className = "price-baseline";
+        zero.style.top = `${baseline}%`;
+        const divider = document.createElement("span");
+        divider.className = "price-day-divider";
+        divider.setAttribute("aria-hidden", "true");
+        bars.append(zero, divider);
+        value.days.forEach((day, index) => {
+          const name = index === 0 ? "Today" : "Tomorrow";
+          day.prices.forEach((price, hour) => {
+            const available = isPrice(price);
+            const slot = document.createElement(available ? "button" : "span");
+            slot.className = "price-slot";
+            const description = `${name}, ${day.date}, ${String(hour).padStart(2, "0")}:00–${String(hour + 1).padStart(2, "0")}:00 · ${available ? `${price} c/kWh` : "Unavailable"}`;
+            slot.setAttribute("aria-label", description);
+            slot.title = description;
+            if (available) {
+              slot.type = "button";
+              const bar = document.createElement("span");
+              bar.className = "price-bar";
+              bar.style.top = `${Math.min(baseline, (upper - price) / range * 100)}%`;
+              bar.style.height = `${Math.abs(price) / range * 100}%`;
+              // Keep zero prices visible inside the plot rather than below it.
+              if (price === 0 && lower === 0) bar.style.transform = "translateY(-100%)";
+              slot.append(bar);
+              const show = () => {
+                byId("price-detail").textContent = description;
+                byId("price-detail").hidden = false;
+              };
+              for (const event of ["mouseenter", "focus", "click"]) slot.addEventListener(event, show);
+            }
+            bars.append(slot);
+          });
+        });
+        plot.append(scale, bars);
+        const hours = document.createElement("div");
+        hours.className = "price-hours";
+        hours.setAttribute("aria-hidden", "true");
+        for (const hour of ["00", "06", "12", "18", "00", "06", "12", "18"]) {
+          const tick = document.createElement("span");
+          tick.textContent = hour;
+          hours.append(tick);
+        }
+        chart.append(heading, plot, hours);
+        value.days.forEach((day, index) => {
+          if (day.prices.some(isPrice)) return;
+          const empty = document.createElement("p");
+          empty.className = "price-empty";
+          empty.textContent = `${index === 0 ? "Today" : "Tomorrow"}’s prices not available yet`;
+          chart.append(empty);
+        });
+      }
+
+      async function loadPrices() {
+        try {
+          renderPrices(await requestJson("/api/electricity-prices"));
+          feedback(byId("prices-status"), "");
+        } catch (_) {
+          byId("price-days").replaceChildren();
+          byId("price-detail").hidden = true;
+          feedback(byId("prices-status"), "Could not refresh prices. Retrying automatically.", "error");
+        } finally {
+          setTimeout(loadPrices, 60000);
         }
       }
 
@@ -414,6 +549,7 @@
       }
       byId("retry-modes").addEventListener("click", loadChargeModes);
       byId("retry-tasks").addEventListener("click", loadTasks);
+      loadPrices();
       loadBattery();
       loadChargeModes();
       loadBmwSoc();

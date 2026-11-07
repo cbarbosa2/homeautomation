@@ -40,6 +40,7 @@ With the default port:
 
 - Dashboard: <http://localhost:1881/>
 - Home battery readings: <http://localhost:1881/api/battery>
+- Hourly electricity prices: <http://localhost:1881/api/electricity-prices>
 - Prometheus metrics: <http://localhost:1881/metrics>
 - Health: <http://localhost:1881/health>
 
@@ -55,6 +56,19 @@ old. The response is not cached. The dashboard polls battery readings every ten
 seconds after the preceding request completes and shows unavailable values on
 refresh failure. These values are read-only; wallbox mode and priority changes
 still require pressing Set.
+
+The Electricity prices panel shows Today followed by Tomorrow in one compact
+48-hour bar chart with a day divider and a shared scale in cents/kWh, using the existing tariff-adjusted OMIE
+prices. Hover, focus, or tap a bar for its exact price. Dates and hours are in
+Europe/Lisbon. `GET /api/electricity-prices` returns
+`{ "timeZone": "Europe/Lisbon", "days": [{ "date": "2026-11-07", "prices": [...] }, { "date": "2026-11-08", "prices": [...] }] }`.
+Each prices array contains 24 values indexed by local hour (0–23). Missing or
+nonfinite values are `null`; zero and negative prices remain valid. Missing hours
+appear as gaps, and an unavailable day has an explicit message. The endpoint
+reads cached prices, performs no external requests, and sends `Cache-Control:
+no-store`. The dashboard refreshes every minute after the preceding request
+completes; failed refreshes clear the chart and retry automatically. Price loading
+retains its existing hourly schedule and calculation.
 
 The discharge indicator reports the existing controller assessment: Confirmed,
 Checking, Blocked, or Unknown, with an explanation. SOC above minimum alone does
