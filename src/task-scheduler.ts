@@ -6,7 +6,7 @@ export interface TaskInfo {
   type: "cron" | "interval";
   schedule: string;
   handler: () => void | Promise<void>;
-  intervalId?: number;
+  intervalId?: ReturnType<typeof setInterval>;
 }
 
 export class TaskScheduler {
