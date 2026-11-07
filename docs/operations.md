@@ -18,7 +18,7 @@ Use [.env.example](../.env.example) as the configuration template; [constants.ts
 | `JSONBIN_ACCESS_KEY` | JSONBin access key with Bins Read and Update permissions. |
 | `JSONBIN_MASTER_KEY` | JSONBin master key; preferred for writes to disable versioning on public bins. Reads prefer the access key. |
 | `BMW_CARDATA_CLIENT_ID` | Owner API client ID from the BMW CarData portal. Optional until BMW setup is complete. |
-| `BMW_CARDATA_VIN`, `BMW_CARDATA_CONTAINER_ID` | Filled by `deno task bmw:setup` after owner authorization; enable startup and half-hourly vehicle SOC reads. |
+| `BMW_CARDATA_VIN`, `BMW_CARDATA_CONTAINER_ID` | Filled by `npm run bmw:setup` after owner authorization; enable startup and half-hourly vehicle SOC reads. |
 
 `HTTP_TIMEOUT` remains in the configuration but is not used by current request code. Logging settings are listed in `.env.example`.
 
@@ -26,11 +26,11 @@ Store both Victron identifiers in the ignored `.env` file, never in tracked sour
 
 ## BMW CarData setup
 
-Set `BMW_CARDATA_CLIENT_ID` in the ignored `.env` file and subscribe that client to **CarData API** in the BMW customer portal. Run `deno task bmw:setup` from the repository root. Open the verification URL printed by the command and authorize the device using the displayed code. The setup command selects the only PRIMARY vehicle on the account, creates or reuses a container for `vehicle.drivetrain.electricEngine.charging.level`, `vehicle.powertrain.electric.battery.stateOfCharge.displayed`, and `vehicle.drivetrain.batteryManagement.header`, saves the VIN and container ID in `.env`, and stores rotating tokens in the ignored `.bmw-cardata-tokens.json` file. If there is more than one PRIMARY vehicle, set `BMW_CARDATA_VIN` in `.env` before rerunning setup. Keep both files private with mode `0600`.
+Set `BMW_CARDATA_CLIENT_ID` in the ignored `.env` file and subscribe that client to **CarData API** in the BMW customer portal. Run `npm run bmw:setup` from the repository root. Open the verification URL printed by the command and authorize the device using the displayed code. The setup command selects the only PRIMARY vehicle on the account, creates or reuses a container for `vehicle.drivetrain.electricEngine.charging.level`, `vehicle.powertrain.electric.battery.stateOfCharge.displayed`, and `vehicle.drivetrain.batteryManagement.header`, saves the VIN and container ID in `.env`, and stores rotating tokens in the ignored `.bmw-cardata-tokens.json` file. If there is more than one PRIMARY vehicle, set `BMW_CARDATA_VIN` in `.env` before rerunning setup. Keep both files private with mode `0600`.
 
 Restart the service after setup. It reads the three SOC fields on startup and every half hour at minutes 05 and 35, selecting the valid value with the most recent BMW timestamp. It exposes the SOC at `/api/bmw-soc`, in the dashboard, and as `bmw_i3_soc` with `bmw_i3_soc_timestamp_seconds`. The timestamp is essential because vehicle updates can lag behind API polling. An SOC reading no more than 90 minutes old stops the inside wallbox at 80% in Sun Only, ESS Only, and Night modes. Missing or older readings allow charging under the usual mode rules. On and Manual are unaffected. If the refresh token expires after prolonged downtime, rerun setup to authorize again. See the [BMW CarData integration guide](https://bmw-cardata.bmwgroup.com/customer/public/api-documentation).
 
-Run setup on each host where the service will read BMW data. The deployment scripts do not transfer `.env` or `.bmw-cardata-tokens.json`; on `bee.local`, set the client ID in `/home/carlos/homeautomation/.env` and run `deno task bmw:setup` from `/home/carlos/homeautomation`. The setup script is not part of normal service startup.
+Run setup on each host where the service will read BMW data. The deployment scripts do not transfer `.env` or `.bmw-cardata-tokens.json`; on `bee.local`, set the client ID in `/home/carlos/homeautomation/.env` and run `npm run bmw:setup` from `/home/carlos/homeautomation`. The setup script is not part of normal service startup.
 
 ## Monitoring
 
@@ -101,3 +101,19 @@ ID alone does not authorize writes. See the [JSONBin update API](https://jsonbin
 Settings writes send `X-Bin-Versioning: false` to avoid exhausting bin versions.
 Public bins require the master key to honor this header. Configure
 `JSONBIN_MASTER_KEY` for public bins; existing history is not deleted.
+
+## Node.js rollout and rollback
+
+The Linux service uses Node.js 26.13 or newer in the 26.x line, with compiled ESM at `dist/src/bootstrap.js`. npm and development dependencies are needed when building on the host; systemd executes the compiled JavaScript directly. Upgrading a developer machine's Node installation does not update `bee.local`.
+
+For a host still running the former Deno service, perform the one-time cutover below with permission to install packages and replace/reload the systemd unit. Deployment scripts do not perform that cutover automatically.
+
+1. Install Node.js 26.13 or newer in the 26.x LTS line and npm using your host's trusted package source or the official [Node distributions](https://nodejs.org/en/download). The service requires `/usr/bin/node`; verify `/usr/bin/node --version`, `node --version`, and `npm --version` as `carlos`. If Node is installed elsewhere, change `ExecStart` and both deployment scripts together. A shell-only version manager does not configure systemd.
+2. Record the running Git revision, or back up the source tree for a local-copy deployment. Back up `/etc/systemd/system/homeautomation.service` and retain Deno for rollback. Preserve the host's `.env` and rotating BMW token files with ownership `carlos` and mode `0600`; do not replace them with local copies or restore old rotating tokens during rollback.
+3. On the local machine, run `npm ci`, `npm run analyze`, and `npm run build`. On the host, stop the service before replacing its source/dependencies. Transfer or check out the migration, then run `npm ci` and `npm run build` as `carlos` from `/home/carlos/homeautomation`. Both commands must succeed before startup. Builds require development dependencies, so do not use `npm ci --omit=dev` for this workflow.
+4. Copy the updated unit with `sudo cp homeautomation.service /etc/systemd/system/`, run `sudo systemctl daemon-reload`, and start with `sudo systemctl start homeautomation`. Its working directory and filesystem protection remain the same; Node runs the precompiled entrypoint without npm or compiler access at service startup.
+5. Check `systemctl status homeautomation`, `journalctl -u homeautomation`, `/health`, the dashboard, and `/metrics` on the configured HTTP port. Confirm MQTT connection status and telemetry freshness. A successful health response only checks HTTP. Do not run a second instance against the same installation during verification.
+
+Subsequent deployment scripts require the migrated systemd unit before stopping the service. They validate locally, check both remote Node binaries, stop the service, update source, install locked dependencies, build remotely, and start only after success. The local-copy script preserves the existing build timestamp; Git deployment refreshes it. Failure after stopping leaves the service stopped for operator recovery.
+
+For rollback, stop the service, restore the recorded source revision/tree and the backed-up systemd unit, reload systemd, and start with the former Deno runtime. Keep current `.env` and BMW tokens: their formats and locations are unchanged. Verify the journal, HTTP endpoints, MQTT connection, and telemetry again. If a build fails during ordinary Node deployment, restore the previous Node revision, rerun `npm ci` and `npm run build`, then start; never restart against a partially built output directory.

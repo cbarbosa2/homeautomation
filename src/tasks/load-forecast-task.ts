@@ -12,10 +12,8 @@ import { METRICS } from "../prometheus/metrics.ts";
 import { PrometheusMetrics } from "../prometheus/prometheus.ts";
 
 export class LoadForecastTask {
-  private readonly forecastSolarApiUrl =
-    `https://api.forecast.solar/${FORECAST_SOLAR_API_KEY}/estimate/watthours/day/41.081591/-8.643748/13/12/8.2`;
-  private readonly victronApiUrl =
-    `https://vrmapi.victronenergy.com/v2/installations/${VICTRON_INSTALLATION_ID}/stats?type=custom&attributeCodes[]=vrm_pv_charger_yield_fc&interval=days`;
+  private readonly forecastSolarApiUrl = `https://api.forecast.solar/${FORECAST_SOLAR_API_KEY}/estimate/watthours/day/41.081591/-8.643748/13/12/8.2`;
+  private readonly victronApiUrl = `https://vrmapi.victronenergy.com/v2/installations/${VICTRON_INSTALLATION_ID}/stats?type=custom&attributeCodes[]=vrm_pv_charger_yield_fc&interval=days`;
   private metrics: Pick<PrometheusMetrics, "setGauge">;
 
   constructor(metrics: Pick<PrometheusMetrics, "setGauge">) {
@@ -62,16 +60,18 @@ export class LoadForecastTask {
 
     const now = systemClock();
     const today = lisbonTime(now).toPlainDate();
-    const entries = Object.entries(jsonResponse.result).filter((
-      [date, value],
-    ) =>
-      /^\d{4}-\d{2}-\d{2}$/.test(date) && typeof value === "number" &&
-      Number.isFinite(value) && value >= 0
+    const entries = Object.entries(jsonResponse.result).filter(
+      ([date, value]) =>
+        /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+        typeof value === "number" &&
+        Number.isFinite(value) &&
+        value >= 0,
     );
     globals.solarForecastByDate = new SolarForecasts(
-      entries.map((
-        [date, wattHours],
-      ) => [Temporal.PlainDate.from(date), { wattHours, fetchedAt: now }]),
+      entries.map(([date, wattHours]) => [
+        Temporal.PlainDate.from(date),
+        { wattHours, fetchedAt: now },
+      ]),
     );
     return Array.from(
       { length: 4 },
@@ -107,7 +107,7 @@ export class LoadForecastTask {
 
     // add 50% more to account for Inverter as that would require an additional HTTP call, not worth it
     return jsonResponse.records.vrm_pv_charger_yield_fc.map((value) =>
-      Math.floor(value[1]! * 1.5)
+      Math.floor(value[1]! * 1.5),
     );
   }
 }

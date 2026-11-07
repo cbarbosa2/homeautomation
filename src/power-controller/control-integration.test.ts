@@ -1,4 +1,9 @@
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import { test } from "node:test";
+import {
+  deepStrictEqual as assertEquals,
+  ok as assert,
+  rejects as assertRejects,
+} from "node:assert/strict";
 import { Temporal } from "../temporal.ts";
 import {
   CONTROL_PATHS as P,
@@ -17,6 +22,7 @@ interface Write {
   path: string;
   value: unknown;
 }
+
 const inside = (field: string) => wallboxPath(L.Inside, field);
 const outside = (field: string) => wallboxPath(L.Outside, field);
 const has = (writes: Write[], path: string, value: number) =>
@@ -42,7 +48,10 @@ function installation(enabled = true, startupCharging = false) {
     for (const [path, value] of values) telemetry.record(path, { value });
   };
   refresh();
-  const modes = new Map([[L.Inside, Mode.On], [L.Outside, Mode.On]]);
+  const modes = new Map([
+    [L.Inside, Mode.On],
+    [L.Outside, Mode.On],
+  ]);
   const writes: Write[] = [];
   let onPublish: (write: Write) => Promise<void> = () => Promise.resolve();
   let reads = 0;
@@ -88,11 +97,14 @@ function installation(enabled = true, startupCharging = false) {
       now = Temporal.Instant.from(value);
     },
     setInsideVehicleSoc: (percent: number | undefined, ageMinutes = 0) => {
-      insideVehicleSoc = percent === undefined ? undefined : {
-        percent,
-        observedAt: now.subtract({ minutes: ageMinutes }),
-        source: "test",
-      };
+      insideVehicleSoc =
+        percent === undefined
+          ? undefined
+          : {
+              percent,
+              observedAt: now.subtract({ minutes: ageMinutes }),
+              source: "test",
+            };
     },
     onPublish: (callback: typeof onPublish) => {
       onPublish = callback;
@@ -115,7 +127,7 @@ function installation(enabled = true, startupCharging = false) {
   };
 }
 
-Deno.test("cycle stops the inside BMW at 80% and ignores unavailable readings", async () => {
+test("cycle stops the inside BMW at 80% and ignores unavailable readings", async () => {
   const h = installation();
   h.modes.set(L.Inside, Mode.Night);
   h.modes.set(L.Outside, Mode.Off);
@@ -130,7 +142,7 @@ Deno.test("cycle stops the inside BMW at 80% and ignores unavailable readings", 
   assert(!has(await h.tick(), inside("StartStop"), 0));
 });
 
-Deno.test("cycle stops a pending start before telemetry arrives", async () => {
+test("cycle stops a pending start before telemetry arrives", async () => {
   const h = installation();
   assert(has(await h.tick(), inside("StartStop"), 1));
   h.modes.set(L.Inside, Mode.Off);
@@ -139,7 +151,7 @@ Deno.test("cycle stops a pending start before telemetry arrives", async () => {
   assert(has(writes, P.batteryMaxChargePower, 0));
 });
 
-Deno.test("cycle reserves capacity until both settings and measured power confirm reduction", async () => {
+test("cycle reserves capacity until both settings and measured power confirm reduction", async () => {
   const h = installation();
   await h.tick();
   h.modes.set(L.Inside, Mode.Off);
@@ -160,7 +172,7 @@ Deno.test("cycle reserves capacity until both settings and measured power confir
   assert(has(writes, outside("StartStop"), 1));
 });
 
-Deno.test("cycle retains first-start priority through power pauses and resets it on restart", async () => {
+test("cycle retains first-start priority through power pauses and resets it on restart", async () => {
   const h = installation();
   h.values.set(outside("Status"), S.Charging);
   h.advance();
@@ -188,17 +200,22 @@ Deno.test("cycle retains first-start priority through power pauses and resets it
   assert(has(await h.tick(), inside("SetCurrent"), 20));
 });
 
-Deno.test("cycle gives Inside the startup tie", async () => {
+test("cycle gives Inside the startup tie", async () => {
   const h = installation(true, true);
   const writes = await h.tick();
   assert(has(writes, inside("SetCurrent"), 20));
   assert(has(writes, outside("SetCurrent"), 8));
 });
 
-Deno.test("cycle transfers priority when the first charger becomes ineligible", async () => {
-  for (
-    const reason of ["off", "manual", "full", "disconnected", "fault", "mode"]
-  ) {
+test("cycle transfers priority when the first charger becomes ineligible", async () => {
+  for (const reason of [
+    "off",
+    "manual",
+    "full",
+    "disconnected",
+    "fault",
+    "mode",
+  ]) {
     const h = installation();
     h.values.set(outside("Status"), S.Charging);
     h.advance();
@@ -216,7 +233,7 @@ Deno.test("cycle transfers priority when the first charger becomes ineligible", 
   }
 });
 
-Deno.test("cycle uses one conservative budget and recovers after fresh readings", async () => {
+test("cycle uses one conservative budget and recovers after fresh readings", async () => {
   const h = installation();
   // Only grid is stale; charger status remains valid so On remains eligible.
   h.telemetry.record(P.gridPower, { value: null });
@@ -224,8 +241,8 @@ Deno.test("cycle uses one conservative budget and recovers after fresh readings"
   assert(has(writes, inside("SetCurrent"), 12));
   assert(!has(writes, outside("StartStop"), 1));
   assert(
-    !writes.some((w) =>
-      w.path === P.batteryMaxChargePower && Number(w.value) > 0
+    !writes.some(
+      (w) => w.path === P.batteryMaxChargePower && Number(w.value) > 0,
     ),
   );
   assert(has(await h.settle(), inside("SetCurrent"), 20));
@@ -237,7 +254,7 @@ Deno.test("cycle uses one conservative budget and recovers after fresh readings"
   assert(has(await h.settle(), inside("SetCurrent"), 20));
 });
 
-Deno.test("cycle treats missing PV inverter power as zero", async () => {
+test("cycle treats missing PV inverter power as zero", async () => {
   const night = installation();
   night.setTime("2026-09-27T21:00:00Z"); // 22:00 in Lisbon
   night.modes.set(L.Inside, Mode.Night);
@@ -258,7 +275,7 @@ Deno.test("cycle treats missing PV inverter power as zero", async () => {
   assert(has(await missingGrid.tick(), inside("SetCurrent"), 12));
 });
 
-Deno.test("conservative allocation still enforces solar eligibility and funds battery last", async () => {
+test("conservative allocation still enforces solar eligibility and funds battery last", async () => {
   const h = installation();
   h.modes.set(L.Inside, Mode.SunOnly);
   h.modes.set(L.Outside, Mode.Off);
@@ -268,7 +285,7 @@ Deno.test("conservative allocation still enforces solar eligibility and funds ba
   assert(has(writes, P.batteryMaxChargePower, 2880));
 });
 
-Deno.test("cycle publishes reductions before increases", async () => {
+test("cycle publishes reductions before increases", async () => {
   const h = installation();
   h.values.set(P.batteryMaxChargePower, 2400);
   h.refresh();
@@ -277,7 +294,7 @@ Deno.test("cycle publishes reductions before increases", async () => {
   assert(has(writes.slice(1), inside("StartStop"), 1));
 });
 
-Deno.test("cycle checks live Manual mode during publication using its injected reader", async () => {
+test("cycle checks live Manual mode during publication using its injected reader", async () => {
   const h = installation();
   h.onPublish(() => {
     h.modes.set(L.Inside, Mode.Manual);
@@ -288,7 +305,7 @@ Deno.test("cycle checks live Manual mode during publication using its injected r
   assert(!has(writes, inside("StartStop"), 1));
 });
 
-Deno.test("cycle preserves built commands for non-Manual mode changes during publication", async () => {
+test("cycle preserves built commands for non-Manual mode changes during publication", async () => {
   const h = installation();
   h.onPublish(() => {
     h.modes.set(L.Inside, Mode.Off);
@@ -298,10 +315,14 @@ Deno.test("cycle preserves built commands for non-Manual mode changes during pub
   assert(has(await h.tick(), inside("StartStop"), 0));
 });
 
-Deno.test("failed cycle aborts publication, retains reservations, and permits recovery", async () => {
+test("failed cycle aborts publication, retains reservations, and permits recovery", async () => {
   const h = installation();
   h.onPublish(() => Promise.reject(new Error("offline")));
-  await assertRejects(h.tick, Error, "offline");
+  await assertRejects(
+    h.tick,
+    (error: unknown) =>
+      error instanceof Error && error.message.includes("offline"),
+  );
   assertEquals(h.writes.length, 1);
   h.onPublish(() => Promise.resolve());
   h.modes.set(L.Inside, Mode.Off);
@@ -316,16 +337,20 @@ Deno.test("failed cycle aborts publication, retains reservations, and permits re
   assert(has(await h.tick(), outside("SetCurrent"), 28));
 });
 
-Deno.test("failed reduction also aborts remaining reductions", async () => {
+test("failed reduction also aborts remaining reductions", async () => {
   const h = installation(true, true);
   h.modes.set(L.Inside, Mode.Off);
   h.modes.set(L.Outside, Mode.Off);
   h.onPublish(() => Promise.reject(new Error("offline")));
-  await assertRejects(h.tick, Error, "offline");
+  await assertRejects(
+    h.tick,
+    (error: unknown) =>
+      error instanceof Error && error.message.includes("offline"),
+  );
   assertEquals(h.writes, [{ path: inside("StartStop"), value: 0 }]);
 });
 
-Deno.test("busy triggers are skipped without reading telemetry or queuing work", async () => {
+test("busy triggers are skipped without reading telemetry or queuing work", async () => {
   const h = installation();
   const gate = Promise.withResolvers<void>();
   h.onPublish(() => gate.promise);
@@ -340,7 +365,7 @@ Deno.test("busy triggers are skipped without reading telemetry or queuing work",
   assertEquals(h.readCount(), 2);
 });
 
-Deno.test("disabled publication still advances reservations and smoothing", async () => {
+test("disabled publication still advances reservations and smoothing", async () => {
   const h = installation(false);
   await h.tick();
   assertEquals(h.writes, []);
@@ -355,7 +380,7 @@ Deno.test("disabled publication still advances reservations and smoothing", asyn
   assert(has(await h.settle(), outside("StartStop"), 1));
 });
 
-Deno.test("disabled publication still commits priority", async () => {
+test("disabled publication still commits priority", async () => {
   const h = installation(false);
   h.values.set(outside("Status"), S.Charging);
   h.refresh();
@@ -366,13 +391,11 @@ Deno.test("disabled publication still commits priority", async () => {
   assert(has(await h.settle(), outside("SetCurrent"), 28));
 });
 
-Deno.test("cycle uses Lisbon night boundaries in summer and winter", async () => {
-  for (
-    const [evening, morning] of [
-      ["2026-09-27T21:00:00Z", "2026-09-28T07:00:00Z"],
-      ["2026-12-01T22:00:00Z", "2026-12-02T08:00:00Z"],
-    ]
-  ) {
+test("cycle uses Lisbon night boundaries in summer and winter", async () => {
+  for (const [evening, morning] of [
+    ["2026-09-27T21:00:00Z", "2026-09-28T07:00:00Z"],
+    ["2026-12-01T22:00:00Z", "2026-12-02T08:00:00Z"],
+  ] as const) {
     const h = installation();
     h.modes.set(L.Inside, Mode.Night);
     h.modes.set(L.Outside, Mode.Off);
@@ -385,8 +408,11 @@ Deno.test("cycle uses Lisbon night boundaries in summer and winter", async () =>
   }
 });
 
-Deno.test("cycle supplies rounded remaining Lisbon night hours to ESS Only", async () => {
-  for (const [soc, starts] of [[38, false], [39, true]] as const) {
+test("cycle supplies rounded remaining Lisbon night hours to ESS Only", async () => {
+  for (const [soc, starts] of [
+    [38, false],
+    [39, true],
+  ] as const) {
     const h = installation();
     h.modes.set(L.Inside, Mode.ESSOnly);
     h.modes.set(L.Outside, Mode.Off);
@@ -397,7 +423,7 @@ Deno.test("cycle supplies rounded remaining Lisbon night hours to ESS Only", asy
   }
 });
 
-Deno.test("cycle stops a starting charger below 10 A even before StartStop acknowledgment", async () => {
+test("cycle stops a starting charger below 10 A even before StartStop acknowledgment", async () => {
   const h = installation();
   h.values.set(inside("Status"), S.StartCharging);
   h.values.set(P.gridPower, 4560);

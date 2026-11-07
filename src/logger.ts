@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 // src/logger.ts
 // Explicit LogLayer integration with Logflare transport.
 // Falls back to console when LogLayer credentials are not available.
@@ -5,17 +6,18 @@ import { LogLayer } from "loglayer";
 import { LogflareTransport } from "@loglayer/transport-logflare";
 import { serializeError } from "serialize-error";
 
-export const LOGLAYER_SOURCE_ID = Deno.env.get("LOGLAYER_SOURCE_ID");
-export const LOGLAYER_API_KEY = Deno.env.get("LOGLAYER_API_KEY");
+export const LOGLAYER_SOURCE_ID = process.env["LOGLAYER_SOURCE_ID"];
+
+export const LOGLAYER_API_KEY = process.env["LOGLAYER_API_KEY"];
 
 // Determine a host identifier synchronously. Prefer explicit env `HOST_ID`,
 // then `HOSTNAME`, then `/etc/hostname`, else fall back to 'unknown-host'.
 function detectHostId(): string {
-  const fromEnv = Deno.env.get("HOST_ID") || Deno.env.get("HOSTNAME") ||
-    Deno.env.get("HOST");
+  const fromEnv =
+    process.env["HOST_ID"] || process.env["HOSTNAME"] || process.env["HOST"];
   if (fromEnv) return fromEnv;
   try {
-    const hostname = Deno.readTextFileSync("/etc/hostname");
+    const hostname = readFileSync("/etc/hostname", "utf8");
     if (hostname) return hostname.trim();
   } catch {
     // ignore
@@ -65,18 +67,15 @@ function log(level: "info" | "warn" | "error", ...args: unknown[]): void {
   if (logger) {
     try {
       if (payload instanceof Error) {
-        logger.withMetadata({ host: HOST_ID }).withError(payload)[level](
-          payload.message,
-        );
+        const entry = logger.withMetadata({ host: HOST_ID }).withError(payload);
+        entry[level](payload.message);
       } else if (typeof payload === "object" && payload !== null) {
         const { message, ...metadata } = payload as Record<string, unknown>;
-        logger.withMetadata({ ...metadata, host: HOST_ID })[level](
-          typeof message === "string" ? message : "",
-        );
+        const entry = logger.withMetadata({ ...metadata, host: HOST_ID });
+        entry[level](typeof message === "string" ? message : "");
       } else {
-        logger.withMetadata({ host: HOST_ID })[level](
-          payload === undefined ? "" : String(payload),
-        );
+        const entry = logger.withMetadata({ host: HOST_ID });
+        entry[level](payload === undefined ? "" : String(payload));
       }
     } catch (e) {
       console.error(`LogLayer.${level} failed:`, e);

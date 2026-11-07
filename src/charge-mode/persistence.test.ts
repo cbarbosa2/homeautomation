@@ -1,11 +1,12 @@
-import { assertEquals } from "@std/assert";
+import { test } from "node:test";
+import { deepStrictEqual as assertEquals } from "node:assert/strict";
 import { HttpServer } from "../http-server.ts";
 import { globals, WallboxChargeMode, WallboxLocation } from "../globals.ts";
 import { PrometheusMetrics } from "../prometheus/prometheus.ts";
 import { loadPersistentStorage } from "../persistent-storage.ts";
 import { setChargeMode } from "./charge-mode-switcher.ts";
 
-Deno.test("API reports persistence failure and later saved modes restore after reset", async () => {
+test("API reports persistence failure and later saved modes restore after reset", async () => {
   const originalFetch = globalThis.fetch;
   const originalModes = new Map(globals.wallboxChargeMode);
   const metrics = new PrometheusMetrics();

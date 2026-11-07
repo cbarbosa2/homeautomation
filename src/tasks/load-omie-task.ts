@@ -1,4 +1,4 @@
-import { globals, OmieEntry } from "../globals.ts";
+import { globals, type OmieEntry } from "../globals.ts";
 import { PrometheusMetrics } from "../prometheus/prometheus.ts";
 import { fetchOmie, parseOmieResponse } from "../omie/omie-proxy.ts";
 import { METRICS } from "../prometheus/metrics.ts";
@@ -16,7 +16,7 @@ export class LoadOmieTask {
   public async execute(): Promise<void> {
     const omieEntries = parseOmieResponse(
       await fetchOmie(),
-      this.getStartOfToday()
+      this.getStartOfToday(),
     );
     globals.omieEntries = omieEntries;
 

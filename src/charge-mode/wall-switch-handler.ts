@@ -93,9 +93,8 @@ async function handleWallSwitch(
   const mode = mapIdAndPushesToChargeMode.get(id + "_" + pushes);
 
   if (mode != undefined) {
-    const location = id == 0 || id == 1
-      ? WallboxLocation.Inside
-      : WallboxLocation.Outside;
+    const location =
+      id == 0 || id == 1 ? WallboxLocation.Inside : WallboxLocation.Outside;
     await setChargeMode(metrics, location, mode);
   }
 }

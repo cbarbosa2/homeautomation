@@ -1,10 +1,10 @@
-import { assertEquals } from "@std/assert";
+import { test } from "node:test";
+import { deepStrictEqual as assertEquals } from "node:assert/strict";
 import { parseOmieResponse } from "./omie-proxy.ts";
 import { Temporal } from "../temporal.ts";
 
 // Test data that simulates OMIE CSV format
-const sampleOmieData =
-  `OMIE - Mercado de electricidad;Fecha Emisión :14/11/2025 - 13:10;;15/11/2025;Precios y volúmenes del mercado diario;;;;
+const sampleOmieData = `OMIE - Mercado de electricidad;Fecha Emisión :14/11/2025 - 13:10;;15/11/2025;Precios y volúmenes del mercado diario;;;;
 
 Fecha;Periodo;Precio marginal en el sistema español (EUR/MWh);Precio marginal en el sistema portugués (EUR/MWh);Potencia total de compra sistema español (MW);Potencia total de venta sistema español (MW);Potencia total de compra sistema portugués (MW);Potencia total de venta sistema portugués (MW);Potencia total de compra del mercado Ibérico (MW);Potencia total de venta del mercado Ibérico (MW);Potencia total con bilaterales del mercado Ibérico (MW);
 15/11/2025;1;31,5;31,5;19027,4;18635,4;5871,2;5267,6;24898,6;23903;32041,3;
@@ -20,7 +20,7 @@ Fecha;Periodo;Precio marginal en el sistema español (EUR/MWh);Precio marginal e
 15/11/2025;43;23,98;23,98;23557,6;25784,9;5659,9;5112,6;29217,5;30897,5;34242,4;
 15/11/2025;44;18,49;18,49;24375,7;26040,6;5701,8;5132,5;30077,5;31173,1;35142,5;`;
 
-Deno.test("parseOmieResponse should parse OMIE data correctly", () => {
+test("parseOmieResponse should parse OMIE data correctly", () => {
   const startOfToday = new Temporal.PlainDateTime(2025, 11, 14, 0, 0, 0);
 
   const result = parseOmieResponse(sampleOmieData, startOfToday);
@@ -55,7 +55,7 @@ Deno.test("parseOmieResponse should parse OMIE data correctly", () => {
   }
 });
 
-Deno.test("parseOmieResponse applies tariffs at Portugal hour boundaries", () => {
+test("parseOmieResponse applies tariffs at Portugal hour boundaries", () => {
   // OMIE periods are quarter-hours in Spain time, one hour ahead.
   const response = [
     "15/11/2025;5;100;100", // 00:00 Portugal
@@ -72,19 +72,21 @@ Deno.test("parseOmieResponse applies tariffs at Portugal hour boundaries", () =>
   );
 
   // At 0.1 EUR/kWh OMIE, night is 17.2992 cents and day is 24.4754 cents.
-  assertEquals(result.map((entry) => [entry.date.hour, entry.price]), [
-    [0, 17],
-    [7, 17],
-    [8, 24],
-    [21, 24],
-    [22, 17],
-    [23, 17],
-  ]);
+  assertEquals(
+    result.map((entry) => [entry.date.hour, entry.price]),
+    [
+      [0, 17],
+      [7, 17],
+      [8, 24],
+      [21, 24],
+      [22, 17],
+      [23, 17],
+    ],
+  );
 });
 
-Deno.test("parseOmieResponse should filter entries before startOfToday", () => {
-  const response =
-    `15/11/2025;1;31,5;31,5;19027,4;18635,4;5871,2;5267,6;24898,6;23903;32041,3;
+test("parseOmieResponse should filter entries before startOfToday", () => {
+  const response = `15/11/2025;1;31,5;31,5;19027,4;18635,4;5871,2;5267,6;24898,6;23903;32041,3;
 16/11/2025;5;25,0;25,0;19027,4;18635,4;5871,2;5267,6;24898,6;23903;32041,3;`;
 
   // Set startOfToday to 16/11/2025, so 15/11/2025 entries should be filtered out

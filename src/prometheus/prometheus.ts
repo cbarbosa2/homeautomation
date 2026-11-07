@@ -1,7 +1,6 @@
 import * as client from "prom-client";
-import { MetricInfo, METRICS } from "./metrics.ts";
+import { type MetricInfo, METRICS } from "./metrics.ts";
 import { logWarn } from "../logger.ts";
-// Using Deno's built-in HTTP server
 
 export class PrometheusMetrics {
   private register: client.Registry;
@@ -26,7 +25,7 @@ export class PrometheusMetrics {
       this.createCounter(
         counter.name,
         counter.description,
-        "labels" in counter ? [...counter.labels] : []
+        "labels" in counter ? [...counter.labels] : [],
       );
     });
 
@@ -35,7 +34,7 @@ export class PrometheusMetrics {
       this.createGauge(
         gauge.name,
         gauge.description,
-        "labels" in gauge ? [...gauge.labels] : []
+        "labels" in gauge ? [...gauge.labels] : [],
       );
     });
 
@@ -56,7 +55,7 @@ export class PrometheusMetrics {
   createCounter(
     name: string,
     help: string,
-    labelNames: string[] = []
+    labelNames: string[] = [],
   ): client.Counter {
     const counter = new client.Counter({
       name: name,
@@ -72,7 +71,7 @@ export class PrometheusMetrics {
   createGauge(
     name: string,
     help: string,
-    labelNames: string[] = []
+    labelNames: string[] = [],
   ): client.Gauge {
     const gauge = new client.Gauge({
       name: name,
@@ -89,7 +88,7 @@ export class PrometheusMetrics {
     name: string,
     help: string,
     labelNames: string[] = [],
-    buckets?: number[]
+    buckets?: number[],
   ): client.Histogram {
     const histogramConfig = {
       name: name,
@@ -107,7 +106,7 @@ export class PrometheusMetrics {
 
   incrementCounter(
     counterKey: keyof typeof METRICS.COUNTERS,
-    labels?: Record<string, string | number>
+    labels?: Record<string, string | number>,
   ): void {
     const counterInfo = METRICS.COUNTERS[counterKey]!;
     const counter = this.counters.get(counterInfo.name);
@@ -129,7 +128,7 @@ export class PrometheusMetrics {
   setGauge(
     gaugeInfo: MetricInfo,
     value: number,
-    labels?: Record<string, string | number>
+    labels?: Record<string, string | number>,
   ): void {
     const gauge = this.gauges.get(gaugeInfo.name);
     if (gauge) {

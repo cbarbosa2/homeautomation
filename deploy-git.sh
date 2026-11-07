@@ -1,34 +1,29 @@
 #!/bin/bash
+# Pull main on bee.local, build there, then start the service.
+set -euo pipefail
+cd "$(dirname "$0")"
 
-# Deploy script for home automation service
-# Connects to bee.local, stops service, pulls latest code, and restarts service
+node scripts/check-node.mjs
+npm run analyze
+npm run build
 
-set -e
+ssh carlos@bee.local 'bash -se' <<'EOF_REMOTE'
+set -euo pipefail
+cd /home/carlos/homeautomation
+/usr/bin/node -e 'if (process.versions.node.split(".")[0] !== "26" || Number(process.versions.node.split(".")[1]) < 13) process.exit(1)'
+node -e 'if (process.versions.node.split(".")[0] !== "26" || Number(process.versions.node.split(".")[1]) < 13) process.exit(1)'
+command -v npm >/dev/null
+case "$(systemctl show homeautomation --property=ExecStart --value)" in
+  *"/usr/bin/node"*"dist/src/bootstrap.js"*) ;;
+  *) echo 'Install the Node systemd unit and run daemon-reload first; see docs/operations.md.' >&2; exit 1 ;;
+esac
+sudo -n systemctl stop homeautomation
+git pull --ff-only origin main
+npm ci
+npm run build
+date -u +"%Y-%m-%dT%H:%M:%S.%3NZ" > build-timestamp.txt
+sudo -n systemctl start homeautomation
+sudo -n systemctl status homeautomation --no-pager
+EOF_REMOTE
 
-if ! deno task compile; then
-  echo "❌ Compilation failed. Aborting deployment."
-  exit 1
-fi
-
-echo "🚀 Starting deployment to bee.local..."
-
-ssh carlos@bee.local << 'EOF'
-    echo "📋 Stopping homeautomation service..."
-    sudo -n systemctl stop homeautomation
-
-    echo "📁 Navigating to project directory..."
-    cd /home/carlos/homeautomation
-    echo "🔄 Pulling latest code from git..."
-    git pull origin main
-
-    echo "📝 Creating build timestamp..."
-    date -u +"%Y-%m-%dT%H:%M:%S.%3NZ" > build-timestamp.txt
-
-    echo "🔄 Restarting homeautomation service..."
-    sudo -n systemctl start homeautomation
-
-    echo "✅ Checking service status..."
-    sudo -n systemctl status homeautomation
-EOF
-
-echo "✅ Deployment completed successfully!"
+echo 'Git deployment completed; verify the health endpoint, metrics and journal.'

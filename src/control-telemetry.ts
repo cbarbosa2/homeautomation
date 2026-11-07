@@ -1,5 +1,5 @@
 import { VICTRON_PORTAL_ID } from "./constants.ts";
-import { Clock, systemClock } from "./lisbon-clock.ts";
+import { type Clock, systemClock } from "./lisbon-clock.ts";
 import { Temporal } from "./temporal.ts";
 import { globals, WallboxLocation as L, WallboxStatus } from "./globals.ts";
 import { finite } from "./utils/index.ts";
@@ -13,15 +13,17 @@ export const CONTROL_PATHS = {
   pvInverterPower: "system/0/Ac/PvOnGrid/L1/Power",
   pvChargerPower: "system/0/Dc/Pv/Power",
 };
+
 export function wallboxPath(location: L, field: string): string {
   return `evcharger/${location === L.Inside ? 40 : 41}/${field}`;
 }
+
 export const REFRESH_PATHS = [
   ...Object.values(CONTROL_PATHS),
   ...[L.Inside, L.Outside].flatMap((l) =>
     ["Ac/Power", "Status", "SetCurrent", "StartStop"].map((f) =>
-      wallboxPath(l, f)
-    )
+      wallboxPath(l, f),
+    ),
   ),
 ];
 
@@ -44,15 +46,17 @@ export class ControlTelemetry {
       ((path.endsWith("Soc") || path.endsWith("SocLimit")) &&
         (rawValue < 0 || rawValue > 100)) ||
       (path.endsWith("Status") &&
-        (![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24]
-          .includes(rawValue))) ||
+        ![
+          0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24,
+        ].includes(rawValue)) ||
       (path.endsWith("StartStop") && ![0, 1].includes(rawValue)) ||
-      ((path.includes("evcharger/") &&
-        (path.endsWith("Ac/Power") || path.endsWith("SetCurrent"))) &&
+      (path.includes("evcharger/") &&
+        (path.endsWith("Ac/Power") || path.endsWith("SetCurrent")) &&
         rawValue < 0) ||
       ([CONTROL_PATHS.pvInverterPower, CONTROL_PATHS.pvChargerPower].includes(
         path,
-      ) && rawValue < 0)
+      ) &&
+        rawValue < 0)
     ) {
       this.readings.delete(path);
       return;
@@ -62,7 +66,8 @@ export class ControlTelemetry {
     for (const l of [L.Inside, L.Outside]) {
       if (path !== wallboxPath(l, "Status")) continue;
       if (
-        value === WallboxStatus.Charging && this.previousStatus.get(l) !== value
+        value === WallboxStatus.Charging &&
+        this.previousStatus.get(l) !== value
       ) {
         // Both charging on first observation have indistinguishable start order.
         this.starts.set(
@@ -81,23 +86,27 @@ export class ControlTelemetry {
   value(path: string): number | undefined {
     const reading = this.readings.get(path);
     const now = this.now();
-    return reading && Temporal.Instant.compare(now, reading.at) >= 0 &&
-        Temporal.Instant.compare(now, reading.at.add({ seconds: 60 })) <= 0
+    return reading &&
+      Temporal.Instant.compare(now, reading.at) >= 0 &&
+      Temporal.Instant.compare(now, reading.at.add({ seconds: 60 })) <= 0
       ? reading.value
       : undefined;
   }
   snapshot() {
     const pvInverterPower = this.value(CONTROL_PATHS.pvInverterPower);
     const map = (field: string) =>
-      new Map([L.Inside, L.Outside].flatMap((l) => {
-        const value = this.value(wallboxPath(l, field));
-        return value === undefined ? [] : [[l, value] as const];
-      }));
+      new Map(
+        [L.Inside, L.Outside].flatMap((l) => {
+          const value = this.value(wallboxPath(l, field));
+          return value === undefined ? [] : [[l, value] as const];
+        }),
+      );
     return {
       ...globals,
-      telemetryValid: REFRESH_PATHS.every((path) =>
-        path === CONTROL_PATHS.pvInverterPower ||
-        this.value(path) !== undefined
+      telemetryValid: REFRESH_PATHS.every(
+        (path) =>
+          path === CONTROL_PATHS.pvInverterPower ||
+          this.value(path) !== undefined,
       ),
       gridPower: this.value(CONTROL_PATHS.gridPower),
       batterySOC: this.value(CONTROL_PATHS.batterySOC),
@@ -112,10 +121,12 @@ export class ControlTelemetry {
       wallboxStartStop: map("StartStop"),
       chargingStartedAt: new Map(this.starts),
       observedAt: new Map(
-        [...this.readings].filter(([path]) => this.value(path) !== undefined)
+        [...this.readings]
+          .filter(([path]) => this.value(path) !== undefined)
           .map(([path, r]) => [path, r.at]),
       ),
     };
   }
 }
+
 export const controlTelemetry = new ControlTelemetry();

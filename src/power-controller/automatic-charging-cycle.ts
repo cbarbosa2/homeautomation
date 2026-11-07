@@ -1,11 +1,11 @@
 import { WallboxChargeMode, WallboxLocation } from "../globals.ts";
-import { VehicleSoc } from "../bmw-cardata/bmw-cardata.ts";
-import { Clock, lisbonTime, timeUntilMorning } from "../lisbon-clock.ts";
+import { type VehicleSoc } from "../bmw-cardata/bmw-cardata.ts";
+import { type Clock, lisbonTime, timeUntilMorning } from "../lisbon-clock.ts";
 import { MqttClient } from "../mqtt-client.ts";
-import { CommandBuilder, SystemState } from "./command-builder.ts";
+import { CommandBuilder, type SystemState } from "./command-builder.ts";
 import {
   calculateTargetAmpsAndPriority,
-  InputState,
+  type InputState,
 } from "./dynamic-power-calculator.ts";
 import { runCommands } from "./power-controller.ts";
 import { Temporal } from "../temporal.ts";
@@ -48,14 +48,15 @@ export class AutomaticChargingCycle {
         this.dependencies;
       const now = clock();
       const insideVehicleReading = insideVehicleSoc?.();
-      const insideVehicleSOC = insideVehicleReading &&
-          Temporal.Instant.compare(insideVehicleReading.observedAt, now) <= 0 &&
-          Temporal.Instant.compare(
-              insideVehicleReading.observedAt.add(VEHICLE_SOC_MAX_AGE),
-              now,
-            ) >= 0
-        ? insideVehicleReading.percent
-        : undefined;
+      const insideVehicleSOC =
+        insideVehicleReading &&
+        Temporal.Instant.compare(insideVehicleReading.observedAt, now) <= 0 &&
+        Temporal.Instant.compare(
+          insideVehicleReading.observedAt.add(VEHICLE_SOC_MAX_AGE),
+          now,
+        ) >= 0
+          ? insideVehicleReading.percent
+          : undefined;
       const state = {
         ...telemetry(),
         insideVehicleSOC,
@@ -76,11 +77,8 @@ export class AutomaticChargingCycle {
         state,
         targets,
       );
-      await runCommands(
-        commands,
-        publisher,
-        enabled,
-        (location) => modes().get(location),
+      await runCommands(commands, publisher, enabled, (location) =>
+        modes().get(location),
       );
     } finally {
       this.running = false;

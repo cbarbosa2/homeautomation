@@ -1,27 +1,39 @@
 #!/bin/bash
+# Copy the local working tree to bee.local, build there, then start the service.
+set -euo pipefail
+cd "$(dirname "$0")"
 
-# Development deploy script for home automation service
-# Connects to bee.local, stops service, copies local files, and restarts service
+node scripts/check-node.mjs
+npm run analyze
+npm run build
 
-set -e
+# Verify runtime and the one-time systemd migration before stopping the service.
+ssh carlos@bee.local 'bash -se' <<'EOF_REMOTE'
+set -euo pipefail
+/usr/bin/node -e 'if (process.versions.node.split(".")[0] !== "26" || Number(process.versions.node.split(".")[1]) < 13) process.exit(1)'
+node -e 'if (process.versions.node.split(".")[0] !== "26" || Number(process.versions.node.split(".")[1]) < 13) process.exit(1)'
+command -v npm >/dev/null
+case "$(systemctl show homeautomation --property=ExecStart --value)" in
+  *"/usr/bin/node"*"dist/src/bootstrap.js"*) ;;
+  *) echo 'Install the Node systemd unit and run daemon-reload first; see docs/operations.md.' >&2; exit 1 ;;
+esac
+sudo -n systemctl stop homeautomation
+EOF_REMOTE
 
-if ! deno task compile; then
-  echo "❌ Compilation failed. Aborting deployment."
-  exit 1
-fi
+rsync -av \
+  --exclude='.git/' --exclude='.env' --exclude='.env.*' \
+  --exclude='.bmw-cardata-tokens.json*' --exclude='.DS_Store' \
+  --exclude='logs*' --exclude='node_modules/' --exclude='dist/' \
+  --exclude='.test-dist/' --exclude='docs-temp/' --exclude='deploy*.sh' \
+  ./ carlos@bee.local:/home/carlos/homeautomation/
 
-echo "🚀 Starting development deployment to bee.local..."
+ssh carlos@bee.local 'bash -se' <<'EOF_REMOTE'
+set -euo pipefail
+cd /home/carlos/homeautomation
+npm ci
+npm run build
+sudo -n systemctl start homeautomation
+sudo -n systemctl status homeautomation --no-pager
+EOF_REMOTE
 
-echo "📋 Stopping homeautomation service..."
-ssh carlos@bee.local "sudo -n systemctl stop homeautomation"
-
-echo "📁 Copying files to bee.local..."
-rsync -av --exclude='.*' --exclude='logs*' --exclude='node_modules' --exclude='deploy*.sh' . carlos@bee.local:/home/carlos/homeautomation/
-
-echo "🔄 Restarting homeautomation service..."
-ssh carlos@bee.local "sudo -n systemctl start homeautomation"
-
-echo "✅ Checking service status..."
-ssh carlos@bee.local "sudo -n systemctl status homeautomation"
-
-echo "✅ Development deployment completed successfully!"
+echo 'Local deployment completed; verify the health endpoint, metrics and journal.'

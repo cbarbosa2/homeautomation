@@ -1,3 +1,4 @@
+import cron, { type ScheduledTask } from "node-cron";
 import { Temporal } from "./temporal.ts";
 import { logError, logInfo } from "./logger.ts";
 
@@ -11,6 +12,7 @@ export interface TaskInfo {
 
 export class TaskScheduler {
   private scheduledTasks = new Map<string, TaskInfo>();
+  private cronTasks = new Map<string, ScheduledTask>();
 
   /**
    * Schedule a task using cron expression
@@ -35,7 +37,15 @@ export class TaskScheduler {
       }
     };
 
-    Deno.cron(name, cronExpression, cronHandler);
+    this.stop(name);
+    this.cronTasks.set(
+      name,
+      cron.schedule(cronExpression, cronHandler, {
+        name,
+        timezone: "UTC",
+        noOverlap: true,
+      }),
+    );
     this.scheduledTasks.set(name, {
       name,
       type: "cron",
@@ -74,8 +84,10 @@ export class TaskScheduler {
       }
     };
 
+    this.stop(name);
+
     // Execute immediately
-    intervalHandler();
+    void intervalHandler();
 
     // Then schedule recurring
     const intervalId = setInterval(
@@ -123,13 +135,13 @@ export class TaskScheduler {
    */
   stop(name: string): boolean {
     const task = this.scheduledTasks.get(name);
-    if (task && task.type === "interval" && task.intervalId) {
-      clearInterval(task.intervalId);
-      this.scheduledTasks.delete(name);
-      logInfo(`🛑 Stopped scheduled task: ${name}`);
-      return true;
-    }
-    return false;
+    if (!task) return false;
+    if (task.intervalId) clearInterval(task.intervalId);
+    this.cronTasks.get(name)?.destroy();
+    this.cronTasks.delete(name);
+    this.scheduledTasks.delete(name);
+    logInfo(`🛑 Stopped scheduled task: ${name}`);
+    return true;
   }
 
   /**
@@ -137,15 +149,9 @@ export class TaskScheduler {
    */
   terminateAll(): void {
     logInfo("🛑 Terminating all scheduled tasks...");
-    for (const [name, task] of this.scheduledTasks.entries()) {
-      if (task.type === "interval" && task.intervalId) {
-        clearInterval(task.intervalId);
-        logInfo(`🛑 Stopped interval task: ${name}`);
-      } else if (task.type === "cron") {
-        logInfo(`🛑 Stopped cron task: ${name}`);
-      }
+    for (const name of this.scheduledTasks.keys()) {
+      this.stop(name);
     }
-    this.scheduledTasks.clear();
     logInfo("✅ All scheduled tasks terminated");
   }
 }

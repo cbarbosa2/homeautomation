@@ -36,18 +36,18 @@ export async function runCommands(
   ) => globals.wallboxChargeMode.get(location),
 ) {
   for (const command of commands) {
-    const location = [CommandType.InsideCurrent, CommandType.InsideStartStop]
-        .includes(command.type)
+    const location = [
+      CommandType.InsideCurrent,
+      CommandType.InsideStartStop,
+    ].includes(command.type)
       ? WallboxLocation.Inside
       : [CommandType.OutsideCurrent, CommandType.OutsideStartStop].includes(
-          command.type,
-        )
-      ? WallboxLocation.Outside
-      : undefined;
-    if (
-      location !== undefined &&
-      modeAt(location) === WallboxChargeMode.Manual
-    ) continue;
+            command.type,
+          )
+        ? WallboxLocation.Outside
+        : undefined;
+    if (location !== undefined && modeAt(location) === WallboxChargeMode.Manual)
+      continue;
     const topic = getTopic(command);
     if (topic && enabled) {
       logInfo("Running command: " + JSON.stringify(command));

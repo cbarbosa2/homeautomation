@@ -1,9 +1,12 @@
 import { Temporal } from "./temporal.ts";
+
 export type Clock = () => Temporal.Instant;
+
 export const systemClock: Clock = () => Temporal.Now.instant();
 export function lisbonTime(instant: Temporal.Instant) {
   return instant.toZonedDateTimeISO("Europe/Lisbon");
 }
+
 export function timeUntilMorning(instant: Temporal.Instant): Temporal.Duration {
   const local = lisbonTime(instant);
   let morning = local.with({

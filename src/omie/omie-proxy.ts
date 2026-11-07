@@ -1,4 +1,4 @@
-import { OmieEntry } from "../globals.ts";
+import { type OmieEntry } from "../globals.ts";
 import { logError } from "../logger.ts";
 import { Temporal } from "../temporal.ts";
 

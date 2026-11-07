@@ -4,8 +4,8 @@ import { JSONBIN_ID } from "./constants.ts";
 
 function storageHeaders(write = false): Headers {
   const headers = new Headers({ "Content-Type": "application/json" });
-  const accessKey = Deno.env.get("JSONBIN_ACCESS_KEY");
-  const masterKey = Deno.env.get("JSONBIN_MASTER_KEY");
+  const accessKey = process.env["JSONBIN_ACCESS_KEY"];
+  const masterKey = process.env["JSONBIN_MASTER_KEY"];
   if (write) headers.set("X-Bin-Versioning", "false");
   if (write && masterKey) headers.set("X-Master-Key", masterKey);
   else if (accessKey) headers.set("X-Access-Key", accessKey);

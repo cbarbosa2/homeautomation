@@ -1,13 +1,17 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import { test } from "node:test";
+import {
+  deepStrictEqual as assertEquals,
+  rejects as assertRejects,
+} from "node:assert/strict";
 import {
   loadPersistentStorage,
   savePersistentStorage,
 } from "./persistent-storage.ts";
 
-Deno.test("authenticated mode save survives reloading storage", async () => {
+test("authenticated mode save survives reloading storage", async () => {
   const originalFetch = globalThis.fetch;
-  const originalKey = Deno.env.get("JSONBIN_ACCESS_KEY");
-  Deno.env.set("JSONBIN_ACCESS_KEY", "test-access-key");
+  const originalKey = process.env["JSONBIN_ACCESS_KEY"];
+  process.env["JSONBIN_ACCESS_KEY"] = "test-access-key";
   let stored = { inside: 6, outside: 4 };
   globalThis.fetch = (_input, init) => {
     if (new Headers(init?.headers).get("X-Access-Key") !== "test-access-key") {
@@ -21,30 +25,30 @@ Deno.test("authenticated mode save survives reloading storage", async () => {
     assertEquals(await loadPersistentStorage(), { inside: 2, outside: 2 });
   } finally {
     globalThis.fetch = originalFetch;
-    if (originalKey === undefined) Deno.env.delete("JSONBIN_ACCESS_KEY");
-    else Deno.env.set("JSONBIN_ACCESS_KEY", originalKey);
+    if (originalKey === undefined) delete process.env["JSONBIN_ACCESS_KEY"];
+    else process.env["JSONBIN_ACCESS_KEY"] = originalKey;
   }
 });
 
-Deno.test("rejected storage writes propagate to the caller", async () => {
+test("rejected storage writes propagate to the caller", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = () => Promise.resolve(new Response(null, { status: 403 }));
   try {
     await assertRejects(
       () => savePersistentStorage({ inside: 2, outside: 2 }),
-      Error,
-      "403",
+      (error: unknown) =>
+        error instanceof Error && error.message.includes("403"),
     );
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-Deno.test("saves stay ordered and continue after a failed write", async () => {
+test("saves stay ordered and continue after a failed write", async () => {
   const originalFetch = globalThis.fetch;
   const started: number[] = [];
   let release!: () => void;
-  const blocked = new Promise<void>((resolve) => release = resolve);
+  const blocked = new Promise<void>((resolve) => (release = resolve));
   globalThis.fetch = async (_input, init) => {
     const value = JSON.parse(String(init?.body));
     started.push(value.inside);
@@ -57,8 +61,8 @@ Deno.test("saves stay ordered and continue after a failed write", async () => {
   try {
     const first = assertRejects(
       () => savePersistentStorage({ inside: 2, outside: 4 }),
-      Error,
-      "403",
+      (error: unknown) =>
+        error instanceof Error && error.message.includes("403"),
     );
     const second = savePersistentStorage({ inside: 5, outside: 2 });
     await Promise.resolve();
@@ -73,12 +77,12 @@ Deno.test("saves stay ordered and continue after a failed write", async () => {
   }
 });
 
-Deno.test("writes use the master key to disable versioning even when an access key exists", async () => {
+test("writes use the master key to disable versioning even when an access key exists", async () => {
   const originalFetch = globalThis.fetch;
   const keys = ["JSONBIN_ACCESS_KEY", "JSONBIN_MASTER_KEY"];
-  const previous = keys.map((key) => Deno.env.get(key));
-  Deno.env.set(keys[0]!, "test-access");
-  Deno.env.set(keys[1]!, "test-master");
+  const previous = keys.map((key) => process.env[key]);
+  process.env[keys[0]!] = "test-access";
+  process.env[keys[1]!] = "test-master";
   globalThis.fetch = (_input, init) => {
     const headers = new Headers(init?.headers);
     assertEquals(headers.get("X-Master-Key"), "test-master");
@@ -91,8 +95,8 @@ Deno.test("writes use the master key to disable versioning even when an access k
   } finally {
     globalThis.fetch = originalFetch;
     keys.forEach((key, i) => {
-      if (previous[i] === undefined) Deno.env.delete(key);
-      else Deno.env.set(key, previous[i]!);
+      if (previous[i] === undefined) delete process.env[key];
+      else process.env[key] = previous[i]!;
     });
   }
 });

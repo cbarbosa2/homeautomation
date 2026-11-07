@@ -1,8 +1,9 @@
+import { test } from "node:test";
 import { Temporal } from "../temporal.ts";
-import { assertEquals } from "@std/assert";
+import { deepStrictEqual as assertEquals } from "node:assert/strict";
 import {
   calculateTargetAmpsAndPriority,
-  InputState,
+  type InputState,
 } from "./dynamic-power-calculator.ts";
 import {
   WallboxChargeMode,
@@ -39,7 +40,7 @@ function createDefaultState(): InputState {
   };
 }
 
-Deno.test("calculateTargetAmpsAndPriority basic SunOnly", () => {
+test("calculateTargetAmpsAndPriority basic SunOnly", () => {
   const state = createDefaultState();
   const result = calculateTargetAmpsAndPriority(state);
   assertEquals(typeof result.insideWallboxAmps, "number");
@@ -48,14 +49,14 @@ Deno.test("calculateTargetAmpsAndPriority basic SunOnly", () => {
   assertEquals(result.priorityDecision, { kind: "retain" });
 });
 
-Deno.test("calculateTargetAmpsAndPriority Off disables charging", () => {
+test("calculateTargetAmpsAndPriority Off disables charging", () => {
   const state = createDefaultState();
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Off);
   const result = calculateTargetAmpsAndPriority(state);
   assertEquals(result.insideWallboxAmps, 0);
 });
 
-Deno.test("calculateTargetAmpsAndPriority Night mode off-peak", () => {
+test("calculateTargetAmpsAndPriority Night mode off-peak", () => {
   const state = createDefaultState();
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Night);
   state.timeOfDay = Temporal.PlainTime.from("23:00");
@@ -63,14 +64,12 @@ Deno.test("calculateTargetAmpsAndPriority Night mode off-peak", () => {
   assertEquals(typeof result.insideWallboxAmps, "number");
 });
 
-Deno.test("inside BMW charge limit applies only to automatic capped modes", () => {
-  for (
-    const mode of [
-      WallboxChargeMode.SunOnly,
-      WallboxChargeMode.ESSOnly,
-      WallboxChargeMode.Night,
-    ]
-  ) {
+test("inside BMW charge limit applies only to automatic capped modes", () => {
+  for (const mode of [
+    WallboxChargeMode.SunOnly,
+    WallboxChargeMode.ESSOnly,
+    WallboxChargeMode.Night,
+  ]) {
     const state = createDefaultState();
     state.pvInverterPower = 8000;
     state.batteryPower = 8000;
@@ -93,7 +92,7 @@ Deno.test("inside BMW charge limit applies only to automatic capped modes", () =
   }
 });
 
-Deno.test("calculateTargetAmpsAndPriority changes primary wallbox", () => {
+test("calculateTargetAmpsAndPriority changes primary wallbox", () => {
   const state = createDefaultState();
   // Simulate concedePriority for inside, not for outside
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Off);
@@ -105,7 +104,7 @@ Deno.test("calculateTargetAmpsAndPriority changes primary wallbox", () => {
   });
 });
 
-Deno.test("batteryChargePower with moderate grid power", () => {
+test("batteryChargePower with moderate grid power", () => {
   const state = {
     ...createDefaultState(),
     gridPower: 2000,
@@ -119,7 +118,7 @@ Deno.test("batteryChargePower with moderate grid power", () => {
   assertEquals(result.batteryChargePower, 4720);
 });
 
-Deno.test("batteryChargePower with no grid power", () => {
+test("batteryChargePower with no grid power", () => {
   const state = {
     ...createDefaultState(),
     gridPower: 0,
@@ -135,7 +134,7 @@ Deno.test("batteryChargePower with no grid power", () => {
   );
 });
 
-Deno.test("batteryChargePower with high grid power", () => {
+test("batteryChargePower with high grid power", () => {
   const state = {
     ...createDefaultState(),
     gridPower: 7000,
@@ -151,7 +150,7 @@ Deno.test("batteryChargePower with high grid power", () => {
   );
 });
 
-Deno.test("batteryChargePower with car charging", () => {
+test("batteryChargePower with car charging", () => {
   const state = {
     ...createDefaultState(),
     gridPower: 18 * 240,
@@ -167,7 +166,7 @@ Deno.test("batteryChargePower with car charging", () => {
   assertEquals(result.batteryChargePower, MAX_BATTERY_CHARGE_POWER - 20 * 240);
 });
 
-Deno.test("wallbox amps with excess battery power", () => {
+test("wallbox amps with excess battery power", () => {
   const state = createDefaultState();
   state.batteryPower = 4000;
   state.pvInverterPower = 8000;
@@ -175,7 +174,7 @@ Deno.test("wallbox amps with excess battery power", () => {
   assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 16);
 });
 
-Deno.test("wallbox amps when already charging with high power", () => {
+test("wallbox amps when already charging with high power", () => {
   const state = createDefaultState();
   state.batteryPower = 4000;
   state.pvInverterPower = 8000;
@@ -184,7 +183,7 @@ Deno.test("wallbox amps when already charging with high power", () => {
   assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 31);
 });
 
-Deno.test("wallbox amps when no PV power available", () => {
+test("wallbox amps when no PV power available", () => {
   const state = createDefaultState();
   state.batteryPower = 4000;
   state.pvInverterPower = 0;
@@ -192,7 +191,7 @@ Deno.test("wallbox amps when no PV power available", () => {
   assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 0);
 });
 
-Deno.test("wallbox amps with battery at 95% or above gets maximum power", () => {
+test("wallbox amps with battery at 95% or above gets maximum power", () => {
   const state = createDefaultState();
   state.batteryPower = 0;
   state.pvInverterPower = 8000;
@@ -202,7 +201,7 @@ Deno.test("wallbox amps with battery at 95% or above gets maximum power", () => 
   assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 32);
 });
 
-Deno.test("wallbox amps when battery not full and not charging", () => {
+test("wallbox amps when battery not full and not charging", () => {
   const state = createDefaultState();
   state.batteryPower = 0;
   state.pvInverterPower = 8000;
@@ -212,7 +211,7 @@ Deno.test("wallbox amps when battery not full and not charging", () => {
   assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 0);
 });
 
-Deno.test("On mode uses shared fallback when PV telemetry is unavailable", () => {
+test("On mode uses shared fallback when PV telemetry is unavailable", () => {
   const state = createDefaultState();
   state.pvInverterPower = undefined;
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.On);

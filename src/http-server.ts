@@ -1,5 +1,9 @@
+import { readFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
+import { createServer, type Server } from "node:http";
+import { getRequestListener } from "@hono/node-server";
 import { HTTP_PORT } from "./constants.ts";
-import { logError, logError as _error, logInfo } from "./logger.ts";
+import { logError, logInfo } from "./logger.ts";
 import { scheduler } from "./task-scheduler.ts";
 import { globals, WallboxChargeMode, WallboxLocation } from "./globals.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
@@ -7,7 +11,7 @@ import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
 import { getVehicleSoc } from "./bmw-cardata/bmw-cardata.ts";
 
 export class HttpServer {
-  private server: Deno.HttpServer | null = null;
+  private server: Server | null = null;
   private metrics: PrometheusMetrics;
   private readonly buildTimestamp: string;
 
@@ -18,13 +22,13 @@ export class HttpServer {
 
   private readBuildTimestamp(): string {
     try {
-      return Deno.readTextFileSync("./build-timestamp.txt").trim();
+      return readFileSync("./build-timestamp.txt", "utf8").trim();
     } catch {
       return "unknown";
     }
   }
 
-  start(): void {
+  async start(port = HTTP_PORT): Promise<number> {
     const handler = async (request: Request): Promise<Response> => {
       const url = new URL(request.url);
 
@@ -48,17 +52,15 @@ export class HttpServer {
         return this.handleGetTasks();
       }
 
-      if (
-        url.pathname === "/api/bmw-soc" && request.method === "GET"
-      ) {
+      if (url.pathname === "/api/bmw-soc" && request.method === "GET") {
         const value = getVehicleSoc();
         return Response.json(
           value
             ? {
-              percent: value.percent,
-              observedAt: value.observedAt.toString(),
-              source: value.source,
-            }
+                percent: value.percent,
+                observedAt: value.observedAt.toString(),
+                source: value.source,
+              }
             : null,
         );
       }
@@ -84,28 +86,51 @@ export class HttpServer {
       return new Response("Not Found", { status: 404 });
     };
 
-    logInfo(`🌐 HTTP server starting on port ${HTTP_PORT}`);
-    this.server = Deno.serve({ port: HTTP_PORT }, handler);
-    logInfo(`📊 Metrics available at: http://localhost:${HTTP_PORT}/metrics`);
-    logInfo(`📋 Task dashboard at: http://localhost:${HTTP_PORT}/`);
+    logInfo(`🌐 HTTP server starting on port ${port}`);
+    await new Promise<void>((resolve, reject) => {
+      const server = createServer(
+        getRequestListener(handler, { overrideGlobalObjects: false }),
+      );
+      this.server = server;
+      const onError = (error: Error) => {
+        this.server = null;
+        reject(error);
+      };
+      server.once("error", onError);
+      server.once("listening", () => {
+        server.removeListener("error", onError);
+        resolve();
+      });
+      server.listen(port);
+    });
+    const address = this.server?.address();
+    if (!address || typeof address === "string") {
+      throw new Error("HTTP server has no TCP address");
+    }
+    logInfo(
+      `📊 Metrics available at: http://localhost:${address.port}/metrics`,
+    );
+    logInfo(`📋 Task dashboard at: http://localhost:${address.port}/`);
+    return address.port;
   }
 
   async stop(): Promise<void> {
-    if (this.server) {
-      try {
-        // Force shutdown after 5 seconds
-        const shutdownPromise = this.server.shutdown();
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Shutdown timeout")), 5000)
-        );
+    const server = this.server;
+    if (!server) return;
+    this.server = null;
 
-        await Promise.race([shutdownPromise, timeoutPromise]);
-        logInfo("🌐 HTTP server stopped");
-      } catch (_) {
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        server.closeAllConnections();
         logInfo("🌐 HTTP server force stopped");
-        // Force exit if graceful shutdown fails
-      }
-    }
+      }, 5000);
+      server.close((error) => {
+        clearTimeout(timeout);
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+    logInfo("🌐 HTTP server stopped");
   }
 
   private async handleMetrics(): Promise<Response> {
@@ -121,7 +146,7 @@ export class HttpServer {
 
   private async handleTaskDashboard(): Promise<Response> {
     try {
-      let html = await Deno.readTextFile("./static/index.html");
+      let html = await readFile("./static/index.html", "utf8");
       html = html.replace("__BUILD_TIMESTAMP__", this.buildTimestamp);
       return new Response(html, {
         headers: { "Content-Type": "text/html; charset=utf-8" },
@@ -169,9 +194,11 @@ export class HttpServer {
 
   private handleGetWallboxChargeMode(): Response {
     // Return current charge mode for inside and outside
-    const inside = globals.wallboxChargeMode.get(WallboxLocation.Inside) ??
+    const inside =
+      globals.wallboxChargeMode.get(WallboxLocation.Inside) ??
       WallboxChargeMode.Off;
-    const outside = globals.wallboxChargeMode.get(WallboxLocation.Outside) ??
+    const outside =
+      globals.wallboxChargeMode.get(WallboxLocation.Outside) ??
       WallboxChargeMode.Off;
     return new Response(JSON.stringify({ Inside: inside, Outside: outside }), {
       headers: { "Content-Type": "application/json" },

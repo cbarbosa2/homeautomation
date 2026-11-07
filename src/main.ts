@@ -1,3 +1,4 @@
+import { installProcessErrorHandlers } from "./process-handlers.ts";
 import { Temporal } from "./temporal.ts";
 import { MqttClient } from "./mqtt-client.ts";
 import { logError, logInfo } from "./logger.ts";
@@ -49,7 +50,7 @@ class HomeAutomationApp {
 
       await this.loadPersistedSettings();
       await this.mqttClient.connect();
-      this.httpServer.start();
+      await this.httpServer.start();
 
       this.setupScheduledTasks();
 
@@ -61,14 +62,14 @@ class HomeAutomationApp {
       await logError(
         `❌ Failed to start Home Automation System: ${String(error)}`,
       );
-      Deno.exit(1);
+      process.exit(1);
     }
   }
 
   private setupScheduledTasks() {
-    const bmwClientId = Deno.env.get("BMW_CARDATA_CLIENT_ID")?.trim();
-    const bmwVin = Deno.env.get("BMW_CARDATA_VIN")?.trim();
-    const bmwContainerId = Deno.env.get("BMW_CARDATA_CONTAINER_ID")?.trim();
+    const bmwClientId = process.env["BMW_CARDATA_CLIENT_ID"]?.trim();
+    const bmwVin = process.env["BMW_CARDATA_VIN"]?.trim();
+    const bmwContainerId = process.env["BMW_CARDATA_CONTAINER_ID"]?.trim();
     if (bmwClientId && bmwVin && bmwContainerId) {
       let loadingBmwSoc = false;
       scheduler.cron("Load BMW i3 SOC", "5,35 * * * *", async () => {
@@ -81,10 +82,7 @@ class HomeAutomationApp {
             bmwContainerId,
           );
           if (value) {
-            this.metrics.setGauge(
-              METRICS.GAUGES.BMW_I3_SOC,
-              value.percent,
-            );
+            this.metrics.setGauge(METRICS.GAUGES.BMW_I3_SOC, value.percent);
             this.metrics.setGauge(
               METRICS.GAUGES.BMW_I3_SOC_TIMESTAMP,
               value.observedAt.epochMilliseconds / 1000,
@@ -130,10 +128,8 @@ class HomeAutomationApp {
     });
 
     const setSocLimitTask = new SetSocLimitTask(this.mqttClient);
-    scheduler.cron(
-      "Lisbon SOC schedule",
-      "* * * * *",
-      () => setSocLimitTask.tick(),
+    scheduler.cron("Lisbon SOC schedule", "* * * * *", () =>
+      setSocLimitTask.tick(),
     );
   }
 
@@ -172,33 +168,27 @@ class HomeAutomationApp {
         await this.httpServer.stop();
         await flushPersistentStorage();
         await logInfo("✅ Shutdown complete");
-        Deno.exit(0);
+        process.exit(0);
       } catch (error) {
         await logError(`❌ Error during shutdown: ${String(error)}`);
-        Deno.exit(1);
+        process.exit(1);
       }
     };
 
-    Deno.addSignalListener("SIGINT", shutdown);
-    Deno.addSignalListener("SIGTERM", shutdown);
+    process.on("SIGINT", shutdown);
+    process.on("SIGTERM", shutdown);
   }
 }
 
 // Log uncaught exceptions and unhandled rejections
-Deno.addSignalListener("SIGUSR1", async () => {
+process.on("SIGUSR1", async () => {
   await logError("Received SIGUSR1 - possible manual or system stop.");
 });
-Deno.addSignalListener("SIGUSR2", async () => {
+process.on("SIGUSR2", async () => {
   await logError("Received SIGUSR2 - possible manual or system stop.");
 });
 
-addEventListener("unhandledrejection", async (event) => {
-  await logError(`Unhandled promise rejection: ${String(event.reason)}`);
-});
-
-addEventListener("error", async (event) => {
-  await logError(`Uncaught exception: ${String(event.error)}`);
-});
+installProcessErrorHandlers();
 
 const app = new HomeAutomationApp();
 await app.start();

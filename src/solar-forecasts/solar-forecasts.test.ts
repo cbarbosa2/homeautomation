@@ -1,8 +1,12 @@
-import { assertEquals, assertStrictEquals } from "@std/assert";
+import { test } from "node:test";
+import {
+  deepStrictEqual as assertEquals,
+  strictEqual as assertStrictEquals,
+} from "node:assert/strict";
 import { SolarForecasts } from "./solar-forecasts.ts";
 import { Temporal } from "../temporal.ts";
 
-Deno.test("forecasts use calendar dates rather than date object identity", () => {
+test("forecasts use calendar dates rather than date object identity", () => {
   const date = Temporal.PlainDate.from("2026-09-27");
   const forecast = {
     wattHours: 1000,

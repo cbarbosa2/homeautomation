@@ -1,4 +1,5 @@
-import { load } from "@std/dotenv";
+import { chmod, readFile, writeFile } from "node:fs/promises";
+import { config } from "dotenv";
 import {
   BMW_SOC_DESCRIPTORS,
   BMW_TOKEN_URL,
@@ -6,22 +7,21 @@ import {
   saveBmwTokens,
 } from "../src/bmw-cardata/bmw-cardata.ts";
 
-await load({ export: true });
-const clientId = Deno.env.get("BMW_CARDATA_CLIENT_ID")?.trim();
+config({ quiet: true });
+const clientId = process.env["BMW_CARDATA_CLIENT_ID"]?.trim();
 if (!clientId) throw new Error("Set BMW_CARDATA_CLIENT_ID in .env first");
 
 function base64url(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes)).replaceAll("+", "-")
-    .replaceAll("/", "_").replaceAll("=", "");
+  return btoa(String.fromCharCode(...bytes))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
 }
 
 const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
 const challenge = base64url(
   new Uint8Array(
-    await crypto.subtle.digest(
-      "SHA-256",
-      new TextEncoder().encode(verifier),
-    ),
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)),
   ),
 );
 const deviceResponse = await fetch(
@@ -29,7 +29,7 @@ const deviceResponse = await fetch(
   {
     method: "POST",
     headers: {
-      "Accept": "application/json",
+      Accept: "application/json",
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams({
@@ -45,7 +45,7 @@ const deviceResponse = await fetch(
 if (!deviceResponse.ok) {
   throw new Error(`BMW device authorization failed: ${deviceResponse.status}`);
 }
-const device = await deviceResponse.json() as {
+const device = (await deviceResponse.json()) as {
   device_code: string;
   user_code: string;
   verification_uri: string;
@@ -94,14 +94,14 @@ const mappings = await bmwApi(clientId, "/customers/vehicles/mappings");
 const mapped = Array.isArray(mappings)
   ? mappings
   : mappings && typeof mappings === "object" && "vehicles" in mappings
-  ? mappings.vehicles
-  : [mappings];
-const primary = (mapped as { vin: string; mappingType: string }[]).filter((
-  item,
-) => item?.mappingType === "PRIMARY");
-const configuredVin = Deno.env.get("BMW_CARDATA_VIN")?.trim();
-const vin = configuredVin ||
-  (primary.length === 1 ? primary[0].vin : undefined);
+    ? mappings.vehicles
+    : [mappings];
+const primary = (mapped as { vin: string; mappingType: string }[]).filter(
+  (item) => item?.mappingType === "PRIMARY",
+);
+const configuredVin = process.env["BMW_CARDATA_VIN"]?.trim();
+const vin =
+  configuredVin || (primary.length === 1 ? primary[0]?.vin : undefined);
 if (!vin || !primary.some((item) => item.vin === vin)) {
   throw new Error(
     "Could not select a primary vehicle. Set BMW_CARDATA_VIN in .env and rerun setup.",
@@ -109,14 +109,14 @@ if (!vin || !primary.some((item) => item.vin === vin)) {
 }
 
 const name = "Home automation i3 SOC";
-const listing = await bmwApi(clientId, "/customers/containers") as {
+const listing = (await bmwApi(clientId, "/customers/containers")) as {
   containers?: { containerId: string; name: string; state: string }[];
 };
-let containerId = listing.containers?.find((item) =>
-  item.name === name && item.state === "ACTIVE"
+let containerId = listing.containers?.find(
+  (item) => item.name === name && item.state === "ACTIVE",
 )?.containerId;
 if (!containerId) {
-  const created = await bmwApi(clientId, "/customers/containers", {
+  const created = (await bmwApi(clientId, "/customers/containers", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -124,21 +124,19 @@ if (!containerId) {
       purpose: "Display BMW i3 SOC in home automation",
       technicalDescriptors: BMW_SOC_DESCRIPTORS,
     }),
-  }) as { containerId: string };
+  })) as { containerId: string };
   containerId = created.containerId;
 }
 if (!containerId) throw new Error("BMW did not return a container ID");
 
-let env = await Deno.readTextFile(".env");
-for (
-  const [key, value] of Object.entries({
-    BMW_CARDATA_VIN: vin,
-    BMW_CARDATA_CONTAINER_ID: containerId,
-  })
-) {
+let env = await readFile(".env", "utf8");
+for (const [key, value] of Object.entries({
+  BMW_CARDATA_VIN: vin,
+  BMW_CARDATA_CONTAINER_ID: containerId,
+})) {
   const lines = env.split("\n").filter((line) => !line.startsWith(`${key}=`));
   env = `${lines.join("\n").trimEnd()}\n${key}=${value}\n`;
 }
-await Deno.writeTextFile(".env", env, { mode: 0o600 });
-await Deno.chmod(".env", 0o600);
+await writeFile(".env", env, { mode: 0o600 });
+await chmod(".env", 0o600);
 console.log("BMW CarData setup complete. Restart the home automation service.");

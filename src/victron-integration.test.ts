@@ -1,4 +1,8 @@
-import { assert, assertEquals } from "@std/assert";
+import { test } from "node:test";
+import {
+  deepStrictEqual as assertEquals,
+  ok as assert,
+} from "node:assert/strict";
 import { VICTRON_INSTALLATION_ID, VICTRON_PORTAL_ID } from "./constants.ts";
 import {
   CONTROL_PATHS,
@@ -15,14 +19,17 @@ import {
   runCommands,
 } from "./power-controller/power-controller.ts";
 
-Deno.test("configured portal ID routes telemetry, subscriptions, refreshes and commands", async () => {
+test("configured portal ID routes telemetry, subscriptions, refreshes and commands", async () => {
   const subscriptions: string[] = [];
-  new MqttToPrometheusTask({
-    subscribeWithHandler: (topic) => {
-      subscriptions.push(topic);
-      return Promise.resolve();
+  new MqttToPrometheusTask(
+    {
+      subscribeWithHandler: (topic) => {
+        subscriptions.push(topic);
+        return Promise.resolve();
+      },
     },
-  }, { setGauge: () => {} }).subscribeTopics();
+    { setGauge: () => {} },
+  ).subscribeTopics();
   const victronTopics = subscriptions.filter((topic) => topic.startsWith("N/"));
   assert(victronTopics.length > 0);
   assert(
@@ -44,8 +51,8 @@ Deno.test("configured portal ID routes telemetry, subscriptions, refreshes and c
   }).execute();
   assertEquals(
     reads,
-    ["keepalive", ...REFRESH_PATHS].map((path) =>
-      `R/${VICTRON_PORTAL_ID}/${path}`
+    ["keepalive", ...REFRESH_PATHS].map(
+      (path) => `R/${VICTRON_PORTAL_ID}/${path}`,
     ),
   );
 
@@ -83,7 +90,7 @@ Deno.test("configured portal ID routes telemetry, subscriptions, refreshes and c
   }
 });
 
-Deno.test("forecast request uses the configured installation ID", async () => {
+test("forecast request uses the configured installation ID", async () => {
   const originalFetch = globalThis.fetch;
   const previousForecast = globals.solarForecastByDate;
   const previousSolar = globals.solarForecastNextDays;

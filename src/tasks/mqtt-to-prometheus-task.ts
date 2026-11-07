@@ -2,7 +2,7 @@ import { VICTRON_PORTAL_ID } from "../constants.ts";
 import { controlTelemetry } from "../control-telemetry.ts";
 import { events, globals, WallboxLocation } from "../globals.ts";
 import { MqttClient } from "../mqtt-client.ts";
-import { MetricInfo, METRICS } from "../prometheus/metrics.ts";
+import { type MetricInfo, METRICS } from "../prometheus/metrics.ts";
 import { PrometheusMetrics } from "../prometheus/prometheus.ts";
 
 export class MqttToPrometheusTask {
@@ -178,13 +178,13 @@ export class MqttToPrometheusTask {
   ): void {
     this.mqttClient.subscribeWithHandler(topic, (_, data) => {
       controlTelemetry.record(topic, data);
-      const raw = data !== null && typeof data === "object" && "value" in data
-        ? data.value
-        : undefined;
+      const raw =
+        data !== null && typeof data === "object" && "value" in data
+          ? data.value
+          : undefined;
       const payload = {
-        value: typeof raw === "number" && Number.isFinite(raw)
-          ? raw
-          : undefined,
+        value:
+          typeof raw === "number" && Number.isFinite(raw) ? raw : undefined,
       };
       this.metrics.setGauge(gaugeInfo, payload.value ?? 0);
       if (handler) {

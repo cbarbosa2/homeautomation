@@ -8,15 +8,12 @@ Type=simple
 User=carlos
 Group=carlos
 WorkingDirectory=/home/carlos/homeautomation
-ExecStart=/usr/bin/deno task start
+ExecStart=/usr/bin/node dist/src/bootstrap.js
 Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=homeautomation
-
-# Environment
-Environment=DENO_DIR=/home/carlos/.cache/deno
 
 # Security settings
 NoNewPrivileges=true

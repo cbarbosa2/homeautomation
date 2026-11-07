@@ -1,4 +1,4 @@
-import { Clock, systemClock } from "../lisbon-clock.ts";
+import { type Clock, systemClock } from "../lisbon-clock.ts";
 import { Temporal } from "../temporal.ts";
 import { isCharging, wallboxAmps } from "./wallbox-policy.ts";
 import {
@@ -9,7 +9,7 @@ import {
 import { CONTROL_PATHS, wallboxPath } from "../control-telemetry.ts";
 import { SYSTEM_VOLTAGE } from "../utils/index.ts";
 import {
-  CalculatedTargetResults,
+  type CalculatedTargetResults,
   LOCATIONS,
 } from "./dynamic-power-calculator.ts";
 import {
@@ -17,7 +17,7 @@ import {
   MAX_BATTERY_CHARGE_POWER,
   WALLBOX_MIN_START_AMPS,
 } from "./power-constants.ts";
-import { CommandType, PowerCommand } from "./power-controller.ts";
+import { CommandType, type PowerCommand } from "./power-controller.ts";
 
 export interface SystemState {
   batteryMaxChargePower: number | undefined;
@@ -29,6 +29,7 @@ export interface SystemState {
   wallboxStartStop?: Map<L, number>;
   observedAt?: Map<string, Temporal.Instant>;
 }
+
 type Device = L | "battery";
 interface Reservation {
   watts: number;
@@ -49,11 +50,11 @@ export class CommandBuilder {
   ): PowerCommand[] {
     const desired = new Map<Device, number>();
     for (const l of LOCATIONS) {
-      const target = l === L.Inside
-        ? targets.insideWallboxAmps
-        : targets.outsideWallboxAmps;
+      const target =
+        l === L.Inside ? targets.insideWallboxAmps : targets.outsideWallboxAmps;
       if (
-        state.wallboxChargeMode?.get(l) === Mode.Manual || target === undefined
+        state.wallboxChargeMode?.get(l) === Mode.Manual ||
+        target === undefined
       ) {
         this.history.delete(l);
         this.reservations.delete(l);
@@ -104,7 +105,8 @@ export class CommandBuilder {
       const destination = watts <= reservation.watts ? reductions : increases;
       if (device === "battery") {
         if (
-          watts !== state.batteryMaxChargePower || watts !== reservation.target
+          watts !== state.batteryMaxChargePower ||
+          watts !== reservation.target
         ) {
           destination.push({
             type: CommandType.BatteryMaxChargePower,
@@ -112,12 +114,14 @@ export class CommandBuilder {
           });
         }
       } else {
-        const currentType = device === L.Inside
-          ? CommandType.InsideCurrent
-          : CommandType.OutsideCurrent;
-        const switchType = device === L.Inside
-          ? CommandType.InsideStartStop
-          : CommandType.OutsideStartStop;
+        const currentType =
+          device === L.Inside
+            ? CommandType.InsideCurrent
+            : CommandType.OutsideCurrent;
+        const switchType =
+          device === L.Inside
+            ? CommandType.InsideStartStop
+            : CommandType.OutsideStartStop;
         if (watts === 0) {
           // Intent is sufficient to stop; missing power is not evidence of idle.
           if (
@@ -134,11 +138,13 @@ export class CommandBuilder {
           if (
             watts !== reservation.target ||
             state.wallboxSetCurrent?.get(device) !== amps
-          ) destination.push({ type: currentType, value: amps });
+          )
+            destination.push({ type: currentType, value: amps });
           if (
             !isCharging(state.wallboxVictronStatus.get(device)) &&
             amps >= WALLBOX_MIN_START_AMPS
-          ) destination.push({ type: switchType, value: 1 });
+          )
+            destination.push({ type: switchType, value: 1 });
         }
       }
       if (watts !== reservation.target) {
@@ -161,37 +167,42 @@ export class CommandBuilder {
     const isBattery = device === "battery";
     const measured = Math.max(
       0,
-      isBattery ? state.batteryPower ?? 0 : state.wallboxPower.get(device) ?? 0,
+      isBattery
+        ? (state.batteryPower ?? 0)
+        : (state.wallboxPower.get(device) ?? 0),
     );
     const setting = isBattery
       ? state.batteryMaxChargePower
       : state.wallboxStartStop?.get(device) === 0
-      ? 0
-      : state.wallboxSetCurrent?.get(device);
-    const configured = setting === undefined || setting < 0
-      ? (isBattery
-        ? MAX_BATTERY_CHARGE_POWER
-        : MAX_AMPS_PER_LOCATION.get(device)! * SYSTEM_VOLTAGE)
-      : setting * (isBattery ? 1 : SYSTEM_VOLTAGE);
+        ? 0
+        : state.wallboxSetCurrent?.get(device);
+    const configured =
+      setting === undefined || setting < 0
+        ? isBattery
+          ? MAX_BATTERY_CHARGE_POWER
+          : MAX_AMPS_PER_LOCATION.get(device)! * SYSTEM_VOLTAGE
+        : setting * (isBattery ? 1 : SYSTEM_VOLTAGE);
     const old = this.reservations.get(device);
     const paths = isBattery
       ? [CONTROL_PATHS.batteryMaxChargePower, CONTROL_PATHS.batteryPower]
       : [
-        wallboxPath(device, "Ac/Power"),
-        wallboxPath(device, "SetCurrent"),
-        wallboxPath(device, "StartStop"),
-      ];
+          wallboxPath(device, "Ac/Power"),
+          wallboxPath(device, "SetCurrent"),
+          wallboxPath(device, "StartStop"),
+        ];
     const fresh = paths.every((p) => {
       const observedAt = state.observedAt?.get(p);
-      return observedAt !== undefined &&
+      return (
+        observedAt !== undefined &&
         (old?.since === undefined ||
-          Temporal.Instant.compare(observedAt, old.since) > 0);
+          Temporal.Instant.compare(observedAt, old.since) > 0)
+      );
     });
     if (!old) {
       // Without telemetry metadata (pure callers), retain measured consumption.
       const watts = Math.max(
         measured,
-        (state.observedAt || setting !== undefined) ? configured : 0,
+        state.observedAt || setting !== undefined ? configured : 0,
       );
       this.reservations.set(device, {
         watts,
@@ -200,7 +211,9 @@ export class CommandBuilder {
         pendingPeak: watts,
       });
     } else if (
-      fresh && old.target < old.watts && configured < old.watts &&
+      fresh &&
+      old.target < old.watts &&
+      configured < old.watts &&
       measured < old.watts
     ) {
       old.watts = Math.max(configured, measured, old.pendingPeak);

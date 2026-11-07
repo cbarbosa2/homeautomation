@@ -1,19 +1,23 @@
-import { assert, assertEquals } from "@std/assert";
+import { test } from "node:test";
+import {
+  deepStrictEqual as assertEquals,
+  ok as assert,
+} from "node:assert/strict";
 import { Temporal } from "../temporal.ts";
 import { WallboxLocation, WallboxStatus } from "../globals.ts";
 import { CONTROL_PATHS } from "../control-telemetry.ts";
-import { CalculatedTargetResults } from "./dynamic-power-calculator.ts";
-import { CommandBuilder, SystemState } from "./command-builder.ts";
-import { CommandType, PowerCommand } from "./power-controller.ts";
+import { type CalculatedTargetResults } from "./dynamic-power-calculator.ts";
+import { CommandBuilder, type SystemState } from "./command-builder.ts";
+import { CommandType, type PowerCommand } from "./power-controller.ts";
 
 function createSystemState(overrides?: Partial<SystemState>): SystemState {
   return {
     batteryMaxChargePower: undefined,
     wallboxPower: new Map(),
-    wallboxVictronStatus: new Map([[
-      WallboxLocation.Inside,
-      WallboxStatus.Charging,
-    ], [WallboxLocation.Outside, WallboxStatus.Charging]]),
+    wallboxVictronStatus: new Map([
+      [WallboxLocation.Inside, WallboxStatus.Charging],
+      [WallboxLocation.Outside, WallboxStatus.Charging],
+    ]),
     ...overrides,
   };
 }
@@ -30,7 +34,7 @@ function createTargets(
   };
 }
 
-Deno.test("CommandBuilder should create wallbox current commands", () => {
+test("CommandBuilder should create wallbox current commands", () => {
   const builder = new CommandBuilder();
   const state = createSystemState({
     wallboxPower: new Map([[WallboxLocation.Inside, 2300]]), // ~10 amps
@@ -46,7 +50,7 @@ Deno.test("CommandBuilder should create wallbox current commands", () => {
   assertEquals(commands[0]!.value, 15);
 });
 
-Deno.test("CommandBuilder should create start/stop commands", () => {
+test("CommandBuilder should create start/stop commands", () => {
   const builder = new CommandBuilder();
   const state = createSystemState({
     wallboxVictronStatus: new Map([
@@ -71,69 +75,60 @@ Deno.test("CommandBuilder should create start/stop commands", () => {
   assertEquals(currentCommand?.value, 10);
 });
 
-Deno.test(
-  "CommandBuilder should create stop commands for low target amps",
-  () => {
-    const builder = new CommandBuilder();
-    const state = createSystemState({
-      wallboxPower: new Map([[WallboxLocation.Inside, 1380]]), // ~6 amps
-    });
-    const targets = createTargets({
-      insideWallboxAmps: 2, // Below continuation threshold (7)
-    });
+test("CommandBuilder should create stop commands for low target amps", () => {
+  const builder = new CommandBuilder();
+  const state = createSystemState({
+    wallboxPower: new Map([[WallboxLocation.Inside, 1380]]), // ~6 amps
+  });
+  const targets = createTargets({
+    insideWallboxAmps: 2, // Below continuation threshold (7)
+  });
 
-    const commands = builder.createCommandsFromPowerSettings(state, targets);
+  const commands = builder.createCommandsFromPowerSettings(state, targets);
 
-    assertEquals(commands.length, 1);
-    const startStopCommand = commands.find(
-      (cmd) => cmd.type === CommandType.InsideStartStop,
-    );
-    const currentCommand = commands.find(
-      (cmd) => cmd.type === CommandType.InsideCurrent,
-    );
+  assertEquals(commands.length, 1);
+  const startStopCommand = commands.find(
+    (cmd) => cmd.type === CommandType.InsideStartStop,
+  );
+  const currentCommand = commands.find(
+    (cmd) => cmd.type === CommandType.InsideCurrent,
+  );
 
-    assertEquals(startStopCommand?.value, 0); // Stop
-    assertEquals(currentCommand, undefined); // Stop without raising the current limit
-  },
-);
+  assertEquals(startStopCommand?.value, 0); // Stop
+  assertEquals(currentCommand, undefined); // Stop without raising the current limit
+});
 
-Deno.test(
-  "CommandBuilder should create battery commands when power changes",
-  () => {
-    const builder = new CommandBuilder();
-    const state = createSystemState({
-      batteryMaxChargePower: 1000,
-    });
-    const targets = createTargets({
-      batteryChargePower: 1500,
-    });
+test("CommandBuilder should create battery commands when power changes", () => {
+  const builder = new CommandBuilder();
+  const state = createSystemState({
+    batteryMaxChargePower: 1000,
+  });
+  const targets = createTargets({
+    batteryChargePower: 1500,
+  });
 
-    const commands = builder.createCommandsFromPowerSettings(state, targets);
+  const commands = builder.createCommandsFromPowerSettings(state, targets);
 
-    assertEquals(commands.length, 1);
-    assertEquals(commands[0]!.type, CommandType.BatteryMaxChargePower);
-    assertEquals(commands[0]!.value, 1500);
-  },
-);
+  assertEquals(commands.length, 1);
+  assertEquals(commands[0]!.type, CommandType.BatteryMaxChargePower);
+  assertEquals(commands[0]!.value, 1500);
+});
 
-Deno.test(
-  "CommandBuilder should not create battery commands when power is unchanged",
-  () => {
-    const builder = new CommandBuilder();
-    const state = createSystemState({
-      batteryMaxChargePower: 1000,
-    });
-    const targets = createTargets({
-      batteryChargePower: 1000, // Same as current
-    });
+test("CommandBuilder should not create battery commands when power is unchanged", () => {
+  const builder = new CommandBuilder();
+  const state = createSystemState({
+    batteryMaxChargePower: 1000,
+  });
+  const targets = createTargets({
+    batteryChargePower: 1000, // Same as current
+  });
 
-    const commands = builder.createCommandsFromPowerSettings(state, targets);
+  const commands = builder.createCommandsFromPowerSettings(state, targets);
 
-    assertEquals(commands.length, 0);
-  },
-);
+  assertEquals(commands.length, 0);
+});
 
-Deno.test("CommandBuilder should limit history to maximum size", () => {
+test("CommandBuilder should limit history to maximum size", () => {
   const builder = new CommandBuilder();
   const state = createSystemState();
 
@@ -155,51 +150,45 @@ Deno.test("CommandBuilder should limit history to maximum size", () => {
   assertEquals(commands[0]!.value, 20);
 });
 
-Deno.test(
-  "CommandBuilder should handle both wallbox locations independently",
-  () => {
-    const builder = new CommandBuilder();
-    const state = createSystemState();
+test("CommandBuilder should handle both wallbox locations independently", () => {
+  const builder = new CommandBuilder();
+  const state = createSystemState();
 
-    const targets = createTargets({
-      insideWallboxAmps: 15,
-      outsideWallboxAmps: 8,
-    });
+  const targets = createTargets({
+    insideWallboxAmps: 15,
+    outsideWallboxAmps: 8,
+  });
 
-    const commands = builder.createCommandsFromPowerSettings(state, targets);
+  const commands = builder.createCommandsFromPowerSettings(state, targets);
 
-    assertEquals(commands.length, 2);
-    const insideCommand = commands.find(
-      (cmd) => cmd.type === CommandType.InsideCurrent,
-    );
-    const outsideCommand = commands.find(
-      (cmd) => cmd.type === CommandType.OutsideCurrent,
-    );
+  assertEquals(commands.length, 2);
+  const insideCommand = commands.find(
+    (cmd) => cmd.type === CommandType.InsideCurrent,
+  );
+  const outsideCommand = commands.find(
+    (cmd) => cmd.type === CommandType.OutsideCurrent,
+  );
 
-    assertEquals(insideCommand?.value, 15);
-    assertEquals(outsideCommand?.value, 8);
-  },
-);
+  assertEquals(insideCommand?.value, 15);
+  assertEquals(outsideCommand?.value, 8);
+});
 
-Deno.test(
-  "CommandBuilder should not create commands when target equals current",
-  () => {
-    const builder = new CommandBuilder();
-    const state = createSystemState({
-      wallboxPower: new Map([[WallboxLocation.Inside, 2300]]),
-      wallboxSetCurrent: new Map([[WallboxLocation.Inside, 10]]),
-    });
-    const targets = createTargets({
-      insideWallboxAmps: 10, // Same as current
-    });
+test("CommandBuilder should not create commands when target equals current", () => {
+  const builder = new CommandBuilder();
+  const state = createSystemState({
+    wallboxPower: new Map([[WallboxLocation.Inside, 2300]]),
+    wallboxSetCurrent: new Map([[WallboxLocation.Inside, 10]]),
+  });
+  const targets = createTargets({
+    insideWallboxAmps: 10, // Same as current
+  });
 
-    const commands = builder.createCommandsFromPowerSettings(state, targets);
+  const commands = builder.createCommandsFromPowerSettings(state, targets);
 
-    assertEquals(commands.length, 0);
-  },
-);
+  assertEquals(commands.length, 0);
+});
 
-Deno.test("Manual transition clears populated command history", () => {
+test("Manual transition clears populated command history", () => {
   const builder = new CommandBuilder();
   const state = createSystemState();
   builder.createCommandsFromPowerSettings(
@@ -212,7 +201,7 @@ Deno.test("Manual transition clears populated command history", () => {
   );
 });
 
-Deno.test("battery reduction releases capacity despite changing targets and staggered telemetry", () => {
+test("battery reduction releases capacity despite changing targets and staggered telemetry", () => {
   let now = Temporal.Instant.from("2026-11-07T10:00:00Z");
   const builder = new CommandBuilder(() => now);
   const observedAt = new Map([
@@ -226,18 +215,18 @@ Deno.test("battery reduction releases capacity despite changing targets and stag
       [WallboxLocation.Inside, WallboxStatus.Disconnected],
       [WallboxLocation.Outside, WallboxStatus.WaitingForStart],
     ]),
-    wallboxPower: new Map([[WallboxLocation.Inside, 0], [
-      WallboxLocation.Outside,
-      0,
-    ]]),
-    wallboxSetCurrent: new Map([[WallboxLocation.Inside, 19], [
-      WallboxLocation.Outside,
-      7,
-    ]]),
-    wallboxStartStop: new Map([[WallboxLocation.Inside, 0], [
-      WallboxLocation.Outside,
-      0,
-    ]]),
+    wallboxPower: new Map([
+      [WallboxLocation.Inside, 0],
+      [WallboxLocation.Outside, 0],
+    ]),
+    wallboxSetCurrent: new Map([
+      [WallboxLocation.Inside, 19],
+      [WallboxLocation.Outside, 7],
+    ]),
+    wallboxStartStop: new Map([
+      [WallboxLocation.Inside, 0],
+      [WallboxLocation.Outside, 0],
+    ]),
     observedAt,
   });
   const targets = createTargets({
@@ -251,7 +240,7 @@ Deno.test("battery reduction releases capacity despite changing targets and stag
   let commands: PowerCommand[] = [];
   for (let second = 1; second <= 47; second++) {
     now = now.add({ seconds: 1 });
-    targets.batteryChargePower = 200 + second % 2;
+    targets.batteryChargePower = 200 + (second % 2);
     if (second === 30) {
       state.batteryMaxChargePower = 200;
       observedAt.set(CONTROL_PATHS.batteryMaxChargePower, now);
@@ -264,13 +253,15 @@ Deno.test("battery reduction releases capacity despite changing targets and stag
   }
 
   assert(
-    commands.some((command) =>
-      command.type === CommandType.OutsideCurrent && command.value >= 10
+    commands.some(
+      (command) =>
+        command.type === CommandType.OutsideCurrent && command.value >= 10,
     ),
   );
   assert(
-    commands.some((command) =>
-      command.type === CommandType.OutsideStartStop && command.value === 1
+    commands.some(
+      (command) =>
+        command.type === CommandType.OutsideStartStop && command.value === 1,
     ),
   );
 });

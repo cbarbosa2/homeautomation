@@ -4,3 +4,7 @@
 logs/
 build-timestamp.txt
 docs-temp/
+
+node_modules/
+dist/
+.test-dist/

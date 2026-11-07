@@ -1,3 +1,4 @@
+import { chmod, readFile, rename, writeFile } from "node:fs/promises";
 import { Temporal } from "../temporal.ts";
 import { systemClock } from "../lisbon-clock.ts";
 
@@ -7,6 +8,7 @@ export const BMW_SOC_DESCRIPTORS = [
   "vehicle.drivetrain.batteryManagement.header",
 ] as const;
 export const BMW_API_BASE = "https://api-cardata.bmwgroup.com";
+
 export const BMW_TOKEN_URL = "https://customer.bmwgroup.com/gcdm/oauth/token";
 export const BMW_TOKEN_FILE = ".bmw-cardata-tokens.json";
 
@@ -32,11 +34,14 @@ export function setVehicleSoc(value: VehicleSoc): void {
   vehicleSoc = value;
 }
 
-export async function saveBmwTokens(
-  response: { access_token: string; refresh_token: string; expires_in: number },
-): Promise<void> {
+export async function saveBmwTokens(response: {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+}): Promise<void> {
   if (
-    !response.access_token || !response.refresh_token ||
+    !response.access_token ||
+    !response.refresh_token ||
     !Number.isFinite(response.expires_in)
   ) {
     throw new Error("BMW token response is incomplete");
@@ -47,21 +52,22 @@ export async function saveBmwTokens(
     expiresAt: systemClock().add({ seconds: response.expires_in }).toString(),
   };
   const temp = `${BMW_TOKEN_FILE}.tmp`;
-  await Deno.writeTextFile(temp, JSON.stringify(tokens), { mode: 0o600 });
-  await Deno.chmod(temp, 0o600);
-  await Deno.rename(temp, BMW_TOKEN_FILE);
+  await writeFile(temp, JSON.stringify(tokens), { mode: 0o600 });
+  await chmod(temp, 0o600);
+  await rename(temp, BMW_TOKEN_FILE);
 }
 
 export async function bmwAccessToken(clientId: string): Promise<string> {
   const tokens = JSON.parse(
-    await Deno.readTextFile(BMW_TOKEN_FILE),
+    await readFile(BMW_TOKEN_FILE, "utf8"),
   ) as StoredTokens;
   if (
     Temporal.Instant.compare(
       Temporal.Instant.from(tokens.expiresAt),
       systemClock().add({ minutes: 5 }),
     ) > 0
-  ) return tokens.accessToken;
+  )
+    return tokens.accessToken;
 
   const response = await fetch(BMW_TOKEN_URL, {
     method: "POST",
@@ -104,7 +110,9 @@ export async function bmwApi(
 
 export function parseVehicleSoc(payload: unknown): VehicleSoc | undefined {
   if (
-    !payload || typeof payload !== "object" || !("telematicData" in payload)
+    !payload ||
+    typeof payload !== "object" ||
+    !("telematicData" in payload)
   ) {
     throw new Error("BMW CarData response has no telematicData");
   }
@@ -127,7 +135,8 @@ export function parseVehicleSoc(payload: unknown): VehicleSoc | undefined {
       continue;
     }
     if (
-      !newest || Temporal.Instant.compare(observedAt, newest.observedAt) > 0
+      !newest ||
+      Temporal.Instant.compare(observedAt, newest.observedAt) > 0
     ) {
       newest = { percent, observedAt, source };
     }
@@ -140,9 +149,9 @@ export async function loadVehicleSoc(
   vin: string,
   containerId: string,
 ): Promise<VehicleSoc | undefined> {
-  const path = `/customers/vehicles/${
-    encodeURIComponent(vin)
-  }/telematicData?containerId=${encodeURIComponent(containerId)}`;
+  const path = `/customers/vehicles/${encodeURIComponent(
+    vin,
+  )}/telematicData?containerId=${encodeURIComponent(containerId)}`;
   const value = parseVehicleSoc(await bmwApi(clientId, path));
   if (value) setVehicleSoc(value);
   return value;

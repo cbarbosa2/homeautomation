@@ -219,7 +219,7 @@ export class MqttClient {
     // Convert MQTT wildcards to regex
     const regexPattern = pattern
       .replace(/\+/g, "[^/]+") // + matches any single level
-      .replace(/\#/g, ".*"); // # matches any number of levels
+      .replace(/#/g, ".*"); // # matches any number of levels
 
     const regex = new RegExp(`^${regexPattern}$`);
     return regex.test(topic);

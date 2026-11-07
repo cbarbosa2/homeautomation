@@ -1,7 +1,8 @@
-import { assertEquals } from "@std/assert";
+import { test } from "node:test";
+import { deepStrictEqual as assertEquals } from "node:assert/strict";
 import { BMW_SOC_DESCRIPTORS, parseVehicleSoc } from "./bmw-cardata.ts";
 
-Deno.test("BMW SOC selects the reading with the latest BMW timestamp", () => {
+test("BMW SOC selects the reading with the latest BMW timestamp", () => {
   const value = parseVehicleSoc({
     telematicData: {
       [BMW_SOC_DESCRIPTORS[0]]: {
@@ -23,7 +24,7 @@ Deno.test("BMW SOC selects the reading with the latest BMW timestamp", () => {
   assertEquals(value?.source, BMW_SOC_DESCRIPTORS[0]);
 });
 
-Deno.test("BMW SOC accepts zero and skips unavailable or invalid readings", () => {
+test("BMW SOC accepts zero and skips unavailable or invalid readings", () => {
   const value = parseVehicleSoc({
     telematicData: {
       [BMW_SOC_DESCRIPTORS[0]]: {

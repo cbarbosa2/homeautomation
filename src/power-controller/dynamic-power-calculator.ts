@@ -17,10 +17,13 @@ enum ChargingRequest {
   Manual = "manual",
 }
 
-export type PriorityDecision = { kind: "retain" } | { kind: "clear" } | {
-  kind: "set";
-  location: Location;
-};
+export type PriorityDecision =
+  | { kind: "retain" }
+  | { kind: "clear" }
+  | {
+      kind: "set";
+      location: Location;
+    };
 
 export interface CalculatedTargetResults {
   insideWallboxAmps: number | undefined;
@@ -52,14 +55,15 @@ export interface InputState {
 export function calculateTargetAmpsAndPriority(
   state: InputState,
 ): CalculatedTargetResults {
-  const automatic = LOCATIONS.filter((l) =>
-    state.wallboxChargeMode.get(l) !== Mode.Manual
+  const automatic = LOCATIONS.filter(
+    (l) => state.wallboxChargeMode.get(l) !== Mode.Manual,
   );
   const measured = automatic.reduce(
     (sum, l) => sum + Math.max(0, state.wallboxPower.get(l) ?? 0),
     0,
   );
-  const valid = state.telemetryValid !== false &&
+  const valid =
+    state.telemetryValid !== false &&
     [
       state.gridPower,
       state.batteryPower,
@@ -72,21 +76,23 @@ export function calculateTargetAmpsAndPriority(
     ].every(finite);
   const budget = valid
     ? Math.max(
-      0,
-      MAX_GRID_AMPS * SYSTEM_VOLTAGE - state.gridPower! + measured +
-        Math.max(0, state.batteryPower!),
-    )
+        0,
+        MAX_GRID_AMPS * SYSTEM_VOLTAGE -
+          state.gridPower! +
+          measured +
+          Math.max(0, state.batteryPower!),
+      )
     : 12 * SYSTEM_VOLTAGE;
   // Energy balance includes both PV sources. Subtract grid-funded charging and
   // battery discharge; Manual consumption remains in the household baseline.
   const solar = valid
     ? Math.max(
-      0,
-      Math.min(
-        state.pvInverterPower! + state.pvChargerPower!,
-        measured + state.batteryPower! - state.gridPower!,
-      ),
-    )
+        0,
+        Math.min(
+          state.pvInverterPower! + state.pvChargerPower!,
+          measured + state.batteryPower! - state.gridPower!,
+        ),
+      )
     : 0;
   const requests = new Map(LOCATIONS.map((l) => [l, request(state, l)]));
 
@@ -98,8 +104,9 @@ export function calculateTargetAmpsAndPriority(
     primary = LOCATIONS.find((l) => eligible(l));
   }
   if (primary === undefined) {
-    const started = LOCATIONS.filter((l) =>
-      eligible(l) && state.wallboxVictronStatus.get(l) === Status.Charging
+    const started = LOCATIONS.filter(
+      (l) =>
+        eligible(l) && state.wallboxVictronStatus.get(l) === Status.Charging,
     );
     started.sort((a, b) =>
       Temporal.Instant.compare(
@@ -107,14 +114,15 @@ export function calculateTargetAmpsAndPriority(
           Temporal.Instant.fromEpochMilliseconds(0),
         state.chargingStartedAt?.get(b) ??
           Temporal.Instant.fromEpochMilliseconds(0),
-      )
+      ),
     );
     primary = started[0];
   }
 
-  const order = primary === Location.Outside
-    ? [Location.Outside, Location.Inside]
-    : LOCATIONS;
+  const order =
+    primary === Location.Outside
+      ? [Location.Outside, Location.Inside]
+      : LOCATIONS;
   let remaining = budget;
   let remainingSolar = solar;
   const targets = new Map<Location, number | undefined>();
@@ -124,11 +132,12 @@ export function calculateTargetAmpsAndPriority(
       targets.set(l, undefined);
       continue;
     }
-    const available = modeRequest === ChargingRequest.Off
-      ? 0
-      : modeRequest === ChargingRequest.Solar
-      ? Math.min(remaining, remainingSolar)
-      : remaining;
+    const available =
+      modeRequest === ChargingRequest.Off
+        ? 0
+        : modeRequest === ChargingRequest.Solar
+          ? Math.min(remaining, remainingSolar)
+          : remaining;
     const amps = wallboxAmps(l, state.wallboxVictronStatus.get(l), available);
     targets.set(l, amps);
     remaining -= amps * SYSTEM_VOLTAGE;
@@ -142,30 +151,30 @@ export function calculateTargetAmpsAndPriority(
       Math.min(MAX_BATTERY_CHARGE_POWER, remaining),
     ),
     sharedBudgetWatts: budget,
-    priorityDecision: primary === state.primaryWallboxLocation
-      ? { kind: "retain" }
-      : primary === undefined
-      ? { kind: "clear" }
-      : { kind: "set", location: primary },
+    priorityDecision:
+      primary === state.primaryWallboxLocation
+        ? { kind: "retain" }
+        : primary === undefined
+          ? { kind: "clear" }
+          : { kind: "set", location: primary },
   };
 }
 
-function request(
-  state: InputState,
-  location: Location,
-): ChargingRequest {
+function request(state: InputState, location: Location): ChargingRequest {
   const mode = state.wallboxChargeMode.get(location) ?? Mode.SunOnly;
   if (mode === Mode.Manual) return ChargingRequest.Manual;
-  if (
-    mode === Mode.Off || !canCharge(state.wallboxVictronStatus.get(location))
-  ) return ChargingRequest.Off;
+  if (mode === Mode.Off || !canCharge(state.wallboxVictronStatus.get(location)))
+    return ChargingRequest.Off;
   if (
     location === Location.Inside &&
     [Mode.SunOnly, Mode.ESSOnly, Mode.Night].includes(mode) &&
-    finite(state.insideVehicleSOC) && state.insideVehicleSOC >= 80
-  ) return ChargingRequest.Off;
+    finite(state.insideVehicleSOC) &&
+    state.insideVehicleSOC >= 80
+  )
+    return ChargingRequest.Off;
 
-  const night = Temporal.PlainTime.compare(state.timeOfDay, "22:00") >= 0 ||
+  const night =
+    Temporal.PlainTime.compare(state.timeOfDay, "22:00") >= 0 ||
     Temporal.PlainTime.compare(state.timeOfDay, "08:00") < 0;
   const soc = state.batterySOC;
   const min = state.batteryMinSOC;
@@ -179,11 +188,16 @@ function request(
 
   const hours = Math.ceil(remainingNight.total("hours"));
   if (
-    mode === Mode.On || (finite(soc) && soc >= 95) ||
+    mode === Mode.On ||
+    (finite(soc) && soc >= 95) ||
     (mode === Mode.Night && night) ||
-    (mode === Mode.ESSOnly && night && finite(soc) && finite(min) &&
+    (mode === Mode.ESSOnly &&
+      night &&
+      finite(soc) &&
+      finite(min) &&
       soc > min + 2 * hours)
-  ) return ChargingRequest.Maximum;
+  )
+    return ChargingRequest.Maximum;
 
   return finite(soc) && finite(min) && soc > min + 1
     ? ChargingRequest.Solar

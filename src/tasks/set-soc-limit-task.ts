@@ -3,7 +3,7 @@ import { globals } from "../globals.ts";
 import { SolarForecasts } from "../solar-forecasts/solar-forecasts.ts";
 import { CONTROL_PATHS, controlTelemetry } from "../control-telemetry.ts";
 import {
-  Clock,
+  type Clock,
   lisbonTime,
   systemClock,
   timeUntilMorning,
@@ -18,13 +18,15 @@ export function calculateEveningSOC(
   instant: Temporal.Instant,
 ): number {
   const today = lisbonTime(instant);
-  const floor = today.month < 3 || today.month > 10 ||
-      (today.month === 10 && today.day >= 15)
-    ? 30
-    : 10;
+  const floor =
+    today.month < 3 ||
+    today.month > 10 ||
+    (today.month === 10 && today.day >= 15)
+      ? 30
+      : 10;
   const energy = forecastKwh * 0.95;
-  const lower = floor - 100 * (energy - 15) / 40;
-  const upper = 85 - 100 * (energy - 2) / 40;
+  const lower = floor - (100 * (energy - 15)) / 40;
+  const upper = 85 - (100 * (energy - 2)) / 40;
   return Math.max(
     floor,
     Math.min(
@@ -34,20 +36,21 @@ export function calculateEveningSOC(
     ),
   );
 }
+
 interface EveningInputs {
   soc: number | undefined;
   forecast: SolarForecasts;
 }
+
 export class SetSocLimitTask {
-  private readonly topic =
-    `W/${VICTRON_PORTAL_ID}/settings/0/Settings/CGwacs/BatteryLife/MinimumSocLimit`;
+  private readonly topic = `W/${VICTRON_PORTAL_ID}/settings/0/Settings/CGwacs/BatteryLife/MinimumSocLimit`;
   private lastMinute: Temporal.Instant;
   private pending:
     | {
-      eveningDate: Temporal.PlainDate;
-      targetDate: Temporal.PlainDate;
-      retryAt: Temporal.Instant;
-    }
+        eveningDate: Temporal.PlainDate;
+        targetDate: Temporal.PlainDate;
+        retryAt: Temporal.Instant;
+      }
     | undefined;
   constructor(
     private mqttClient: Pick<MqttClient, "publishJson">,
@@ -73,12 +76,17 @@ export class SetSocLimitTask {
     const { soc, forecast } = this.inputs();
     const estimate = forecast.get(targetDate);
     if (
-      !finite(soc) || soc < 0 || soc > 100 || !estimate ||
-      !finite(estimate.wattHours) || estimate.wattHours < 0 ||
+      !finite(soc) ||
+      soc < 0 ||
+      soc > 100 ||
+      !estimate ||
+      !finite(estimate.wattHours) ||
+      estimate.wattHours < 0 ||
       !(estimate.fetchedAt instanceof Temporal.Instant) ||
       Temporal.Instant.compare(now, estimate.fetchedAt) < 0 ||
       Temporal.Instant.compare(now, estimate.fetchedAt.add({ hours: 6 })) > 0
-    ) return false;
+    )
+      return false;
     await this.mqttClient.publishJson(this.topic, {
       value: calculateEveningSOC(soc, estimate.wattHours / 1000, now),
     });
