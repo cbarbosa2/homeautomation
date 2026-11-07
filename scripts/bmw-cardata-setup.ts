@@ -1,5 +1,5 @@
 import { chmod, readFile, writeFile } from "node:fs/promises";
-import { config } from "dotenv";
+import { loadEnv } from "../src/load-env.ts";
 import {
   BMW_SOC_DESCRIPTORS,
   BMW_TOKEN_URL,
@@ -7,7 +7,8 @@ import {
   saveBmwTokens,
 } from "../src/bmw-cardata/bmw-cardata.ts";
 
-config({ quiet: true });
+loadEnv();
+
 const { BMW_CARDATA_CLIENT_ID } = process.env;
 const clientId = BMW_CARDATA_CLIENT_ID?.trim();
 if (!clientId) throw new Error("Set BMW_CARDATA_CLIENT_ID in .env first");

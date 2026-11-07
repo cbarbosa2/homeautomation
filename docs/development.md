@@ -31,7 +31,7 @@ See [operations.md](operations.md) for configuration. [bootstrap.ts](../src/boot
 | `npm test` | Clean `.test-dist/`, compile source/scripts/tests, and run Node tests. |
 | `npm run check` | Type-check, then run tests. |
 | `npm run lint` | Run Biome recommended lint rules on source and scripts. |
-| `npm run fmt` | Format TypeScript, JavaScript tooling, and root JSON configuration. |
+| `npm run fmt` | Format TypeScript and `.mjs` source/scripts plus root JSON and `.mjs` configuration. |
 | `npm run fmt:check` | Check formatting without rewriting. |
 | `npm run analyze` | Run checks, lint, and formatting verification. |
 
@@ -41,19 +41,19 @@ The toolchain uses the TypeScript compiler (`tsc`) and Biome with recommended li
 
 Development mode uses the production compiler configuration, which excludes test files. Run `npm run typecheck` to check tests as well, or `npm run analyze` for the complete checks. `npm run build` and `npm start` also require a successful type check of source, scripts, and tests before compiling production output.
 
-Production output is `dist/src/bootstrap.js`; the BMW setup command is `dist/scripts/bmw-cardata-setup.js`. Run both from the repository root. Static assets, `.env`, build timestamps, and token files remain relative to that directory. Production and test builds emit ESM JavaScript targeting ES2024 with source maps. The Temporal polyfill remains the shared implementation on Node.
+Production output is `dist/src/bootstrap.js`; the BMW setup command is `dist/scripts/bmw-cardata-setup.js`. Run both from the repository root. Static assets, `.env`, build timestamps, and token files remain relative to that directory. Production and test builds emit ESM JavaScript targeting ES2024 with source maps. Node provides native Temporal; the shared compiler configuration includes `ESNext.Temporal` declarations while retaining ES2024 output.
 
 The test command supplies synthetic Victron identifiers and does not load your private `.env`. It runs compiled `*.test.js` files with Node's process isolation; tests in each file run sequentially. For a single compiled test, set `VICTRON_PORTAL_ID=test-portal VICTRON_INSTALLATION_ID=123456` and run `node --test .test-dist/src/path/to/file.test.js` after `npm test` has compiled it. Network-facing migration tests use local sockets or stubbed APIs, and token/setup tests use temporary working directories.
 
 Compiler strictness checks code before execution; it does not validate incoming payloads at runtime.
 
-For formatting selected files, run `npx biome format --write path/to/file.ts`. `npm run fmt` covers TypeScript and JavaScript tooling plus root JSON configuration; it excludes dependencies, build outputs, the lockfile, private dotfiles, temporary documents, Markdown, and the dashboard HTML. Biome assist actions, including import organization, are disabled. Keep blank lines between top-level declarations and distinct logic blocks when reviewing formatting.
+For formatting selected files, run `npx biome format --write path/to/file.ts`. `npm run fmt` covers `.ts` and `.mjs` files under `src/` and `scripts/`, plus root `.json` and `.mjs` configuration; it excludes dependencies, build outputs, the lockfile, private dotfiles, temporary documents, Markdown, and the dashboard HTML. [biome.json](../biome.json) defines the formatting scope, style, and recommended lint policy. Biome assist actions, including import organization, are disabled. Keep blank lines between top-level declarations and distinct logic blocks when reviewing formatting.
 
 No automated test should publish hardware commands; `POWER_CONTROL_ENABLED=false` alone does not disable scheduled SOC writes.
 
 ## Date and time
 
-Use Temporal for all date/time-related types in application code and tests. Import it through [src/temporal.ts](../src/temporal.ts).
+Use Temporal for all date/time-related types in application code and tests. Import Node's native implementation through [src/temporal.ts](../src/temporal.ts), which preserves both value and namespace/type imports.
 
 - Use `Temporal.Instant` for timestamps and recorded events.
 - Use `Temporal.ZonedDateTime` for dates and times tied to a time zone, and the appropriate `Temporal.Plain*` type for calendar dates or local times without a time zone.

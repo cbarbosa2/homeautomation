@@ -4,6 +4,8 @@
 
 Use [.env.example](../.env.example) as the configuration template; [constants.ts](../src/constants.ts) defines application defaults.
 
+The service and BMW setup use Node's native environment loader to read `.env` from the working directory. Existing process environment variables take precedence. A missing file is allowed during loading; other loading errors stop startup. BMW setup still requires a writable `.env` to save its results.
+
 | Variable | Purpose |
 | --- | --- |
 | `MQTT_BROKER_URL` | MQTT broker URL. |

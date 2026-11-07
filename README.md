@@ -48,10 +48,11 @@ To show BMW i3 SOC, complete the optional [BMW CarData setup](docs/operations.md
 ## Development and Tests
 
 ```bash
-npm run check  # Type-check and run tests
-npm run lint   # Lint source files
-npm run fmt    # Format source files
-npm test       # Compile and run tests
+npm run check      # Type-check and run tests
+npm run lint       # Lint source and scripts with Biome
+npm run fmt        # Format source, scripts, and root configuration
+npm run fmt:check  # Verify formatting without rewriting
+npm test           # Compile and run tests
 ```
 
 Tests cover power allocation, command reservations, telemetry freshness, forecast lookup, Lisbon scheduling and DST, configuration, and API parsing. The test task supplies synthetic Victron identifiers; a private `.env` is not required.

@@ -21,9 +21,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.9",
-    "@js-temporal/polyfill": "0.5.1",
     "@loglayer/transport-logflare": "2.3.0",
-    "dotenv": "^17.2.3",
     "loglayer": "9.4.0",
     "mqtt": "5.16.1",
     "node-cron": "^4.2.1",

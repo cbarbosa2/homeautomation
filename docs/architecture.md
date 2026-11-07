@@ -6,7 +6,7 @@ The application runs as a Node.js background service compiled from TypeScript, c
 
 The service runs compiled ESM JavaScript on Node.js 26.13 or newer in the 26.x line. npm installs the lockfile's dependencies; `tsc` checks all source, setup scripts, and tests before emitting production code to `dist/`. Development uses `tsc-watch` with the production configuration. Tests are compiled separately to `.test-dist/` and run with Node's test runner. See [development](development.md) for commands and compiler conventions.
 
-`dotenv` loads configuration before application imports. Filesystem access and process signals use Node APIs; dates and times use the shared Temporal polyfill. The dashboard remains a static HTML file served by the application. The service runs from the repository root so assets, build timestamps, environment files, and BMW tokens resolve consistently.
+Node's native `process.loadEnvFile()` loads configuration before application imports. Filesystem access and process signals use Node APIs; dates and times use Node's native Temporal through the shared `src/temporal.ts` module. The dashboard remains a static HTML file served by the application. The service runs from the repository root so assets, build timestamps, environment files, and BMW tokens resolve consistently.
 
 ## Application lifecycle
 

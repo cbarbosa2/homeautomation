@@ -1,6 +1,6 @@
-import { config } from "dotenv";
+import { loadEnv } from "./load-env.ts";
 
-config({ quiet: true });
+loadEnv();
 
 // Use dynamic import so the env is loaded before `main.ts` is evaluated.
 await import("./main.ts");
