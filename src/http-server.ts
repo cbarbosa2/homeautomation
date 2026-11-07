@@ -9,6 +9,7 @@ import { globals, WallboxChargeMode, WallboxLocation } from "./globals.ts";
 import type { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
 import { getVehicleSoc } from "./bmw-cardata/bmw-cardata.ts";
+import { CONTROL_PATHS, controlTelemetry } from "./control-telemetry.ts";
 
 export class HttpServer {
   private server: Server | null = null;
@@ -50,6 +51,16 @@ export class HttpServer {
       // Task API endpoints
       if (url.pathname === "/api/tasks") {
         return this.handleGetTasks();
+      }
+
+      if (url.pathname === "/api/battery" && request.method === "GET") {
+        return Response.json(
+          {
+            soc: controlTelemetry.value(CONTROL_PATHS.batterySOC) ?? null,
+            minSoc: controlTelemetry.value(CONTROL_PATHS.batteryMinSOC) ?? null,
+          },
+          { headers: { "Cache-Control": "no-store" } },
+        );
       }
 
       if (url.pathname === "/api/bmw-soc" && request.method === "GET") {
@@ -193,16 +204,24 @@ export class HttpServer {
   }
 
   private handleGetWallboxChargeMode(): Response {
-    // Return current charge mode for inside and outside
+    // Return current modes and the preference restored at startup.
     const inside =
       globals.wallboxChargeMode.get(WallboxLocation.Inside) ??
       WallboxChargeMode.Off;
     const outside =
       globals.wallboxChargeMode.get(WallboxLocation.Outside) ??
       WallboxChargeMode.Off;
-    return new Response(JSON.stringify({ Inside: inside, Outside: outside }), {
-      headers: { "Content-Type": "application/json" },
-    });
+    return Response.json(
+      {
+        Inside: inside,
+        Outside: outside,
+        preferredLocation:
+          globals.preferredWallboxLocation === WallboxLocation.Outside
+            ? "Outside"
+            : "Inside",
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   private async handleSetWallboxChargeMode(

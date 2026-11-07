@@ -5,6 +5,8 @@ import { once } from "node:events";
 import { HttpServer } from "./http-server.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { scheduler } from "./task-scheduler.ts";
+import { CONTROL_PATHS, controlTelemetry } from "./control-telemetry.ts";
+import { Temporal } from "./temporal.ts";
 
 // Exercise the real TCP adapter without starting MQTT or scheduled automation.
 test("Node HTTP adapter preserves dashboard, APIs, metrics and request bodies", async () => {
@@ -29,6 +31,12 @@ test("Node HTTP adapter preserves dashboard, APIs, metrics and request bodies", 
     deepStrictEqual(await (await fetch(`${base}/api/bmw-soc`)).json(), null);
     const modes = await fetch(`${base}/api/wallbox-charge-mode`);
     equal(modes.status, 200);
+    equal(modes.headers.get("cache-control"), "no-store");
+    deepStrictEqual(await modes.json(), {
+      Inside: 2,
+      Outside: 2,
+      preferredLocation: "Inside",
+    });
     let calls = 0;
     scheduler.cron("HTTP test task", "0 0 1 1 *", () => {
       calls++;
@@ -52,6 +60,58 @@ test("Node HTTP adapter preserves dashboard, APIs, metrics and request bodies", 
     equal((await fetch(`${base}/missing`)).status, 404);
   } finally {
     scheduler.terminateAll();
+    await server.stop();
+    metrics.getRegister().clear();
+  }
+});
+
+test("battery API exposes fresh SOC independently and clears invalid, expired and disconnected readings", async (context) => {
+  let now = Temporal.Instant.from("2026-11-07T12:00:00Z");
+  context.mock.method(Temporal.Now, "instant", () => now);
+  const metrics = new PrometheusMetrics();
+  const server = new HttpServer(metrics);
+  const port = await server.start(0);
+  const url = `http://127.0.0.1:${port}/api/battery`;
+  const read = async () => {
+    const response = await fetch(url);
+    equal(response.status, 200);
+    equal(response.headers.get("cache-control"), "no-store");
+    return response.json();
+  };
+  controlTelemetry.invalidate();
+
+  try {
+    deepStrictEqual(await read(), { soc: null, minSoc: null });
+    controlTelemetry.record(CONTROL_PATHS.batterySOC, { value: 72.5 });
+    deepStrictEqual(await read(), { soc: 72.5, minSoc: null });
+    controlTelemetry.record(CONTROL_PATHS.batteryMinSOC, { value: 30 });
+    deepStrictEqual(await read(), { soc: 72.5, minSoc: 30 });
+    controlTelemetry.record(CONTROL_PATHS.batterySOC, { value: 0 });
+    controlTelemetry.record(CONTROL_PATHS.batteryMinSOC, { value: 0 });
+    deepStrictEqual(await read(), { soc: 0, minSoc: 0 });
+
+    for (const invalid of [-1, 101, NaN, Infinity, "72", null]) {
+      controlTelemetry.record(CONTROL_PATHS.batterySOC, { value: invalid });
+      deepStrictEqual(await read(), { soc: null, minSoc: 0 });
+    }
+    controlTelemetry.record(CONTROL_PATHS.batterySOC, { value: 100 });
+    controlTelemetry.record(CONTROL_PATHS.batteryMinSOC, { value: 101 });
+    deepStrictEqual(await read(), { soc: 100, minSoc: null });
+    controlTelemetry.record(CONTROL_PATHS.batteryMinSOC, { value: 30 });
+
+    now = now.add({ seconds: 60 });
+    deepStrictEqual(await read(), { soc: 100, minSoc: 30 });
+    now = now.add({ nanoseconds: 1 });
+    deepStrictEqual(await read(), { soc: null, minSoc: null });
+    controlTelemetry.record(CONTROL_PATHS.batteryMinSOC, { value: 5 });
+    deepStrictEqual(await read(), { soc: null, minSoc: 5 });
+
+    controlTelemetry.record(CONTROL_PATHS.batterySOC, { value: 80 });
+    controlTelemetry.invalidate();
+    deepStrictEqual(await read(), { soc: null, minSoc: null });
+    equal((await fetch(url, { method: "POST" })).status, 404);
+  } finally {
+    controlTelemetry.invalidate();
     await server.stop();
     metrics.getRegister().clear();
   }

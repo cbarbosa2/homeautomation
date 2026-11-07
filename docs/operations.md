@@ -39,10 +39,21 @@ Run setup on each host where the service will read BMW data. The deployment scri
 With the default port:
 
 - Dashboard: <http://localhost:1881/>
+- Home battery readings: <http://localhost:1881/api/battery>
 - Prometheus metrics: <http://localhost:1881/metrics>
 - Health: <http://localhost:1881/health>
 
 The health endpoint returns `OK`; it does not verify MQTT connectivity or external services. Metrics include process metrics, MQTT message counts and connection status, errors, and device/energy telemetry. Definitions are in [metrics.ts](../src/prometheus/metrics.ts); registration is in [prometheus.ts](../src/prometheus/prometheus.ts).
+
+The Home Energy dashboard displays current home battery SOC and minimum SOC,
+wallbox mode controls, BMW SOC, and a compact list of scheduled jobs. Job cron
+expressions are shown in UTC. `GET /api/battery` returns
+`{ "soc": 72, "minSoc": 30 }` from validated control telemetry, with each value
+independently `null` when missing, invalid, disconnected, or more than 60 seconds
+old. The response is not cached. The dashboard polls battery readings every ten
+seconds after the preceding request completes and shows unavailable values on
+refresh failure. These values are read-only; wallbox mode and priority changes
+still require pressing Set.
 
 ## Automation telemetry and timing
 
@@ -98,7 +109,14 @@ Charge-mode commands apply immediately and give that charger priority, even when
 the mode is unchanged. Dashboard dropdowns prepare a selection; press Set to apply
 it and claim priority. The dashboard reports success only after JSONBin confirms
 both modes and preference were saved; failures show that mode and priority may
-revert after restart. The saved `preferredWallboxLocation` uses numeric locations
+revert after restart. On each page load, a Priority badge identifies the preferred
+charger using `GET /api/wallbox-charge-mode`, which returns `Inside` and `Outside`
+mode values plus `preferredLocation` (`"Inside"` or `"Outside"`). This response is
+not cached. The badge is refreshed after Set attempts, including failed saves,
+because runtime priority may already have changed. This refresh does not alter
+pending dropdown selections. Priority indicates preference when eligible, even
+if that charger is currently disconnected, Off, or Manual.
+The saved `preferredWallboxLocation` uses numeric locations
 (0 Inside, 1 Outside); absent or invalid preference defaults to Inside. Startup
 restoration does not change preference based on mode-loading order.
 Physical switch save failures are logged. Writes are serialized and pending writes

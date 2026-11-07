@@ -3,358 +3,409 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Home Automation - Task Dashboard</title>
+    <meta name="theme-color" content="#f5f6f2" />
+    <title>Home Energy</title>
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
+      :root {
+        color-scheme: light;
+        --background: #f5f6f2;
+        --surface: #ffffff;
+        --text: #253a32;
+        --muted: #68756d;
+        --line: #e2e7df;
+        --green: #287352;
+        --green-light: #e9f2e9;
+        --danger: #a43d30;
       }
+      * { box-sizing: border-box; }
       body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          Oxygen, Ubuntu, Cantarell, sans-serif;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
-        padding: 2rem;
+        margin: 0;
+        background: var(--background);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 13px;
+        line-height: 1.45;
+        -webkit-font-smoothing: antialiased;
       }
-      .container {
-        max-width: 1200px;
-        margin: 0 auto;
+      button, select { font: inherit; }
+      button, a, select { -webkit-tap-highlight-color: transparent; }
+      button:focus-visible, select:focus-visible, a:focus-visible {
+        outline: 3px solid var(--green);
+        outline-offset: 4px;
       }
-      h1 {
-        color: white;
-        margin-bottom: 2rem;
-        text-align: center;
-        font-size: 2.5rem;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+      button { cursor: pointer; }
+      button:disabled, select:disabled { opacity: .55; cursor: not-allowed; }
+      [hidden] { display: none !important; }
+      .container { max-width: 900px; margin: auto; padding: 24px 24px 16px; }
+      .page-header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+      .home-icon {
+        display: grid; place-items: center; width: 36px; height: 36px;
+        background: var(--green-light); color: var(--green); border-radius: 10px;
       }
-      .task-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-        gap: 1.5rem;
+      svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+      .eyebrow { margin: 0 0 3px; color: var(--muted); font-size: 10px; font-weight: 650; letter-spacing: .16em; text-transform: uppercase; }
+      h1 { margin: 0; font-size: 23px; font-weight: 600; letter-spacing: -.045em; line-height: 1.2; }
+      h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.025em; }
+      p { margin: 0; }
+      .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 14px; overflow: hidden; }
+      .section-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 20px; }
+      .subtitle { color: var(--muted); font-size: 13px; margin-top: 3px; }
+      .battery-panel { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; background: #edf3e9; border-color: #dce6d6; padding: 16px 20px; }
+      .battery-panel .section-header { grid-column: 1 / -1; padding: 0; }
+      .badge { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+      .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+      .badge[data-state="ready"] { color: var(--green); }
+      .battery-values { display: grid; grid-template-columns: 1fr 1fr; grid-row: 2 / 4; gap: 20px; align-items: center; margin: 12px 0 0; }
+      .label { color: var(--muted); font-size: 11px; }
+      .soc-number { font-size: 42px; font-weight: 500; line-height: 1.15; letter-spacing: -.065em; font-variant-numeric: tabular-nums; }
+      .soc-number .unit { font-size: .46em; margin-left: 3px; letter-spacing: -.04em; color: #64806c; }
+      .unavailable { font-size: 18px; letter-spacing: -.025em; line-height: 1.5; }
+      .minimum { border-left: 1px solid #d4dfcf; padding-left: 20px; }
+      .min-number { font-size: 28px; font-weight: 500; letter-spacing: -.04em; line-height: 1.35; font-variant-numeric: tabular-nums; }
+      .min-number .unit { font-size: .6em; margin-left: 2px; color: #64806c; }
+      .minimum .subtitle { font-size: 12px; }
+      .battery-track { position: relative; align-self: end; margin-top: 26px; height: 8px; border-radius: 5px; background: #d9e4d3; }
+      .battery-fill { height: 100%; background: var(--green); border-radius: inherit; }
+      .minimum-marker { position: absolute; top: -5px; bottom: -5px; width: 0; border-left: 2px solid #263e2c; transform: translateX(-1px); }
+      .scale { display: flex; justify-content: space-between; margin-top: 6px; color: #61715f; font-size: 11px; }
+      .battery-bottom { display: flex; grid-column: 1 / -1; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 11px; color: var(--muted); }
+      .marker-key { display: inline-block; height: 10px; border-left: 2px solid #263e2c; margin-right: 6px; }
+      .charger-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 20px; border-top: 1px solid var(--line); }
+      .charger-icon { display: grid; place-items: center; height: 30px; border: 1px solid var(--line); border-radius: 8px; color: var(--green); }
+      .charger-icon svg { width: 18px; height: 18px; }
+      .charger-name { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; font-size: 13px; font-weight: 600; }
+      .priority-badge { padding: 1px 7px; border-radius: 5px; background: var(--green-light); color: var(--green); font-size: 10px; font-weight: 600; }
+      .vehicle { display: flex; flex-wrap: wrap; gap: 3px 8px; font-size: 12px; color: var(--muted); margin-top: 3px; }
+      #bmw-soc { font-weight: 600; color: var(--text); }
+      .mode-controls { display: flex; gap: 8px; }
+      select { min-width: 130px; max-width: 100%; color: var(--text); background: #fafbf8; border: 1px solid #d7ded3; border-radius: 9px; padding: 6px 28px 6px 10px; }
+      .button { border: 1px solid #d7ded3; background: white; color: var(--text); border-radius: 9px; padding: 6px 12px; font-weight: 550; font-size: 12px; line-height: 1.5; white-space: nowrap; min-height: 32px; }
+      .button:hover:not(:disabled) { background: #f0f5ec; border-color: #adbfaa; }
+      .button-primary { background: var(--green); border-color: var(--green); color: white; min-width: 52px; }
+      .button-primary:hover:not(:disabled) { background: #205f43; border-color: #205f43; }
+      .feedback { color: var(--muted); font-size: 12px; }
+      .feedback:empty { display: none; }
+      .feedback[data-state="error"] { color: var(--danger); }
+      .feedback[data-state="success"] { color: var(--green); }
+      .charger-row > .feedback { grid-column: 2 / -1; }
+      .section-note { padding: 10px 20px; border-top: 1px solid var(--line); background: #fcfdfa; color: var(--muted); font-size: 12px; }
+      .section-note p + button { margin-top: 10px; }
+      .schedule-label { color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+      .task-list { list-style: none; margin: 0; padding: 0; }
+      .task-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, .55fr) 96px; gap: 16px; align-items: center; padding: 9px 20px; border-top: 1px solid var(--line); }
+      .task-name { font-weight: 500; font-size: 13px; overflow-wrap: anywhere; }
+      .task-schedule { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+      .task-row .feedback { grid-column: 1 / -1; }
+      .task-row .button { padding: 5px 10px; }
+      .empty-state { padding: 14px 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+      .empty-state .button { margin-top: 12px; }
+      footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px 24px; padding: 4px 4px 16px; font-size: 11px; color: var(--muted); }
+      footer nav { display: flex; gap: 20px; }
+      footer a { color: var(--muted); text-underline-offset: 4px; }
+      footer a:hover { color: var(--green); }
+      .build { overflow-wrap: anywhere; }
+      @media (max-width: 600px) {
+        .container { padding: 18px 12px 12px; }
+        .page-header { margin-bottom: 14px; }
+        h1 { font-size: 22px; }
+        .panel { border-radius: 10px; margin-bottom: 12px; }
+        .battery-panel { display: block; padding: 14px 16px; }
+        .battery-panel .section-header { flex-direction: row; gap: 8px; }
+        .battery-values { gap: 16px; margin: 12px 0 14px; }
+        .minimum { padding-left: 18px; }
+        .minimum .subtitle { max-width: 130px; }
+        .soc-number { font-size: 38px; }
+        .soc-number.unavailable, .min-number.unavailable { font-size: 19px; }
+        .min-number { font-size: 26px; }
+        .battery-track { margin-top: 0; }
+        .battery-bottom { flex-wrap: wrap; gap: 6px; }
+        .section-header { padding: 12px 16px; }
+        .charger-row { padding: 12px 16px; grid-template-columns: 28px minmax(0, 1fr); gap: 8px 10px; }
+        .charger-icon { height: 28px; }
+        .mode-controls { grid-column: 1 / -1; }
+        .mode-controls select { flex: 1; min-width: 0; }
+        .charger-row > .feedback { grid-column: 1 / -1; }
+        .section-note { padding: 10px 16px; font-size: 11px; }
+        .task-row { padding: 10px 16px; grid-template-columns: minmax(0, 1fr) 86px; gap: 3px 12px; }
+        .task-row .button { grid-column: 2; grid-row: 1 / 3; }
+        .task-schedule { grid-column: 1; }
+        .empty-state { padding: 12px 16px; }
       }
-      .task-card {
-        background: white;
-        border-radius: 12px;
-        padding: 1.5rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
-        transition: transform 0.2s, box-shadow 0.2s;
-      }
-      .task-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 12px 20px rgba(0, 0, 0, 0.15),
-          0 4px 8px rgba(0, 0, 0, 0.1);
-      }
-      .task-header {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        margin-bottom: 1rem;
-      }
-      .task-name {
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: #2d3748;
-        flex: 1;
-        margin-right: 1rem;
-      }
-      .task-type {
-        font-size: 0.75rem;
-        padding: 0.25rem 0.75rem;
-        border-radius: 12px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-      .task-type.cron {
-        background: #bee3f8;
-        color: #2c5282;
-      }
-      .task-schedule {
-        font-family: "Monaco", "Courier New", monospace;
-        font-size: 0.9rem;
-        color: #718096;
-        background: #f7fafc;
-        padding: 0.5rem 0.75rem;
-        border-radius: 6px;
-        margin-bottom: 1rem;
-        border-left: 3px solid #667eea;
-      }
-      .trigger-btn {
-        width: 100%;
-        padding: 0.75rem 1.5rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-size: 1rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      }
-      .charge-mode-set {
-        width: auto;
-        padding: 0.4rem 0.75rem;
-        margin-left: 0.5rem;
-      }
-      .trigger-btn:hover:not(:disabled) {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-      }
-      .trigger-btn:active:not(:disabled) {
-        transform: translateY(0);
-      }
-      .trigger-btn:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-      }
-      .trigger-btn.running {
-        background: #48bb78;
-      }
-      .trigger-btn.success {
-        background: #38a169;
-      }
-      .trigger-btn.error {
-        background: #e53e3e;
-      }
-      .loading {
-        text-align: center;
-        color: white;
-        font-size: 1.5rem;
-        padding: 4rem;
-      }
-      .error {
-        background: #fed7d7;
-        color: #742a2a;
-        padding: 1rem;
-        border-radius: 8px;
-        margin-bottom: 1rem;
-        text-align: center;
-      }
-      .footer {
-        text-align: center;
-        color: white;
-        margin-top: 3rem;
-        opacity: 0.9;
-      }
-      .footer a {
-        color: white;
-        text-decoration: none;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+      @media (prefers-reduced-motion: no-preference) {
+        .battery-fill { transition: width .5s ease; }
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <h1>🏠 Task Dashboard</h1>
-      <div id="error" class="error" style="display: none"></div>
-      <div id="loading" class="loading">Loading tasks...</div>
-      <div id="tasks" class="task-grid" style="display: none"></div>
-      <div id="wallbox-charge-mode" style="margin: 2rem 0">
-        <h2 style="color: white; text-align: center; margin-bottom: 1rem">
-          Wallbox Charge Mode
-        </h2>
-        <div style="display: flex; justify-content: center; gap: 2rem">
-          <div>
-            <label for="inside-mode" style="color: white; font-weight: 600"
-              >Inside:</label
-            >
-            <select id="inside-mode">
-              <option value="1">Off</option>
-              <option value="2">SunOnly</option>
-              <option value="3">ESSOnly</option>
-              <option value="4">Night</option>
-              <option value="5">On</option>
-              <option value="6">Manual</option>
-            </select>
-            <button
-              class="trigger-btn charge-mode-set"
-              onclick="changeChargeMode('Inside', this)"
-              aria-label="Set inside mode and priority"
-            >Set</button>
-          </div>
-          <div>
-            <label for="outside-mode" style="color: white; font-weight: 600"
-              >Outside:</label
-            >
-            <select id="outside-mode">
-              <option value="1">Off</option>
-              <option value="2">SunOnly</option>
-              <option value="3">ESSOnly</option>
-              <option value="4">Night</option>
-              <option value="5">On</option>
-              <option value="6">Manual</option>
-            </select>
-            <button
-              class="trigger-btn charge-mode-set"
-              onclick="changeChargeMode('Outside', this)"
-              aria-label="Set outside mode and priority"
-            >Set</button>
-          </div>
+    <main class="container">
+      <header class="page-header">
+        <span class="home-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z" /></svg></span>
+        <div><p class="eyebrow">Home automation</p><h1>Home energy</h1></div>
+      </header>
+
+      <section class="panel battery-panel" aria-labelledby="battery-title">
+        <div class="section-header">
+          <h2 id="battery-title">Home battery</h2>
+          <p id="battery-status" class="badge" role="status">Loading readings</p>
         </div>
-        <div
-          id="charge-mode-status"
-          style="color: white; text-align: center; margin-top: 1rem"
-        ></div>
-      </div>
-      <div class="task-card" style="margin: 2rem 0">
-        <div class="task-name">BMW i3 · SOC</div>
-        <p id="bmw-soc" style="margin-top: 0.75rem; color: #4a5568">
-          Sem dados
-        </p>
-      </div>
-      <div class="footer">
-        <p>
-          <a href="/metrics">View Metrics</a> |
-          <a href="/health">Health Check</a>
-        </p>
-        <p style="margin-top: 0.5rem; font-size: 0.875rem; opacity: 0.8">
-          Build: __BUILD_TIMESTAMP__
-        </p>
-      </div>
-    </div>
+        <div class="battery-values">
+          <div><p class="label">Current SOC</p><p id="battery-soc" class="soc-number unavailable">Loading…</p></div>
+          <div class="minimum"><p class="label">Minimum SOC</p><p id="battery-min-soc" class="min-number unavailable">Loading…</p></div>
+        </div>
+        <div id="battery-track" class="battery-track" role="progressbar" aria-label="Home battery charge" aria-valuemin="0" aria-valuemax="100" aria-valuetext="Loading">
+          <div id="battery-fill" class="battery-fill" style="width: 0%"></div>
+          <span id="minimum-marker" class="minimum-marker" hidden aria-hidden="true"></span>
+        </div>
+        <div class="scale" aria-hidden="true"><span>0%</span><span>100%</span></div>
+        <div class="battery-bottom"><span><i class="marker-key" aria-hidden="true"></i>Minimum SOC</span><span id="battery-refresh">Refreshes every 10 seconds</span></div>
+      </section>
+
+      <section class="panel" aria-labelledby="charging-title">
+        <div class="section-header"><div><h2 id="charging-title">Charging</h2></div></div>
+        <form id="inside-form" class="charger-row">
+          <span class="charger-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h10v18H7zM10 6h4M10 17l3-5h-3l3-5" /></svg></span>
+          <div><h3 class="charger-name"><label for="inside-mode">Inside</label><span id="inside-priority" class="priority-badge" title="First in line for available power when eligible" hidden>Priority</span></h3><p class="vehicle"><span>BMW i3</span><span id="bmw-soc">Loading SOC…</span></p><p id="bmw-observed" class="subtitle"></p></div>
+          <div class="mode-controls"><select id="inside-mode" name="mode" disabled><option value="1">Off</option><option value="2">Sun Only</option><option value="3">ESS Only</option><option value="4">Night</option><option value="5">On</option><option value="6">Manual</option></select><button class="button button-primary" type="submit" aria-label="Set inside mode and priority" disabled>Set</button></div>
+          <p id="inside-feedback" class="feedback" role="status"></p>
+        </form>
+        <form id="outside-form" class="charger-row">
+          <span class="charger-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h10v18H7zM10 6h4M10 17l3-5h-3l3-5" /></svg></span>
+          <div><h3 class="charger-name"><label for="outside-mode">Outside</label><span id="outside-priority" class="priority-badge" title="First in line for available power when eligible" hidden>Priority</span></h3><p class="subtitle">Wallbox</p></div>
+          <div class="mode-controls"><select id="outside-mode" name="mode" disabled><option value="1">Off</option><option value="2">Sun Only</option><option value="3">ESS Only</option><option value="4">Night</option><option value="5">On</option><option value="6">Manual</option></select><button class="button button-primary" type="submit" aria-label="Set outside mode and priority" disabled>Set</button></div>
+          <p id="outside-feedback" class="feedback" role="status"></p>
+        </form>
+        <div class="section-note"><p>Set applies the mode and claims priority when eligible.</p><p id="priority-status" class="feedback" role="status">Loading priority…</p><p id="modes-status" class="feedback" role="status">Loading charge modes…</p><button id="retry-modes" class="button" type="button" hidden>Retry loading modes</button></div>
+      </section>
+
+      <section class="panel" aria-labelledby="automation-title">
+        <div class="section-header"><div><h2 id="automation-title">Automation</h2></div><span class="schedule-label">Cron · UTC</span></div>
+        <div id="tasks-state" class="empty-state"><p id="tasks-status" role="status">Loading scheduled jobs…</p><button id="retry-tasks" class="button" type="button" hidden>Retry loading jobs</button></div>
+        <ul id="tasks" class="task-list" hidden></ul>
+      </section>
+      <footer><nav aria-label="Service links"><a href="/metrics">Metrics</a><a href="/health">Health check</a></nav><span class="build">Build · __BUILD_TIMESTAMP__</span></footer>
+    </main>
 
     <script>
-      async function loadBmwSoc() {
-        const label = document.getElementById("bmw-soc");
+      const byId = (id) => document.getElementById(id);
+      const locations = ["Inside", "Outside"];
+      const percentFormat = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 });
+      const lisbonFormat = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Europe/Lisbon", dateStyle: "medium", timeStyle: "short",
+      });
+
+      async function requestJson(url, body) {
+        const response = await fetch(url, {
+          method: body === undefined ? "GET" : "POST",
+          cache: "no-store",
+          signal: AbortSignal.timeout(body === undefined ? 10000 : 35000),
+          ...(body === undefined ? {} : {
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result?.error || `Request failed (${response.status})`);
+        return result;
+      }
+
+      function feedback(element, message, state = "") {
+        element.textContent = message;
+        element.dataset.state = state;
+      }
+
+      function isPercent(value) {
+        return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100;
+      }
+
+      function showPercent(element, value, className) {
+        element.replaceChildren();
+        element.className = className;
+        if (!isPercent(value)) {
+          element.classList.add("unavailable");
+          element.textContent = "Unavailable";
+          return;
+        }
+        element.append(document.createTextNode(percentFormat.format(value)));
+        const unit = document.createElement("span");
+        unit.className = "unit";
+        unit.textContent = "%";
+        element.append(unit);
+      }
+
+      function renderBattery(value, failed = false) {
+        const soc = isPercent(value?.soc) ? value.soc : null;
+        const minSoc = isPercent(value?.minSoc) ? value.minSoc : null;
+        showPercent(byId("battery-soc"), soc, "soc-number");
+        showPercent(byId("battery-min-soc"), minSoc, "min-number");
+        byId("battery-fill").style.width = `${soc ?? 0}%`;
+        const track = byId("battery-track");
+        if (soc === null) track.removeAttribute("aria-valuenow");
+        else track.setAttribute("aria-valuenow", String(soc));
+        track.setAttribute("aria-valuetext", soc === null ? "Unavailable" : `${percentFormat.format(soc)}%`);
+        const marker = byId("minimum-marker");
+        marker.hidden = minSoc === null;
+        marker.style.left = `${minSoc ?? 0}%`;
+        const available = soc !== null && minSoc !== null;
+        feedback(byId("battery-status"), failed ? "Readings unavailable" : available ? "Readings available" : "Waiting for telemetry", available ? "ready" : "");
+        byId("battery-refresh").textContent = failed ? "Refresh failed · retrying automatically" : "Refreshes every 10 seconds";
+      }
+
+      async function loadBattery() {
         try {
-          const response = await fetch("/api/bmw-soc");
-          if (!response.ok) throw new Error("Falha na leitura");
-          const value = await response.json();
-          label.textContent = value
-            ? `${value.percent}% · leitura BMW: ${new Date(value.observedAt).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })}`
-            : "Sem dados";
+          renderBattery(await requestJson("/api/battery"));
         } catch (_) {
-          label.textContent = "Não foi possível obter os dados";
+          renderBattery(null, true);
+        } finally {
+          setTimeout(loadBattery, 10000);
+        }
+      }
+
+      async function loadBmwSoc() {
+        try {
+          const value = await requestJson("/api/bmw-soc");
+          byId("bmw-soc").textContent = isPercent(value?.percent) ? `${percentFormat.format(value.percent)}% SOC` : "SOC unavailable";
+          // Date converts the external ISO timestamp only at this display boundary.
+          byId("bmw-observed").textContent = value?.observedAt
+            ? `BMW reading · ${lisbonFormat.format(new Date(value.observedAt))} · Lisbon`
+            : "";
+        } catch (_) {
+          byId("bmw-soc").textContent = "SOC unavailable";
+          byId("bmw-observed").textContent = "Could not refresh BMW data.";
+        } finally {
+          setTimeout(loadBmwSoc, 60000);
+        }
+      }
+
+      function renderPriority(location) {
+        for (const candidate of locations) {
+          byId(`${candidate.toLowerCase()}-priority`).hidden = candidate !== location;
+        }
+        feedback(byId("priority-status"), locations.includes(location) ? "" : "Priority unavailable.");
+      }
+
+      async function refreshPriority() {
+        try {
+          const modes = await requestJson("/api/wallbox-charge-mode");
+          renderPriority(modes?.preferredLocation);
+        } catch (_) {
+          renderPriority(null);
         }
       }
 
       async function loadChargeModes() {
+        byId("retry-modes").hidden = true;
+        feedback(byId("modes-status"), "Loading charge modes…");
         try {
-          const response = await fetch("/api/wallbox-charge-mode");
-          if (!response.ok) throw new Error("Failed to load charge modes");
-          const modes = await response.json();
-          document.getElementById("inside-mode").value = modes.Inside;
-          document.getElementById("outside-mode").value = modes.Outside;
-        } catch (error) {
-          document.getElementById("charge-mode-status").textContent =
-            "Error loading charge modes: " + error.message;
+          const modes = await requestJson("/api/wallbox-charge-mode");
+          renderPriority(modes?.preferredLocation);
+          if (!locations.every((location) => Number.isInteger(modes?.[location]) && modes[location] >= 1 && modes[location] <= 6)) {
+            throw new Error("Invalid charge modes received");
+          }
+          for (const location of locations) {
+            const key = location.toLowerCase();
+            byId(`${key}-mode`).value = String(modes[location]);
+            byId(`${key}-mode`).disabled = false;
+            byId(`${key}-form`).querySelector("button").disabled = false;
+          }
+          feedback(byId("modes-status"), "");
+        } catch (_) {
+          renderPriority(null);
+          feedback(byId("modes-status"), "Could not load charge modes. Retry to enable the controls.", "error");
+          byId("retry-modes").hidden = false;
         }
       }
 
-      async function changeChargeMode(location, button) {
-        const select = document.getElementById(
-          location.toLowerCase() + "-mode"
-        );
+      async function changeChargeMode(location) {
+        const key = location.toLowerCase();
+        const select = byId(`${key}-mode`);
+        const button = byId(`${key}-form`).querySelector("button");
+        const status = byId(`${key}-feedback`);
         const value = select.value;
         select.disabled = true;
         button.disabled = true;
-        document.getElementById("charge-mode-status").textContent =
-          "Updating...";
+        button.textContent = "Saving…";
+        feedback(status, "Saving mode and priority…");
         try {
-          const response = await fetch("/api/wallbox-charge-mode", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ location, value }),
-          });
-          const result = await response.json();
-          if (response.ok && result.success) {
-            document.getElementById("charge-mode-status").textContent =
-              location + " mode saved; charger has priority when eligible.";
-          } else {
-            document.getElementById("charge-mode-status").textContent =
-              result.error || "Failed to update.";
-          }
-        } catch (error) {
-          document.getElementById("charge-mode-status").textContent =
-            "Error: " + error.message;
+          const result = await requestJson("/api/wallbox-charge-mode", { location, value });
+          if (!result.success) throw new Error(result.error || "Failed to save");
+          feedback(status, "Mode and priority saved.", "success");
+        } catch (_) {
+          feedback(status, "Save not confirmed. Mode and priority may revert after restart. Press Set to retry.", "error");
+        } finally {
+          await refreshPriority();
+          select.disabled = false;
+          button.disabled = false;
+          button.textContent = "Set";
         }
-        select.disabled = false;
-        button.disabled = false;
+      }
+
+      async function triggerTask(taskName, button, status) {
+        button.disabled = true;
+        button.textContent = "Running…";
+        feedback(status, "Running…");
+        try {
+          const result = await requestJson("/api/trigger", { taskName });
+          if (!result.success) throw new Error(result.error || "Task failed");
+          feedback(status, "Run completed successfully.", "success");
+        } catch (_) {
+          feedback(status, "Run could not be confirmed. Check service logs before retrying.", "error");
+        } finally {
+          button.disabled = false;
+          button.textContent = "Run now";
+        }
       }
 
       async function loadTasks() {
+        byId("retry-tasks").hidden = true;
+        byId("tasks-state").hidden = false;
+        byId("tasks-status").textContent = "Loading scheduled jobs…";
         try {
-          const response = await fetch("/api/tasks");
-          if (!response.ok) throw new Error("Failed to load tasks");
-          const tasks = (await response.json()).filter(
-            (task) => task.type !== "interval"
-          );
-
-          const tasksContainer = document.getElementById("tasks");
-          const loading = document.getElementById("loading");
-
-          if (tasks.length === 0) {
-            loading.textContent = "No tasks scheduled";
-            return;
+          const tasks = (await requestJson("/api/tasks")).filter((task) => task.type !== "interval");
+          const list = byId("tasks");
+          list.replaceChildren();
+          for (const task of tasks) {
+            const row = document.createElement("li");
+            row.className = "task-row";
+            const name = document.createElement("span");
+            name.className = "task-name";
+            name.textContent = task.name;
+            const schedule = document.createElement("span");
+            schedule.className = "task-schedule";
+            schedule.textContent = task.schedule;
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "button";
+            button.textContent = "Run now";
+            button.setAttribute("aria-label", `Run ${task.name} now`);
+            const status = document.createElement("p");
+            status.className = "feedback";
+            status.setAttribute("role", "status");
+            button.addEventListener("click", () => triggerTask(task.name, button, status));
+            row.append(name, schedule, button, status);
+            list.append(row);
           }
-
-          tasksContainer.innerHTML = tasks
-            .map(
-              (task) => `
-          <div class="task-card">
-            <div class="task-header">
-              <div class="task-name">${task.name}</div>
-              <div class="task-type ${task.type}">${task.type}</div>
-            </div>
-            <div class="task-schedule">${task.schedule}</div>
-            <button class="trigger-btn" onclick="triggerTask('${task.name}', this)">
-              ▶️ Run Now
-            </button>
-          </div>
-        `
-            )
-            .join("");
-
-          loading.style.display = "none";
-          tasksContainer.style.display = "grid";
-        } catch (error) {
-          document.getElementById("loading").style.display = "none";
-          document.getElementById("error").textContent =
-            "Error: " + error.message;
-          document.getElementById("error").style.display = "block";
+          list.hidden = tasks.length === 0;
+          byId("tasks-state").hidden = tasks.length > 0;
+          byId("tasks-status").textContent = "No scheduled jobs.";
+        } catch (_) {
+          byId("tasks").hidden = true;
+          byId("tasks-status").textContent = "Could not load scheduled jobs.";
+          byId("retry-tasks").hidden = false;
         }
       }
 
-      async function triggerTask(taskName, button) {
-        const originalText = button.textContent;
-        button.disabled = true;
-        button.className = "trigger-btn running";
-        button.textContent = "⏳ Running...";
-
-        try {
-          const response = await fetch("/api/trigger", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ taskName }),
-          });
-
-          const result = await response.json();
-
-          if (result.success) {
-            button.className = "trigger-btn success";
-            button.textContent = "✅ Success!";
-          } else {
-            button.className = "trigger-btn error";
-            button.textContent = "❌ Failed";
-          }
-        } catch (error) {
-          button.className = "trigger-btn error";
-          button.textContent = "❌ Error";
-        }
-
-        setTimeout(() => {
-          button.disabled = false;
-          button.className = "trigger-btn";
-          button.textContent = originalText;
-        }, 2000);
+      for (const location of locations) {
+        byId(`${location.toLowerCase()}-form`).addEventListener("submit", (event) => {
+          event.preventDefault();
+          changeChargeMode(location);
+        });
       }
-
-      loadTasks();
+      byId("retry-modes").addEventListener("click", loadChargeModes);
+      byId("retry-tasks").addEventListener("click", loadTasks);
+      loadBattery();
       loadChargeModes();
       loadBmwSoc();
-      setInterval(loadBmwSoc, 60000);
+      loadTasks();
     </script>
   </body>
 </html>

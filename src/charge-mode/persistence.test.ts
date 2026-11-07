@@ -38,6 +38,10 @@ test("API reports persistence failure and later saved modes restore after reset"
     );
 
     assertEquals(globals.preferredWallboxLocation, WallboxLocation.Inside);
+    // A failed save still changes runtime priority; expose that to the dashboard.
+    // biome-ignore lint/complexity/useLiteralKeys: TypeScript permits private test access only with bracket notation.
+    const current = await server["handleGetWallboxChargeMode"]().json();
+    assertEquals(current.preferredLocation, "Inside");
 
     let saved = {
       inside: 6,
@@ -128,6 +132,10 @@ test("mode commands save ordered snapshots and same-mode commands claim preferen
           ? WallboxLocation.Inside
           : WallboxLocation.Outside,
       );
+      // Read again as a dashboard reload would, including unchanged modes.
+      // biome-ignore lint/complexity/useLiteralKeys: TypeScript permits private test access only with bracket notation.
+      const current = await server["handleGetWallboxChargeMode"]().json();
+      assertEquals(current.preferredLocation, location);
     }
     const count = writes.length;
     const invalidMode: number = 999;
@@ -147,6 +155,7 @@ test("restoration preserves saved preference and defaults legacy or invalid pref
   const originalModes = globals.wallboxChargeMode;
   const originalPreference = globals.preferredWallboxLocation;
   const metrics = new PrometheusMetrics();
+  const server = new HttpServer(metrics);
   try {
     for (const preference of [
       WallboxLocation.Outside,
@@ -180,6 +189,14 @@ test("restoration preserves saved preference and defaults legacy or invalid pref
           [WallboxLocation.Outside, WallboxChargeMode.Night],
         ],
       );
+      // Page reloads must display restored priority without claiming it anew.
+      // biome-ignore lint/complexity/useLiteralKeys: TypeScript permits private test access only with bracket notation.
+      assertEquals(await server["handleGetWallboxChargeMode"]().json(), {
+        Inside: WallboxChargeMode.On,
+        Outside: WallboxChargeMode.Night,
+        preferredLocation:
+          preference === WallboxLocation.Outside ? "Outside" : "Inside",
+      });
     }
     globalThis.fetch = async () => new Response(null, { status: 503 });
     await assertRejects(() => restorePersistedChargeSettings(metrics));
