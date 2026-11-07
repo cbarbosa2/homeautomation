@@ -68,14 +68,12 @@
       .battery-fill { height: 100%; background: var(--green); border-radius: inherit; }
       .minimum-marker { position: absolute; top: -5px; bottom: -5px; width: 0; border-left: 2px solid #263e2c; transform: translateX(-1px); }
       .scale { display: flex; justify-content: space-between; margin-top: 6px; color: #61715f; font-size: 11px; }
-      .battery-bottom { display: flex; grid-column: 1 / -1; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 11px; color: var(--muted); }
       .battery-discharge { grid-column: 1 / -1; margin-top: 12px; padding-top: 10px; border-top: 1px solid #d4dfcf; }
       .discharge-heading { display: flex; align-items: center; gap: 12px; }
       #battery-discharge-status[data-state="confirmed"] { color: var(--green); }
       #battery-discharge-status[data-state="checking"] { color: #84601d; }
       #battery-discharge-status[data-state="blocked"] { color: var(--danger); }
       #battery-discharge-reason { margin-top: 4px; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
-      .marker-key { display: inline-block; height: 10px; border-left: 2px solid #263e2c; margin-right: 6px; }
       .charger-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 20px; border-top: 1px solid var(--line); }
       .charger-icon { display: grid; place-items: center; height: 30px; border: 1px solid var(--line); border-radius: 8px; color: var(--green); }
       .charger-icon svg { width: 18px; height: 18px; }
@@ -124,7 +122,6 @@
         .soc-number.unavailable, .min-number.unavailable { font-size: 19px; }
         .min-number { font-size: 26px; }
         .battery-track { margin-top: 0; }
-        .battery-bottom { flex-wrap: wrap; gap: 6px; }
         .section-header { padding: 12px 16px; }
         .charger-row { padding: 12px 16px; grid-template-columns: 28px minmax(0, 1fr); gap: 8px 10px; }
         .charger-icon { height: 28px; }
@@ -167,7 +164,6 @@
           <div class="discharge-heading"><span class="label">Discharge</span><span id="battery-discharge-status" class="badge">Unknown</span></div>
           <p id="battery-discharge-reason">Loading controller status…</p>
         </div>
-        <div class="battery-bottom"><span><i class="marker-key" aria-hidden="true"></i>Minimum SOC</span><span id="battery-refresh">Refreshes every 10 seconds</span></div>
       </section>
 
       <section class="panel" aria-labelledby="charging-title">
@@ -257,7 +253,6 @@
         marker.style.left = `${minSoc ?? 0}%`;
         const available = soc !== null && minSoc !== null;
         feedback(byId("battery-status"), failed ? "Readings unavailable" : available ? "Readings available" : "Waiting for telemetry", available ? "ready" : "");
-        byId("battery-refresh").textContent = failed ? "Refresh failed · retrying automatically" : "Refreshes every 10 seconds";
         const labels = { confirmed: "Confirmed", checking: "Checking", blocked: "Blocked", unknown: "Unknown" };
         const discharge = failed ? null : value?.discharge;
         const state = Object.hasOwn(labels, discharge?.state) ? discharge.state : "unknown";
