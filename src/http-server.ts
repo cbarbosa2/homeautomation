@@ -6,7 +6,7 @@ import { HTTP_PORT } from "./constants.ts";
 import { logError, logInfo } from "./logger.ts";
 import { scheduler } from "./task-scheduler.ts";
 import { globals, WallboxChargeMode, WallboxLocation } from "./globals.ts";
-import { PrometheusMetrics } from "./prometheus/prometheus.ts";
+import type { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
 import { getVehicleSoc } from "./bmw-cardata/bmw-cardata.ts";
 

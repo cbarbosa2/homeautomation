@@ -9,7 +9,8 @@ test("Lisbon summer evening uses a real zero forecast and current SOC", async ()
   const task = new SetSocLimitTask(
     {
       publishJson: (_, data) => {
-        values.push(data["value"]);
+        const { value } = data;
+        values.push(value);
         return Promise.resolve();
       },
     },
@@ -70,13 +71,14 @@ test("SOC examples enforce seasonal floors, efficiency, consumption and ceiling"
 });
 test("missing evening inputs retry every five minutes with current SOC and fixed forecast date", async () => {
   let now = Temporal.Instant.from("2026-01-01T22:00:00Z");
-  let soc: number | undefined = undefined;
+  let soc: number | undefined;
   const forecast = new SolarForecasts();
   const values: unknown[] = [];
   const task = new SetSocLimitTask(
     {
       publishJson: (_, d) => {
-        values.push(d["value"]);
+        const { value } = d;
+        values.push(value);
         return Promise.resolve();
       },
     },
@@ -116,7 +118,8 @@ test("forecasts expire after six hours, accept zero and select tomorrow by date"
   const task = new SetSocLimitTask(
     {
       publishJson: (_, d) => {
-        values.push(d["value"]);
+        const { value } = d;
+        values.push(value);
         return Promise.resolve();
       },
     },
@@ -143,12 +146,13 @@ test("forecasts expire after six hours, accept zero and select tomorrow by date"
 });
 test("retries stop at midnight and the running service resets at Lisbon 08:00", async () => {
   let now = Temporal.Instant.from("2026-07-01T21:00:00Z");
-  let soc: number | undefined = undefined;
+  let soc: number | undefined;
   const values: unknown[] = [];
   const task = new SetSocLimitTask(
     {
       publishJson: (_, d) => {
-        values.push(d["value"]);
+        const { value } = d;
+        values.push(value);
         return Promise.resolve();
       },
     },
@@ -187,7 +191,8 @@ test("restart does not catch up evening or morning actions or resume retries", a
     const task = new SetSocLimitTask(
       {
         publishJson: (_, d) => {
-          values.push(d["value"]);
+          const { value } = d;
+          values.push(value);
           return Promise.resolve();
         },
       },
@@ -219,7 +224,8 @@ test("winter schedule awaits publication failure and retries the evening job", a
     {
       publishJson: (_, d) => {
         if (fail) return Promise.reject(new Error("publish failed"));
-        values.push(d["value"]);
+        const { value } = d;
+        values.push(value);
         return Promise.resolve();
       },
     },
@@ -258,7 +264,8 @@ test("SOC schedule ignores repeated minutes and a backward clock", async () => {
   const task = new SetSocLimitTask(
     {
       publishJson: (_, data) => {
-        values.push(data["value"]);
+        const { value } = data;
+        values.push(value);
         return Promise.resolve();
       },
     },

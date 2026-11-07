@@ -7,17 +7,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  test(
-    `application drains persistence and exits cleanly on ${signal}`,
-    { timeout: 10000 },
-    async () => {
-      const directory = await mkdtemp(
-        join(tmpdir(), "homeautomation-lifecycle-"),
-      );
-      const bootstrap = new URL("./bootstrap.js", import.meta.url).href;
-      const mqtt = new URL("./mqtt-client.js", import.meta.url).href;
-      const storage = new URL("./persistent-storage.js", import.meta.url).href;
-      const adapter = `export class MqttClient {
+  test(`application drains persistence and exits cleanly on ${signal}`, {
+    timeout: 10000,
+  }, async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), "homeautomation-lifecycle-"),
+    );
+    const bootstrap = new URL("./bootstrap.js", import.meta.url).href;
+    const mqtt = new URL("./mqtt-client.js", import.meta.url).href;
+    const storage = new URL("./persistent-storage.js", import.meta.url).href;
+    const adapter = `export class MqttClient {
       async connect() { console.log('MQTT_CONNECTED'); }
       async disconnect() { console.log('MQTT_DISCONNECTED'); }
       async subscribeWithHandler() {}
@@ -25,7 +24,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
         if (!topic.startsWith('R/test-portal/')) throw new Error('Unexpected MQTT write');
       }
     }`;
-      const code = `
+    const code = `
       import { registerHooks } from 'node:module';
       registerHooks({ load(url, context, next) {
         if (url === ${JSON.stringify(mqtt)}) return { format: 'module', source: ${JSON.stringify(adapter)}, shortCircuit: true };
@@ -48,65 +47,60 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
       void savePersistentStorage({ inside: 2, outside: 2 });
       console.log('TEST_READY');
     `;
-      const child = spawn(
-        process.execPath,
-        ["--input-type=module", "-e", code],
-        {
-          cwd: directory,
-          env: {
-            PATH: process.env["PATH"],
-            VICTRON_PORTAL_ID: "test-portal",
-            VICTRON_INSTALLATION_ID: "123456",
-            HTTP_PORT: "0",
-            POWER_CONTROL_ENABLED: "false",
-          },
-          stdio: ["ignore", "pipe", "pipe"],
-        },
-      );
-      const exited = once(child, "exit");
-      const ready = Promise.withResolvers<void>();
-      let output = "";
-      let errors = "";
-      child.stdout.on("data", (chunk: Buffer) => {
-        output += chunk.toString();
-        if (output.includes("TEST_READY")) ready.resolve();
-      });
-      child.stderr.on("data", (chunk: Buffer) => {
-        errors += chunk.toString();
-      });
-      // Bound readiness independently so a failed startup cannot hang the test.
-      const timeout = setTimeout(
-        () =>
-          ready.reject(new Error(`Startup timed out: ${output}\n${errors}`)),
-        5000,
-      );
-      try {
-        await Promise.race([
-          ready.promise,
-          exited.then(() => {
-            throw new Error(`Early exit: ${output}\n${errors}`);
-          }),
-        ]);
-        child.kill(signal);
-        const [exitCode, exitSignal] = await exited;
-        equal(exitCode, 0, errors);
-        equal(exitSignal, null);
-        match(output, /MQTT_CONNECTED/);
-        match(output, /MQTT_DISCONNECTED/);
-        match(output, /All scheduled tasks terminated/);
-        match(output, /HTTP server stopped/);
-        match(output, /Shutdown complete/);
-        const savedAt = output.indexOf("SAVE_FINISHED");
-        ok(savedAt > output.indexOf("Shutting down Home Automation"));
-        ok(savedAt < output.indexOf("Shutdown complete"));
-        equal(errors, "");
-      } finally {
-        clearTimeout(timeout);
-        if (child.exitCode === null && child.signalCode === null)
-          child.kill("SIGKILL");
-        await exited;
-        await rm(directory, { recursive: true, force: true });
-      }
-    },
-  );
+    const { PATH } = process.env;
+    const child = spawn(process.execPath, ["--input-type=module", "-e", code], {
+      cwd: directory,
+      env: {
+        PATH,
+        VICTRON_PORTAL_ID: "test-portal",
+        VICTRON_INSTALLATION_ID: "123456",
+        HTTP_PORT: "0",
+        POWER_CONTROL_ENABLED: "false",
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const exited = once(child, "exit");
+    const ready = Promise.withResolvers<void>();
+    let output = "";
+    let errors = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      output += chunk.toString();
+      if (output.includes("TEST_READY")) ready.resolve();
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      errors += chunk.toString();
+    });
+    // Bound readiness independently so a failed startup cannot hang the test.
+    const timeout = setTimeout(
+      () => ready.reject(new Error(`Startup timed out: ${output}\n${errors}`)),
+      5000,
+    );
+    try {
+      await Promise.race([
+        ready.promise,
+        exited.then(() => {
+          throw new Error(`Early exit: ${output}\n${errors}`);
+        }),
+      ]);
+      child.kill(signal);
+      const [exitCode, exitSignal] = await exited;
+      equal(exitCode, 0, errors);
+      equal(exitSignal, null);
+      match(output, /MQTT_CONNECTED/);
+      match(output, /MQTT_DISCONNECTED/);
+      match(output, /All scheduled tasks terminated/);
+      match(output, /HTTP server stopped/);
+      match(output, /Shutdown complete/);
+      const savedAt = output.indexOf("SAVE_FINISHED");
+      ok(savedAt > output.indexOf("Shutting down Home Automation"));
+      ok(savedAt < output.indexOf("Shutdown complete"));
+      equal(errors, "");
+    } finally {
+      clearTimeout(timeout);
+      if (child.exitCode === null && child.signalCode === null)
+        child.kill("SIGKILL");
+      await exited;
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
 }

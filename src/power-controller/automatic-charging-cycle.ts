@@ -1,7 +1,7 @@
-import { WallboxChargeMode, WallboxLocation } from "../globals.ts";
-import { type VehicleSoc } from "../bmw-cardata/bmw-cardata.ts";
+import type { WallboxChargeMode, WallboxLocation } from "../globals.ts";
+import type { VehicleSoc } from "../bmw-cardata/bmw-cardata.ts";
 import { type Clock, lisbonTime, timeUntilMorning } from "../lisbon-clock.ts";
-import { MqttClient } from "../mqtt-client.ts";
+import type { MqttClient } from "../mqtt-client.ts";
 import { CommandBuilder, type SystemState } from "./command-builder.ts";
 import {
   calculateTargetAmpsAndPriority,

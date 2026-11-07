@@ -30,12 +30,12 @@ See [operations.md](operations.md) for configuration. [bootstrap.ts](../src/boot
 | `npm run build` | Type-check everything, clean `dist/`, and compile production source and setup scripts. |
 | `npm test` | Clean `.test-dist/`, compile source/scripts/tests, and run Node tests. |
 | `npm run check` | Type-check, then run tests. |
-| `npm run lint` | Run ESLint on source and scripts. |
+| `npm run lint` | Run Biome recommended lint rules on source and scripts. |
 | `npm run fmt` | Format TypeScript, JavaScript tooling, and root JSON configuration. |
 | `npm run fmt:check` | Check formatting without rewriting. |
 | `npm run analyze` | Run checks, lint, and formatting verification. |
 
-The toolchain uses the TypeScript compiler (`tsc`), ESLint with typescript-eslint's recommended rules, and Prettier. Tests use `node:test` and `node:assert/strict`. ESLint and formatting checks complement the compiler's type checks.
+The toolchain uses the TypeScript compiler (`tsc`) and Biome with recommended lint rules and formatting. Tests use `node:test` and `node:assert/strict`. Lint and formatting checks complement the compiler's type checks.
 
 [package.json](../package.json) defines commands and dependencies. The npm lockfile fixes dependency versions. [tsconfig.json](../tsconfig.json) defines shared strict checks, including exact optional properties, unchecked indexed access, type-only imports, and unused code checks. Production and test configs inherit those checks and refuse emission on errors. Keep `.ts` extensions in relative imports; TypeScript rewrites them to `.js` during compilation. Use `import type` for type-only imports.
 
@@ -47,7 +47,7 @@ The test command supplies synthetic Victron identifiers and does not load your p
 
 Compiler strictness checks code before execution; it does not validate incoming payloads at runtime.
 
-For formatting selected files, run `npx prettier --write path/to/file.ts`. `npm run fmt` covers TypeScript and JavaScript tooling plus root JSON configuration; it does not format Markdown or the dashboard HTML. Keep blank lines between top-level declarations and distinct logic blocks when reviewing formatting.
+For formatting selected files, run `npx biome format --write path/to/file.ts`. `npm run fmt` covers TypeScript and JavaScript tooling plus root JSON configuration; it excludes dependencies, build outputs, the lockfile, private dotfiles, temporary documents, Markdown, and the dashboard HTML. Biome assist actions, including import organization, are disabled. Keep blank lines between top-level declarations and distinct logic blocks when reviewing formatting.
 
 No automated test should publish hardware commands; `POWER_CONTROL_ENABLED=false` alone does not disable scheduled SOC writes.
 

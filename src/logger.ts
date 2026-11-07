@@ -6,15 +6,13 @@ import { LogLayer } from "loglayer";
 import { LogflareTransport } from "@loglayer/transport-logflare";
 import { serializeError } from "serialize-error";
 
-export const LOGLAYER_SOURCE_ID = process.env["LOGLAYER_SOURCE_ID"];
-
-export const LOGLAYER_API_KEY = process.env["LOGLAYER_API_KEY"];
+export const { LOGLAYER_SOURCE_ID, LOGLAYER_API_KEY } = process.env;
 
 // Determine a host identifier synchronously. Prefer explicit env `HOST_ID`,
 // then `HOSTNAME`, then `/etc/hostname`, else fall back to 'unknown-host'.
 function detectHostId(): string {
-  const fromEnv =
-    process.env["HOST_ID"] || process.env["HOSTNAME"] || process.env["HOST"];
+  const { HOST_ID, HOSTNAME, HOST } = process.env;
+  const fromEnv = HOST_ID || HOSTNAME || HOST;
   if (fromEnv) return fromEnv;
   try {
     const hostname = readFileSync("/etc/hostname", "utf8");

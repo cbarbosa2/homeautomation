@@ -6,7 +6,7 @@ import {
 import { Temporal } from "../temporal.ts";
 import { WallboxLocation, WallboxStatus } from "../globals.ts";
 import { CONTROL_PATHS } from "../control-telemetry.ts";
-import { type CalculatedTargetResults } from "./dynamic-power-calculator.ts";
+import type { CalculatedTargetResults } from "./dynamic-power-calculator.ts";
 import { CommandBuilder, type SystemState } from "./command-builder.ts";
 import { CommandType, type PowerCommand } from "./power-controller.ts";
 
@@ -46,8 +46,9 @@ test("CommandBuilder should create wallbox current commands", () => {
   const commands = builder.createCommandsFromPowerSettings(state, targets);
 
   assertEquals(commands.length, 1);
-  assertEquals(commands[0]!.type, CommandType.InsideCurrent);
-  assertEquals(commands[0]!.value, 15);
+  assert(commands[0]);
+  assertEquals(commands[0].type, CommandType.InsideCurrent);
+  assertEquals(commands[0].value, 15);
 });
 
 test("CommandBuilder should create start/stop commands", () => {
@@ -110,8 +111,9 @@ test("CommandBuilder should create battery commands when power changes", () => {
   const commands = builder.createCommandsFromPowerSettings(state, targets);
 
   assertEquals(commands.length, 1);
-  assertEquals(commands[0]!.type, CommandType.BatteryMaxChargePower);
-  assertEquals(commands[0]!.value, 1500);
+  assert(commands[0]);
+  assertEquals(commands[0].type, CommandType.BatteryMaxChargePower);
+  assertEquals(commands[0].value, 1500);
 });
 
 test("CommandBuilder should not create battery commands when power is unchanged", () => {
@@ -141,13 +143,15 @@ test("CommandBuilder should limit history to maximum size", () => {
       state,
       createTargets({ insideWallboxAmps: 20 }),
     );
-    assertEquals(commands[0]!.value, 10);
+    assert(commands[0]);
+    assertEquals(commands[0].value, 10);
   }
   const commands = builder.createCommandsFromPowerSettings(
     state,
     createTargets({ insideWallboxAmps: 20 }),
   );
-  assertEquals(commands[0]!.value, 20);
+  assert(commands[0]);
+  assertEquals(commands[0].value, 20);
 });
 
 test("CommandBuilder should handle both wallbox locations independently", () => {

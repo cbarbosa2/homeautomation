@@ -1,7 +1,7 @@
 import { globals, WallboxChargeMode, WallboxLocation } from "../globals.ts";
 import { POWER_CONTROL_ENABLED, VICTRON_PORTAL_ID } from "../constants.ts";
 import { logInfo } from "../logger.ts";
-import { MqttClient } from "../mqtt-client.ts";
+import type { MqttClient } from "../mqtt-client.ts";
 
 export enum CommandType {
   InsideCurrent = "InsideCurrent",
@@ -50,10 +50,10 @@ export async function runCommands(
       continue;
     const topic = getTopic(command);
     if (topic && enabled) {
-      logInfo("Running command: " + JSON.stringify(command));
+      logInfo(`Running command: ${JSON.stringify(command)}`);
       await mqttClient.publishJson(topic, { value: command.value });
     } else {
-      logInfo("Simulating (disabled) command: " + JSON.stringify(command));
+      logInfo(`Simulating (disabled) command: ${JSON.stringify(command)}`);
     }
   }
 }

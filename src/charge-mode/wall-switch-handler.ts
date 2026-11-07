@@ -1,10 +1,10 @@
 import { events, WallboxChargeMode, WallboxLocation } from "../globals.ts";
-import { MqttClient } from "../mqtt-client.ts";
+import type { MqttClient } from "../mqtt-client.ts";
 import {
   CommandType,
   runCommands,
 } from "../power-controller/power-controller.ts";
-import { PrometheusMetrics } from "../prometheus/prometheus.ts";
+import type { PrometheusMetrics } from "../prometheus/prometheus.ts";
 import { setChargeMode } from "./charge-mode-switcher.ts";
 
 const mapIdAndPushesToChargeMode = new Map([
@@ -32,7 +32,7 @@ export function setupWallSwitchHandler(
     return handleWallSwitch(metrics, payload);
   });
   events.wallboxCurrentInsideUpdated.subscribe(async (payload) => {
-    if (payload == AMPS_FORCING_MANUAL_MODE) {
+    if (Number(payload) === AMPS_FORCING_MANUAL_MODE) {
       const saved = setChargeMode(
         metrics,
         WallboxLocation.Inside,
@@ -43,7 +43,7 @@ export function setupWallSwitchHandler(
     }
   });
   events.wallboxCurrentOutsideUpdated.subscribe(async (payload) => {
-    if (payload == AMPS_FORCING_MANUAL_MODE) {
+    if (Number(payload) === AMPS_FORCING_MANUAL_MODE) {
       const saved = setChargeMode(
         metrics,
         WallboxLocation.Outside,
@@ -76,25 +76,28 @@ async function handleWallSwitch(
     params: { events: { id: number; event: string }[] };
   },
 ) {
-  const id = payload.params.events[0]!.id;
-  const event = payload.params.events[0]!.event;
+  const { id, event } = payload.params.events[0] as {
+    id: number;
+    event: string;
+  };
 
-  let pushes;
-  if (event == "single_push") {
+  let pushes: number;
+  if (String(event) === "single_push") {
     pushes = 1;
-  } else if (event == "double_push") {
+  } else if (String(event) === "double_push") {
     pushes = 2;
-  } else if (event == "triple_push") {
+  } else if (String(event) === "triple_push") {
     pushes = 3;
   } else {
     return;
   }
 
-  const mode = mapIdAndPushesToChargeMode.get(id + "_" + pushes);
+  const mode = mapIdAndPushesToChargeMode.get(`${id}_${pushes}`);
 
-  if (mode != undefined) {
-    const location =
-      id == 0 || id == 1 ? WallboxLocation.Inside : WallboxLocation.Outside;
+  if (mode != null) {
+    const location = [0, 1].includes(Number(id))
+      ? WallboxLocation.Inside
+      : WallboxLocation.Outside;
     await setChargeMode(metrics, location, mode);
   }
 }

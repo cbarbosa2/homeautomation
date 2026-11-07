@@ -1,5 +1,8 @@
 import { test } from "node:test";
-import { deepStrictEqual as assertEquals } from "node:assert/strict";
+import {
+  ok as assert,
+  deepStrictEqual as assertEquals,
+} from "node:assert/strict";
 import { HttpServer } from "../http-server.ts";
 import { globals, WallboxChargeMode, WallboxLocation } from "../globals.ts";
 import { PrometheusMetrics } from "../prometheus/prometheus.ts";
@@ -19,6 +22,7 @@ test("API reports persistence failure and later saved modes restore after reset"
   try {
     globalThis.fetch = () =>
       Promise.resolve(new Response(null, { status: 403 }));
+    // biome-ignore lint/complexity/useLiteralKeys: TypeScript permits private test access only with bracket notation.
     const failure = await server["handleSetWallboxChargeMode"](request());
     assertEquals(failure.status, 500);
     const error = await failure.json();
@@ -34,20 +38,23 @@ test("API reports persistence failure and later saved modes restore after reset"
       if (init?.method === "PUT") saved = JSON.parse(String(init.body));
       return Promise.resolve(Response.json(saved));
     };
+    // biome-ignore lint/complexity/useLiteralKeys: TypeScript permits private test access only with bracket notation.
     const success = await server["handleSetWallboxChargeMode"](request());
     assertEquals(await success.json(), { success: true });
     globals.wallboxChargeMode.clear();
     const restored = await loadPersistentStorage();
+    assert(restored.inside !== undefined);
+    assert(restored.outside !== undefined);
     await setChargeMode(
       metrics,
       WallboxLocation.Inside,
-      restored.inside!,
+      restored.inside,
       false,
     );
     await setChargeMode(
       metrics,
       WallboxLocation.Outside,
-      restored.outside!,
+      restored.outside,
       false,
     );
     assertEquals(

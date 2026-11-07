@@ -1,5 +1,8 @@
 import { test } from "node:test";
-import { deepStrictEqual as assertEquals } from "node:assert/strict";
+import {
+  ok as assert,
+  deepStrictEqual as assertEquals,
+} from "node:assert/strict";
 import { parseOmieResponse } from "./omie-proxy.ts";
 import { Temporal } from "../temporal.ts";
 
@@ -30,7 +33,8 @@ test("parseOmieResponse should parse OMIE data correctly", () => {
 
   // Check first entry (period 1 = hour 0, offset -1 = hour 23 of previous day)
   // But since we're filtering >= startOfToday, this should be the first valid entry
-  const firstEntry = result[0]!;
+  const firstEntry = result[0];
+  assert(firstEntry);
   assertEquals(firstEntry.date.year, 2025);
   assertEquals(firstEntry.date.month, 11);
   assertEquals(firstEntry.date.day, 14); // Previous day due to -1 hour offset
@@ -41,15 +45,20 @@ test("parseOmieResponse should parse OMIE data correctly", () => {
   assertEquals(firstEntry.price, 8);
 
   // Check last entry
-  const lastEntry = result[result.length - 1]!;
+  const lastEntry = result[result.length - 1];
+  assert(lastEntry);
   assertEquals(lastEntry.date.hour, 9);
   assertEquals(lastEntry.price, 15);
 
   // Verify entries are sorted by date
   for (let i = 1; i < result.length; i++) {
+    const previous = result[i - 1];
+    const current = result[i];
+    assert(previous);
+    assert(current);
     const comparison = Temporal.PlainDateTime.compare(
-      result[i - 1]!.date,
-      result[i]!.date,
+      previous.date,
+      current.date,
     );
     assertEquals(comparison <= 0, true, "Entries should be sorted by date");
   }
@@ -96,5 +105,6 @@ test("parseOmieResponse should filter entries before startOfToday", () => {
 
   // Should only have 1 entry (the 16/11/2025 one)
   assertEquals(result.length, 1);
-  assertEquals(result[0]!.date.day, 16);
+  assert(result[0]);
+  assertEquals(result[0].date.day, 16);
 });

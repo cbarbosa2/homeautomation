@@ -13,9 +13,9 @@
     "dev": "node scripts/check-node.mjs && tsc-watch -p tsconfig.build.json --onSuccess \"node dist/src/bootstrap.js\"",
     "test": "node scripts/check-node.mjs && node scripts/clean-output.mjs .test-dist && tsc -p tsconfig.test.json && node scripts/run-tests.mjs",
     "check": "npm run typecheck && npm test",
-    "lint": "eslint src scripts",
-    "fmt": "prettier --write \"{src,scripts}/**/*.{ts,mjs}\" \"*.{json,mjs}\"",
-    "fmt:check": "prettier --check \"{src,scripts}/**/*.{ts,mjs}\" \"*.{json,mjs}\"",
+    "lint": "biome lint src scripts",
+    "fmt": "biome format --write .",
+    "fmt:check": "biome format .",
     "analyze": "npm run check && npm run lint && npm run fmt:check",
     "bmw:setup": "npm run build && node dist/scripts/bmw-cardata-setup.js"
   },
@@ -31,12 +31,9 @@
     "serialize-error": "13.1.0"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@biomejs/biome": "2.6.6",
     "@types/node": "^26.0.0",
-    "eslint": "^10.14.0",
-    "prettier": "^3.6.2",
     "tsc-watch": "^7.2.0",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.46.4"
+    "typescript": "^6.0.3"
   }
 }

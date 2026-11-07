@@ -1,8 +1,12 @@
 import { test } from "node:test";
-import { deepStrictEqual as assertEquals } from "node:assert/strict";
+import {
+  ok as assert,
+  deepStrictEqual as assertEquals,
+} from "node:assert/strict";
 
 test("Logflare receives structured messages and metadata through LogLayer", async () => {
-  const names = ["LOGLAYER_SOURCE_ID", "LOGLAYER_API_KEY", "HOST_ID"];
+  const names = ["LOGLAYER_SOURCE_ID", "LOGLAYER_API_KEY", "HOST_ID"] as const;
+  const [sourceIdKey, apiKey, hostIdKey] = names;
   const previous = names.map((name) => process.env[name]);
   const originalFetch = globalThis.fetch;
   const requests: {
@@ -10,9 +14,9 @@ test("Logflare receives structured messages and metadata through LogLayer", asyn
   }[] = [];
 
   try {
-    process.env["LOGLAYER_SOURCE_ID"] = "test-source";
-    process.env["LOGLAYER_API_KEY"] = "test-key";
-    process.env["HOST_ID"] = "test-host";
+    process.env[sourceIdKey] = "test-source";
+    process.env[apiKey] = "test-key";
+    process.env[hostIdKey] = "test-host";
     globalThis.fetch = (_input, init) => {
       requests.push(JSON.parse(String(init?.body)));
       return Promise.resolve(new Response("{}", { status: 200 }));
@@ -25,22 +29,26 @@ test("Logflare receives structured messages and metadata through LogLayer", asyn
     await new Promise((resolve) => setTimeout(resolve, 5200));
 
     assertEquals(requests.length, 1);
-    const entries = requests[0]!.batch;
+    const request = requests[0];
+    assert(request);
+    const entries = request.batch;
+    const [info, warning, error] = entries;
+    assert(info);
+    assert(warning);
+    assert(error);
     assertEquals(
       entries.map((entry) => entry.message),
       ["structured message", "plain warning", "test failure"],
     );
-    assertEquals(entries[0]!.metadata, {
+    assertEquals(info.metadata, {
       level: "info",
       value: 42,
       host: "test-host",
     });
-    assertEquals(entries[1]!.metadata, { level: "warn", host: "test-host" });
-    assertEquals(entries[2]!.metadata["level"], "error");
-    assertEquals(
-      (entries[2]!.metadata["err"] as { message: string }).message,
-      "test failure",
-    );
+    assertEquals(warning.metadata, { level: "warn", host: "test-host" });
+    const { level, err } = error.metadata;
+    assertEquals(level, "error");
+    assertEquals((err as { message: string }).message, "test failure");
   } finally {
     globalThis.fetch = originalFetch;
     names.forEach((name, index) => {

@@ -1,6 +1,9 @@
-import { type OmieEntry } from "../globals.ts";
+import type { OmieEntry } from "../globals.ts";
 import { logError } from "../logger.ts";
 import { Temporal } from "../temporal.ts";
+
+// Keep native decimal/hexadecimal detection for integer inputs.
+const AUTO_DETECT_RADIX = 0;
 
 const OMIE_API_URL = `https://www.omie.es/sites/default/files/dados/NUEVA_SECCION/INT_PBC_EV_H_ACUM.TXT`;
 const TAR_NIGHT = 0.0158; // EUR/kWh, 22:00–08:00
@@ -40,9 +43,9 @@ export function parseOmieResponse(
 
   const averagedEntries = createAveragedEntries(entries);
 
-  averagedEntries.sort(function (a, b) {
-    return Temporal.PlainDateTime.compare(a.date, b.date);
-  });
+  averagedEntries.sort((a, b) =>
+    Temporal.PlainDateTime.compare(a.date, b.date),
+  );
 
   const resultEntries = averagedEntries.map((entry) => {
     const tar =
@@ -69,7 +72,8 @@ function createAveragedEntries(entries: OmieEntry[]): OmieEntry[] {
     if (!dateTimeGroups.has(dateTimeKey)) {
       dateTimeGroups.set(dateTimeKey, []);
     }
-    dateTimeGroups.get(dateTimeKey)!.push(entry);
+    const group = dateTimeGroups.get(dateTimeKey) as OmieEntry[];
+    group.push(entry);
   });
 
   // Calculate average price for each date-time group
@@ -78,7 +82,7 @@ function createAveragedEntries(entries: OmieEntry[]): OmieEntry[] {
       groupEntries.reduce((sum, entry) => sum + entry.price, 0) /
       groupEntries.length;
     averagedEntries.push({
-      date: groupEntries[0]!.date,
+      date: (groupEntries[0] as OmieEntry).date,
       price: averagePrice,
     });
   });
@@ -89,11 +93,11 @@ function createAveragedEntries(entries: OmieEntry[]): OmieEntry[] {
 function parseDate(input: string): Temporal.PlainDate | undefined {
   const parts: string[] = input.split("/");
   try {
-    if (parts.length == 3) {
+    if (parts.length === 3) {
       return new Temporal.PlainDate(
-        parseInt(parts[2]!),
-        parseInt(parts[1]!),
-        parseInt(parts[0]!),
+        parseInt(parts[2] as string, AUTO_DETECT_RADIX),
+        parseInt(parts[1] as string, AUTO_DETECT_RADIX),
+        parseInt(parts[0] as string, AUTO_DETECT_RADIX),
       );
     }
   } catch (_ex) {
@@ -106,16 +110,20 @@ function parseLine(line: string): OmieEntry | undefined {
   const parts: string[] = line.split(";");
   if (parts.length < 4) return undefined;
 
-  const date = parseDate(parts[0]!);
+  const date = parseDate(parts[0] as string);
   if (!date) return undefined;
 
   const dateTime = date
-    .toPlainDateTime({ hour: Math.floor((parseInt(parts[1]!) - 1) / 4) })
+    .toPlainDateTime({
+      hour: Math.floor(
+        (parseInt(parts[1] as string, AUTO_DETECT_RADIX) - 1) / 4,
+      ),
+    })
     // offset spain to portugal
     .add({ hours: -1 });
 
   return {
     date: dateTime,
-    price: parseFloat(parts[3]!.replace(",", ".")),
+    price: parseFloat((parts[3] as string).replace(",", ".")),
   };
 }

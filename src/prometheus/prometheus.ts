@@ -108,7 +108,7 @@ export class PrometheusMetrics {
     counterKey: keyof typeof METRICS.COUNTERS,
     labels?: Record<string, string | number>,
   ): void {
-    const counterInfo = METRICS.COUNTERS[counterKey]!;
+    const counterInfo = METRICS.COUNTERS[counterKey];
     const counter = this.counters.get(counterInfo.name);
     if (counter) {
       if (labels) {

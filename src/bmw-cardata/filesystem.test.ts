@@ -52,6 +52,7 @@ test("compiled BMW setup updates its host's .env and private token file using st
       join(directory, ".env"),
       "BMW_CARDATA_CLIENT_ID=test-client\nBMW_CARDATA_VIN=TESTVIN\nBMW_CARDATA_CONTAINER_ID=old\nUNRELATED=keep\n",
     );
+    const { PATH } = process.env;
     const script = new URL(
       "../../scripts/bmw-cardata-setup.js",
       import.meta.url,
@@ -77,7 +78,7 @@ test("compiled BMW setup updates its host's .env and private token file using st
       ],
       {
         cwd: directory,
-        env: { PATH: process.env["PATH"] },
+        env: { PATH },
         encoding: "utf8",
         timeout: 10000,
       },

@@ -7,7 +7,7 @@ import {
   MQTT_PASSWORD,
   MQTT_USERNAME,
 } from "./constants.ts";
-import { PrometheusMetrics } from "./prometheus/prometheus.ts";
+import type { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { logError, logInfo, logWarn } from "./logger.ts";
 
 export class MqttClient {
@@ -74,9 +74,10 @@ export class MqttClient {
   }
 
   async disconnect(): Promise<void> {
-    if (this.client && this.isConnected) {
+    const client = this.client;
+    if (client && this.isConnected) {
       return await new Promise((resolve) => {
-        this.client!.end(false, {}, () => {
+        client.end(false, {}, () => {
           logInfo("📤 Disconnected from MQTT broker");
           this.isConnected = false;
           resolve();
@@ -86,12 +87,13 @@ export class MqttClient {
   }
 
   async subscribe(topic: string): Promise<void> {
-    if (!this.client || !this.isConnected) {
+    const client = this.client;
+    if (!client || !this.isConnected) {
       throw new Error("MQTT client not connected");
     }
 
     return await new Promise((resolve, reject) => {
-      this.client!.subscribe(topic, (error) => {
+      client.subscribe(topic, (error) => {
         if (error) {
           logError(`❌ Failed to subscribe to ${topic}:`, error);
           reject(error);
@@ -109,12 +111,13 @@ export class MqttClient {
     retain = false,
     log = false,
   ): Promise<void> {
-    if (!this.client || !this.isConnected) {
+    const client = this.client;
+    if (!client || !this.isConnected) {
       throw new Error("MQTT client not connected");
     }
 
     return await new Promise((resolve, reject) => {
-      this.client!.publish(topic, message, { retain }, (error) => {
+      client.publish(topic, message, { retain }, (error) => {
         if (error) {
           logError(`❌ Failed to publish to ${topic}:`, error);
           reject(error);

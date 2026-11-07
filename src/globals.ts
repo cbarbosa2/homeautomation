@@ -1,6 +1,6 @@
 import { SolarForecasts } from "./solar-forecasts/solar-forecasts.ts";
 import { EventEmitter } from "./event-emitter.ts";
-import { Temporal } from "./temporal.ts";
+import type { Temporal } from "./temporal.ts";
 
 /**
  * These values are read from MQTT and trigger the respective event

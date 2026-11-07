@@ -1,5 +1,5 @@
 import cron, { type ScheduledTask } from "node-cron";
-import { Temporal } from "./temporal.ts";
+import type { Temporal } from "./temporal.ts";
 import { logError, logInfo } from "./logger.ts";
 
 export interface TaskInfo {

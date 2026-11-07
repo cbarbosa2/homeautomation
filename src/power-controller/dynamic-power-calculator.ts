@@ -78,9 +78,9 @@ export function calculateTargetAmpsAndPriority(
     ? Math.max(
         0,
         MAX_GRID_AMPS * SYSTEM_VOLTAGE -
-          state.gridPower! +
+          (state.gridPower as number) +
           measured +
-          Math.max(0, state.batteryPower!),
+          Math.max(0, state.batteryPower as number),
       )
     : 12 * SYSTEM_VOLTAGE;
   // Energy balance includes both PV sources. Subtract grid-funded charging and
@@ -89,8 +89,10 @@ export function calculateTargetAmpsAndPriority(
     ? Math.max(
         0,
         Math.min(
-          state.pvInverterPower! + state.pvChargerPower!,
-          measured + state.batteryPower! - state.gridPower!,
+          (state.pvInverterPower as number) + (state.pvChargerPower as number),
+          measured +
+            (state.batteryPower as number) -
+            (state.gridPower as number),
         ),
       )
     : 0;

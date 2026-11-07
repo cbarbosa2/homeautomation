@@ -110,14 +110,16 @@ test("forecast request uses the configured installation ID", async () => {
   try {
     new LoadForecastTask({
       setGauge: (_, __, labels) => {
-        if (labels?.["source"] === "victron") completed.resolve();
+        const { source } = labels ?? {};
+        if (source === "victron") completed.resolve();
       },
     });
     await completed.promise;
     assertEquals(requested.length, 2);
-    assertEquals(requested[1]!.origin, "https://vrmapi.victronenergy.com");
+    assert(requested[1]);
+    assertEquals(requested[1].origin, "https://vrmapi.victronenergy.com");
     assertEquals(
-      requested[1]!.pathname,
+      requested[1].pathname,
       `/v2/installations/${VICTRON_INSTALLATION_ID}/stats`,
     );
   } finally {

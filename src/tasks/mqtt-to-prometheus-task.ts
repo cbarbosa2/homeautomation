@@ -1,9 +1,9 @@
 import { VICTRON_PORTAL_ID } from "../constants.ts";
 import { controlTelemetry } from "../control-telemetry.ts";
 import { events, globals, WallboxLocation } from "../globals.ts";
-import { MqttClient } from "../mqtt-client.ts";
+import type { MqttClient } from "../mqtt-client.ts";
 import { type MetricInfo, METRICS } from "../prometheus/metrics.ts";
-import { PrometheusMetrics } from "../prometheus/prometheus.ts";
+import type { PrometheusMetrics } from "../prometheus/prometheus.ts";
 
 export class MqttToPrometheusTask {
   private metrics: Pick<PrometheusMetrics, "setGauge">;

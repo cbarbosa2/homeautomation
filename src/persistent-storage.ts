@@ -4,8 +4,8 @@ import { JSONBIN_ID } from "./constants.ts";
 
 function storageHeaders(write = false): Headers {
   const headers = new Headers({ "Content-Type": "application/json" });
-  const accessKey = process.env["JSONBIN_ACCESS_KEY"];
-  const masterKey = process.env["JSONBIN_MASTER_KEY"];
+  const { JSONBIN_ACCESS_KEY: accessKey, JSONBIN_MASTER_KEY: masterKey } =
+    process.env;
   if (write) headers.set("X-Bin-Versioning", "false");
   if (write && masterKey) headers.set("X-Master-Key", masterKey);
   else if (accessKey) headers.set("X-Access-Key", accessKey);
@@ -37,7 +37,7 @@ interface StorageValueRequest {
  */
 export async function loadPersistentStorage(): Promise<StorageValueResponse> {
   const response = await fetch(
-    BIN_BASE_URL + JSONBIN_ID + "/latest?meta=false",
+    `${BIN_BASE_URL}${JSONBIN_ID}/latest?meta=false`,
     {
       method: "GET",
       headers: storageHeaders(),

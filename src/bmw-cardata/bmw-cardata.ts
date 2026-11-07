@@ -122,15 +122,15 @@ export function parseVehicleSoc(payload: unknown): VehicleSoc | undefined {
   for (const source of BMW_SOC_DESCRIPTORS) {
     const entry = (data as Record<string, unknown>)[source];
     if (!entry || typeof entry !== "object") continue;
-    const value = entry as Record<string, unknown>;
-    if (value["value"] == null || typeof value["timestamp"] !== "string") {
+    const { value, timestamp } = entry as Record<string, unknown>;
+    if (value == null || typeof timestamp !== "string") {
       continue;
     }
-    const percent = Number(value["value"]);
+    const percent = Number(value);
     if (!Number.isFinite(percent) || percent < 0 || percent > 100) continue;
     let observedAt: Temporal.Instant;
     try {
-      observedAt = Temporal.Instant.from(value["timestamp"]);
+      observedAt = Temporal.Instant.from(timestamp);
     } catch {
       continue;
     }

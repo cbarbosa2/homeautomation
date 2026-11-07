@@ -1,5 +1,5 @@
 import {
-  WallboxLocation as Location,
+  type WallboxLocation as Location,
   WallboxStatus as Status,
 } from "../globals.ts";
 import { SYSTEM_VOLTAGE } from "../utils/index.ts";
@@ -46,7 +46,7 @@ export function wallboxAmps(
 ): number {
   if (!canCharge(status) || !Number.isFinite(watts)) return 0;
   const amps = Math.min(
-    MAX_AMPS_PER_LOCATION.get(location)!,
+    MAX_AMPS_PER_LOCATION.get(location) as number,
     Math.floor(watts / SYSTEM_VOLTAGE),
   );
   return amps <

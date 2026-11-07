@@ -8,7 +8,8 @@ import {
 } from "../src/bmw-cardata/bmw-cardata.ts";
 
 config({ quiet: true });
-const clientId = process.env["BMW_CARDATA_CLIENT_ID"]?.trim();
+const { BMW_CARDATA_CLIENT_ID } = process.env;
+const clientId = BMW_CARDATA_CLIENT_ID?.trim();
 if (!clientId) throw new Error("Set BMW_CARDATA_CLIENT_ID in .env first");
 
 function base64url(bytes: Uint8Array): string {
@@ -99,7 +100,8 @@ const mapped = Array.isArray(mappings)
 const primary = (mapped as { vin: string; mappingType: string }[]).filter(
   (item) => item?.mappingType === "PRIMARY",
 );
-const configuredVin = process.env["BMW_CARDATA_VIN"]?.trim();
+const { BMW_CARDATA_VIN } = process.env;
+const configuredVin = BMW_CARDATA_VIN?.trim();
 const vin =
   configuredVin || (primary.length === 1 ? primary[0]?.vin : undefined);
 if (!vin || !primary.some((item) => item.vin === vin)) {

@@ -34,7 +34,8 @@ for (const withFile of [true, false]) {
         ...process.env,
         MIGRATION_OVERRIDE: "existing",
       };
-      delete env["MIGRATION_FILE"];
+      const migrationFileKey = "MIGRATION_FILE";
+      delete env[migrationFileKey];
       const child = spawnSync(
         process.execPath,
         ["--input-type=module", "-e", code],

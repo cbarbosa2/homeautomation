@@ -1,5 +1,5 @@
 import { globals, type OmieEntry } from "../globals.ts";
-import { PrometheusMetrics } from "../prometheus/prometheus.ts";
+import type { PrometheusMetrics } from "../prometheus/prometheus.ts";
 import { fetchOmie, parseOmieResponse } from "../omie/omie-proxy.ts";
 import { METRICS } from "../prometheus/metrics.ts";
 import { Temporal } from "../temporal.ts";

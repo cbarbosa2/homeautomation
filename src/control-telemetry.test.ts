@@ -1,5 +1,8 @@
 import { test } from "node:test";
-import { deepStrictEqual as assertEquals } from "node:assert/strict";
+import {
+  ok as assert,
+  deepStrictEqual as assertEquals,
+} from "node:assert/strict";
 import { Temporal } from "./temporal.ts";
 import {
   CONTROL_PATHS,
@@ -30,10 +33,11 @@ test("telemetry preserves actual start order and startup ties", () => {
   now = now.add({ seconds: 1 });
   telemetry.record(wallboxPath(L.Inside, "Status"), { value: S.Charging });
   const starts = telemetry.snapshot().chargingStartedAt;
-  assertEquals(
-    Temporal.Instant.compare(starts.get(L.Outside)!, starts.get(L.Inside)!),
-    -1,
-  );
+  const outsideStart = starts.get(L.Outside);
+  const insideStart = starts.get(L.Inside);
+  assert(outsideStart);
+  assert(insideStart);
+  assertEquals(Temporal.Instant.compare(outsideStart, insideStart), -1);
   const startup = new ControlTelemetry();
   for (const l of [L.Outside, L.Inside]) {
     startup.record(wallboxPath(l, "Status"), { value: S.Charging });

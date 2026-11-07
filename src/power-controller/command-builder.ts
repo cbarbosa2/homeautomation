@@ -84,7 +84,7 @@ export class CommandBuilder {
     const reductions: PowerCommand[] = [];
     const increases: PowerCommand[] = [];
     for (const [device, wanted] of desired) {
-      const reservation = this.reservations.get(device)!;
+      const reservation = this.reservations.get(device) as Reservation;
       const others = [...this.reservations].reduce(
         (sum, [d, r]) => sum + (d === device ? 0 : r.watts),
         0,
@@ -180,7 +180,7 @@ export class CommandBuilder {
       setting === undefined || setting < 0
         ? isBattery
           ? MAX_BATTERY_CHARGE_POWER
-          : MAX_AMPS_PER_LOCATION.get(device)! * SYSTEM_VOLTAGE
+          : (MAX_AMPS_PER_LOCATION.get(device) as number) * SYSTEM_VOLTAGE
         : setting * (isBattery ? 1 : SYSTEM_VOLTAGE);
     const old = this.reservations.get(device);
     const paths = isBattery

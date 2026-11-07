@@ -10,8 +10,9 @@ import {
 
 test("authenticated mode save survives reloading storage", async () => {
   const originalFetch = globalThis.fetch;
-  const originalKey = process.env["JSONBIN_ACCESS_KEY"];
-  process.env["JSONBIN_ACCESS_KEY"] = "test-access-key";
+  const accessKeyName = "JSONBIN_ACCESS_KEY";
+  const originalKey = process.env[accessKeyName];
+  process.env[accessKeyName] = "test-access-key";
   let stored = { inside: 6, outside: 4 };
   globalThis.fetch = (_input, init) => {
     if (new Headers(init?.headers).get("X-Access-Key") !== "test-access-key") {
@@ -25,8 +26,8 @@ test("authenticated mode save survives reloading storage", async () => {
     assertEquals(await loadPersistentStorage(), { inside: 2, outside: 2 });
   } finally {
     globalThis.fetch = originalFetch;
-    if (originalKey === undefined) delete process.env["JSONBIN_ACCESS_KEY"];
-    else process.env["JSONBIN_ACCESS_KEY"] = originalKey;
+    if (originalKey === undefined) delete process.env[accessKeyName];
+    else process.env[accessKeyName] = originalKey;
   }
 });
 
@@ -79,10 +80,10 @@ test("saves stay ordered and continue after a failed write", async () => {
 
 test("writes use the master key to disable versioning even when an access key exists", async () => {
   const originalFetch = globalThis.fetch;
-  const keys = ["JSONBIN_ACCESS_KEY", "JSONBIN_MASTER_KEY"];
+  const keys = ["JSONBIN_ACCESS_KEY", "JSONBIN_MASTER_KEY"] as const;
   const previous = keys.map((key) => process.env[key]);
-  process.env[keys[0]!] = "test-access";
-  process.env[keys[1]!] = "test-master";
+  process.env[keys[0]] = "test-access";
+  process.env[keys[1]] = "test-master";
   globalThis.fetch = (_input, init) => {
     const headers = new Headers(init?.headers);
     assertEquals(headers.get("X-Master-Key"), "test-master");
@@ -95,8 +96,9 @@ test("writes use the master key to disable versioning even when an access key ex
   } finally {
     globalThis.fetch = originalFetch;
     keys.forEach((key, i) => {
-      if (previous[i] === undefined) delete process.env[key];
-      else process.env[key] = previous[i]!;
+      const value = previous[i];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
     });
   }
 });

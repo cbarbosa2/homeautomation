@@ -1,6 +1,6 @@
 import { VICTRON_PORTAL_ID } from "../constants.ts";
 import { globals } from "../globals.ts";
-import { SolarForecasts } from "../solar-forecasts/solar-forecasts.ts";
+import type { SolarForecasts } from "../solar-forecasts/solar-forecasts.ts";
 import { CONTROL_PATHS, controlTelemetry } from "../control-telemetry.ts";
 import {
   type Clock,
@@ -8,7 +8,7 @@ import {
   systemClock,
   timeUntilMorning,
 } from "../lisbon-clock.ts";
-import { MqttClient } from "../mqtt-client.ts";
+import type { MqttClient } from "../mqtt-client.ts";
 import { Temporal } from "../temporal.ts";
 import { finite } from "../utils/index.ts";
 
@@ -43,7 +43,8 @@ interface EveningInputs {
 }
 
 export class SetSocLimitTask {
-  private readonly topic = `W/${VICTRON_PORTAL_ID}/settings/0/Settings/CGwacs/BatteryLife/MinimumSocLimit`;
+  private readonly topic =
+    `W/${VICTRON_PORTAL_ID}/settings/0/Settings/CGwacs/BatteryLife/MinimumSocLimit`;
   private lastMinute: Temporal.Instant;
   private pending:
     | {

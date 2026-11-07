@@ -12,8 +12,8 @@ for (const [source, message] of [
   test(`fatal process error logs and exits: ${message}`, () => {
     const module = new URL("./process-handlers.js", import.meta.url).href;
     const env = { ...process.env };
-    delete env["LOGLAYER_SOURCE_ID"];
-    delete env["LOGLAYER_API_KEY"];
+    for (const key of ["LOGLAYER_SOURCE_ID", "LOGLAYER_API_KEY"])
+      delete env[key];
     const child = spawnSync(
       process.execPath,
       [

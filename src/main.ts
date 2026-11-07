@@ -67,9 +67,11 @@ class HomeAutomationApp {
   }
 
   private setupScheduledTasks() {
-    const bmwClientId = process.env["BMW_CARDATA_CLIENT_ID"]?.trim();
-    const bmwVin = process.env["BMW_CARDATA_VIN"]?.trim();
-    const bmwContainerId = process.env["BMW_CARDATA_CONTAINER_ID"]?.trim();
+    const { BMW_CARDATA_CLIENT_ID, BMW_CARDATA_VIN, BMW_CARDATA_CONTAINER_ID } =
+      process.env;
+    const bmwClientId = BMW_CARDATA_CLIENT_ID?.trim();
+    const bmwVin = BMW_CARDATA_VIN?.trim();
+    const bmwContainerId = BMW_CARDATA_CONTAINER_ID?.trim();
     if (bmwClientId && bmwVin && bmwContainerId) {
       let loadingBmwSoc = false;
       scheduler.cron("Load BMW i3 SOC", "5,35 * * * *", async () => {
@@ -136,7 +138,7 @@ class HomeAutomationApp {
   private async loadPersistedSettings(): Promise<void> {
     try {
       const data = await loadPersistentStorage();
-      if (data.inside != undefined) {
+      if (data.inside != null) {
         await setChargeMode(
           this.metrics,
           WallboxLocation.Inside,
@@ -144,7 +146,7 @@ class HomeAutomationApp {
           false,
         );
       }
-      if (data.outside != undefined) {
+      if (data.outside != null) {
         await setChargeMode(
           this.metrics,
           WallboxLocation.Outside,

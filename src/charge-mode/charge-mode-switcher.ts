@@ -1,7 +1,7 @@
 import { globals, WallboxChargeMode, WallboxLocation } from "../globals.ts";
 import { savePersistentStorage } from "../persistent-storage.ts";
 import { METRICS } from "../prometheus/metrics.ts";
-import { PrometheusMetrics } from "../prometheus/prometheus.ts";
+import type { PrometheusMetrics } from "../prometheus/prometheus.ts";
 import { logError, logInfo, logWarn } from "../logger.ts";
 
 export async function setChargeMode(
@@ -15,12 +15,10 @@ export async function setChargeMode(
     return;
   }
 
-  let gauge;
-  if (location == WallboxLocation.Inside) {
-    gauge = METRICS.GAUGES.ESS_WALLBOX_INSIDE_CHARGE_MODE;
-  } else {
-    gauge = METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_CHARGE_MODE;
-  }
+  const gauge =
+    location === WallboxLocation.Inside
+      ? METRICS.GAUGES.ESS_WALLBOX_INSIDE_CHARGE_MODE
+      : METRICS.GAUGES.ESS_WALLBOX_OUTSIDE_CHARGE_MODE;
   globals.wallboxChargeMode.set(location, mode);
   metrics.setGauge(gauge, mode);
 

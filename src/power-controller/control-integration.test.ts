@@ -66,9 +66,10 @@ function installation(enabled = true, startupCharging = false) {
     enabled,
     publisher: {
       publishJson: async (topic: string, data: Record<string, unknown>) => {
+        const { value } = data;
         const write = {
           path: topic.split("/").slice(2).join("/"),
-          value: data["value"],
+          value,
         };
         writes.push(write);
         await onPublish(write);

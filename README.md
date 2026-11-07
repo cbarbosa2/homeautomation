@@ -2,7 +2,7 @@
 
 A Node.js/TypeScript service controlling a home battery and two EV wallboxes through MQTT. It allocates charging power, schedules battery SOC targets in Europe/Lisbon time, fetches solar forecasts and electricity prices, and exposes a dashboard and Prometheus metrics.
 
-The stack uses npm for dependency management, TypeScript's compiler for strict checking and ESM builds, Node's test runner, ESLint with typescript-eslint, and Prettier. MQTT uses `mqtt`; HTTP uses Node's HTTP server with `@hono/node-server`; scheduling uses `node-cron`; monitoring uses `prom-client`. See [development](docs/development.md) for the build workflow and [architecture](docs/architecture.md) for service interactions.
+The stack uses npm for dependency management, TypeScript's compiler for strict checking and ESM builds, Node's test runner, and Biome for linting and formatting. MQTT uses `mqtt`; HTTP uses Node's HTTP server with `@hono/node-server`; scheduling uses `node-cron`; monitoring uses `prom-client`. See [development](docs/development.md) for the build workflow and [architecture](docs/architecture.md) for service interactions.
 
 ## Documentation
 
