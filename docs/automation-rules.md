@@ -25,13 +25,11 @@ For example, at 23:00 the ESS Only night condition requires SOC above minimum SO
 
 ## Wallbox priority
 
-Both wallboxes may charge simultaneously. The first to begin charging gets priority for available power; the other uses the remainder, subject to its mode.
+Both wallboxes may charge simultaneously. The charger whose mode was most recently set gets priority for available power; the other uses the remainder, subject to its mode. Reapplying the same mode also claims priority. Dashboard Set buttons, physical switches, and API mode commands all follow this rule, including Off and Manual selections.
 
-Release priority when that vehicle is fully charged, disconnected, encounters an error preventing charging, or switches to Off or Manual. Also transfer priority when the priority charger's mode conditions no longer permit charging but the other charger's conditions do.
+The preference is retained when that vehicle is fully charged, disconnected, encounters an error preventing charging, switches to Off or Manual, or its mode conditions do not permit charging. The other charger may use available power meanwhile. The preferred charger regains priority automatically when eligible again. A pause caused by insufficient available power also retains preference.
 
-A pause caused only by insufficient available power retains priority while the charger's mode conditions still apply.
-
-When charging-start order cannot be distinguished, including both vehicles already charging at service startup, Inside wins the tie. Priority is not persisted across restarts.
+Persist the preference together with both modes and restore it on restart. Loading modes at startup does not count as setting them. Inside is preferred when no valid saved preference exists. Charging-start order does not affect priority.
 
 Eligible automatic wallboxes receive power in priority order; battery charging receives the remainder. This order also applies within the conservative 12 A shared budget.
 

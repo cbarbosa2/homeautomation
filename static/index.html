@@ -97,6 +97,11 @@
         transition: all 0.3s;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       }
+      .charge-mode-set {
+        width: auto;
+        padding: 0.4rem 0.75rem;
+        margin-left: 0.5rem;
+      }
       .trigger-btn:hover:not(:disabled) {
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
@@ -159,7 +164,7 @@
             <label for="inside-mode" style="color: white; font-weight: 600"
               >Inside:</label
             >
-            <select id="inside-mode" onchange="changeChargeMode('Inside')">
+            <select id="inside-mode">
               <option value="1">Off</option>
               <option value="2">SunOnly</option>
               <option value="3">ESSOnly</option>
@@ -167,12 +172,17 @@
               <option value="5">On</option>
               <option value="6">Manual</option>
             </select>
+            <button
+              class="trigger-btn charge-mode-set"
+              onclick="changeChargeMode('Inside', this)"
+              aria-label="Set inside mode and priority"
+            >Set</button>
           </div>
           <div>
             <label for="outside-mode" style="color: white; font-weight: 600"
               >Outside:</label
             >
-            <select id="outside-mode" onchange="changeChargeMode('Outside')">
+            <select id="outside-mode">
               <option value="1">Off</option>
               <option value="2">SunOnly</option>
               <option value="3">ESSOnly</option>
@@ -180,6 +190,11 @@
               <option value="5">On</option>
               <option value="6">Manual</option>
             </select>
+            <button
+              class="trigger-btn charge-mode-set"
+              onclick="changeChargeMode('Outside', this)"
+              aria-label="Set outside mode and priority"
+            >Set</button>
           </div>
         </div>
         <div
@@ -232,12 +247,13 @@
         }
       }
 
-      async function changeChargeMode(location) {
+      async function changeChargeMode(location, button) {
         const select = document.getElementById(
           location.toLowerCase() + "-mode"
         );
         const value = select.value;
         select.disabled = true;
+        button.disabled = true;
         document.getElementById("charge-mode-status").textContent =
           "Updating...";
         try {
@@ -249,7 +265,7 @@
           const result = await response.json();
           if (response.ok && result.success) {
             document.getElementById("charge-mode-status").textContent =
-              "Updated successfully!";
+              location + " mode saved; charger has priority when eligible.";
           } else {
             document.getElementById("charge-mode-status").textContent =
               result.error || "Failed to update.";
@@ -259,6 +275,7 @@
             "Error: " + error.message;
         }
         select.disabled = false;
+        button.disabled = false;
       }
 
       async function loadTasks() {

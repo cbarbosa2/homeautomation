@@ -29,7 +29,6 @@ function createTargets(
     insideWallboxAmps: undefined,
     outsideWallboxAmps: undefined,
     batteryChargePower: undefined,
-    priorityDecision: { kind: "retain" },
     ...overrides,
   };
 }

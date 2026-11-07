@@ -7,13 +7,13 @@ import {
   WallboxStatus as S,
 } from "../globals.ts";
 import {
-  calculateTargetAmpsAndPriority,
+  calculatePowerTargets,
   type InputState,
 } from "./dynamic-power-calculator.ts";
 
 export function state(): InputState {
   return {
-    primaryWallboxLocation: undefined,
+    preferredWallboxLocation: L.Inside,
     gridPower: 0,
     batteryMinSOC: 20,
     batterySOC: 50,
@@ -37,7 +37,7 @@ export function state(): InputState {
 }
 
 test("one grid budget gives Inside 20 A and battery the unusable start remainder", () => {
-  const result = calculateTargetAmpsAndPriority(state());
+  const result = calculatePowerTargets(state());
   assertEquals(result.insideWallboxAmps, 20);
   assertEquals(result.outsideWallboxAmps, 0);
   assertEquals(result.batteryChargePower, 1920);
@@ -54,7 +54,7 @@ test("an active charger stops even when measured power is zero", () => {
       ...input,
       batteryMaxChargePower: 0,
     },
-    calculateTargetAmpsAndPriority(input),
+    calculatePowerTargets(input),
   );
   assertEquals(
     commands.some(
@@ -73,7 +73,7 @@ test("grid-funded battery charging is not solar surplus", () => {
   input.gridPower = 4000;
   input.batteryPower = 4000;
   input.pvInverterPower = 1000;
-  assertEquals(calculateTargetAmpsAndPriority(input).insideWallboxAmps, 0);
+  assertEquals(calculatePowerTargets(input).insideWallboxAmps, 0);
 });
 test("DC solar is shared once, without an inverter-only gate", () => {
   const input = state();
@@ -83,29 +83,29 @@ test("DC solar is shared once, without an inverter-only gate", () => {
   ]);
   input.batteryPower = 6000;
   input.pvChargerPower = 6000;
-  const result = calculateTargetAmpsAndPriority(input);
+  const result = calculatePowerTargets(input);
   assertEquals([result.insideWallboxAmps, result.outsideWallboxAmps], [20, 0]);
 });
 test("a grid spike fully curtails battery charging even above minimum SOC", () => {
   const input = state();
   input.gridPower = 8000;
-  assertEquals(calculateTargetAmpsAndPriority(input).batteryChargePower, 0);
+  assertEquals(calculatePowerTargets(input).batteryChargePower, 0);
 });
 test("fractional headroom rounds down and start hysteresis applies before allocation", () => {
   const input = state();
   input.gridPower = 4500;
-  assertEquals(calculateTargetAmpsAndPriority(input).insideWallboxAmps, 0);
+  assertEquals(calculatePowerTargets(input).insideWallboxAmps, 0);
   input.wallboxVictronStatus.set(L.Inside, S.Charging);
-  assertEquals(calculateTargetAmpsAndPriority(input).insideWallboxAmps, 9);
+  assertEquals(calculatePowerTargets(input).insideWallboxAmps, 9);
   input.gridPower = 5040;
-  assertEquals(calculateTargetAmpsAndPriority(input).insideWallboxAmps, 7);
+  assertEquals(calculatePowerTargets(input).insideWallboxAmps, 7);
   input.gridPower = 5041;
-  assertEquals(calculateTargetAmpsAndPriority(input).insideWallboxAmps, 0);
+  assertEquals(calculatePowerTargets(input).insideWallboxAmps, 0);
 });
 test("fallback is one 12 A budget with evidence required for solar modes", () => {
   const input = state();
   input.gridPower = undefined;
-  let result = calculateTargetAmpsAndPriority(input);
+  let result = calculatePowerTargets(input);
   assertEquals(
     [
       result.insideWallboxAmps,
@@ -115,7 +115,7 @@ test("fallback is one 12 A budget with evidence required for solar modes", () =>
     [12, 0, 0],
   );
   input.wallboxChargeMode.set(L.Inside, Mode.SunOnly);
-  result = calculateTargetAmpsAndPriority(input);
+  result = calculatePowerTargets(input);
   assertEquals([result.insideWallboxAmps, result.outsideWallboxAmps], [0, 12]);
 });
 test("Manual consumption stays in the grid baseline", () => {
@@ -123,7 +123,7 @@ test("Manual consumption stays in the grid baseline", () => {
   input.gridPower = 4800;
   input.wallboxPower.set(L.Inside, 4800);
   input.wallboxChargeMode.set(L.Inside, Mode.Manual);
-  const result = calculateTargetAmpsAndPriority(input);
+  const result = calculatePowerTargets(input);
   assertEquals(
     [
       result.insideWallboxAmps,
@@ -133,66 +133,48 @@ test("Manual consumption stays in the grid baseline", () => {
     [undefined, 0, 1920],
   );
 });
-test("first observed start owns priority, with Inside winning indistinguishable starts", () => {
-  const input = state();
-  input.wallboxVictronStatus = new Map([
-    [L.Inside, S.Charging],
-    [L.Outside, S.Charging],
-  ]);
-  input.chargingStartedAt = new Map([
-    [L.Inside, Temporal.Instant.fromEpochMilliseconds(20)],
-    [L.Outside, Temporal.Instant.fromEpochMilliseconds(10)],
-  ]);
-  assertEquals(calculateTargetAmpsAndPriority(input).priorityDecision, {
-    kind: "set",
-    location: L.Outside,
-  });
-  input.chargingStartedAt.set(
-    L.Inside,
-    Temporal.Instant.fromEpochMilliseconds(10),
-  );
-  assertEquals(calculateTargetAmpsAndPriority(input).priorityDecision, {
-    kind: "set",
-    location: L.Inside,
-  });
-});
-test("priority releases on full, disconnect, blocking and unknown statuses", () => {
-  for (const status of [S.Charged, S.Disconnected, 8, 14, 999, undefined]) {
+test("preference determines allocation for both normal and conservative budgets", () => {
+  for (const telemetryValid of [true, false]) {
     const input = state();
-    input.primaryWallboxLocation = L.Inside;
-    if (status === undefined) input.wallboxVictronStatus.delete(L.Inside);
-    else input.wallboxVictronStatus.set(L.Inside, status);
-    assertEquals(calculateTargetAmpsAndPriority(input).priorityDecision, {
-      kind: "set",
-      location: L.Outside,
-    });
+    input.telemetryValid = telemetryValid;
+    input.preferredWallboxLocation = L.Outside;
+    assertEquals(
+      calculatePowerTargets(input).outsideWallboxAmps,
+      telemetryValid ? 28 : 12,
+    );
+    assertEquals(calculatePowerTargets(input).insideWallboxAmps, 0);
+    input.preferredWallboxLocation = L.Inside;
+    assertEquals(
+      calculatePowerTargets(input).insideWallboxAmps,
+      telemetryValid ? 20 : 12,
+    );
   }
 });
-test("Off/Manual and mode ineligibility transfer priority, power pauses retain it", () => {
+
+test("preferred charger resumes allocation after temporary ineligibility", () => {
+  for (const status of [S.Charged, S.Disconnected, 8, 14, undefined]) {
+    const input = state();
+    input.preferredWallboxLocation = L.Outside;
+    if (status === undefined) input.wallboxVictronStatus.delete(L.Outside);
+    else input.wallboxVictronStatus.set(L.Outside, status);
+    assertEquals(
+      calculatePowerTargets(input).insideWallboxAmps,
+      status === undefined ? 12 : 20,
+    );
+    input.wallboxVictronStatus.set(L.Outside, S.Connected);
+    assertEquals(calculatePowerTargets(input).outsideWallboxAmps, 28);
+  }
   for (const mode of [Mode.Off, Mode.Manual, Mode.SunOnly]) {
     const input = state();
-    input.primaryWallboxLocation = L.Inside;
-    input.wallboxChargeMode.set(L.Inside, mode);
+    input.preferredWallboxLocation = L.Outside;
+    input.wallboxChargeMode.set(L.Outside, mode);
     input.batterySOC = 20;
-    assertEquals(calculateTargetAmpsAndPriority(input).priorityDecision, {
-      kind: "set",
-      location: L.Outside,
-    });
+    assertEquals(calculatePowerTargets(input).insideWallboxAmps, 20);
+    input.wallboxChargeMode.set(L.Outside, Mode.On);
+    assertEquals(calculatePowerTargets(input).outsideWallboxAmps, 28);
   }
-  const input = state();
-  input.primaryWallboxLocation = L.Outside;
-  input.gridPower = 9000;
-  assertEquals(calculateTargetAmpsAndPriority(input).priorityDecision, {
-    kind: "retain",
-  });
-  input.wallboxChargeMode = new Map([
-    [L.Inside, Mode.Off],
-    [L.Outside, Mode.Off],
-  ]);
-  assertEquals(calculateTargetAmpsAndPriority(input).priorityDecision, {
-    kind: "clear",
-  });
 });
+
 test("mode SOC boundaries and night boundaries follow strict documented margins", () => {
   for (const mode of [Mode.SunOnly, Mode.ESSOnly, Mode.Night]) {
     const input = state();
@@ -200,24 +182,24 @@ test("mode SOC boundaries and night boundaries follow strict documented margins"
     input.pvChargerPower = 4800;
     input.batteryPower = 4800;
     input.batterySOC = 21;
-    assertEquals(calculateTargetAmpsAndPriority(input).insideWallboxAmps, 0);
+    assertEquals(calculatePowerTargets(input).insideWallboxAmps, 0);
     input.batterySOC = 21.01;
-    assertEquals(calculateTargetAmpsAndPriority(input).insideWallboxAmps, 20);
+    assertEquals(calculatePowerTargets(input).insideWallboxAmps, 20);
     input.batteryPower = 0;
     input.pvChargerPower = 0;
     input.batterySOC = 95;
-    assertEquals(calculateTargetAmpsAndPriority(input).insideWallboxAmps, 20);
+    assertEquals(calculatePowerTargets(input).insideWallboxAmps, 20);
     input.batterySOC = 94.99;
-    assertEquals(calculateTargetAmpsAndPriority(input).insideWallboxAmps, 0);
+    assertEquals(calculatePowerTargets(input).insideWallboxAmps, 0);
   }
   const input = state();
   input.wallboxChargeMode.set(L.Inside, Mode.ESSOnly);
   input.timeOfDay = Temporal.PlainTime.from("23:30");
   input.remainingNight = Temporal.Duration.from({ hours: 9 });
   input.batterySOC = 38;
-  assertEquals(calculateTargetAmpsAndPriority(input).insideWallboxAmps, 0);
+  assertEquals(calculatePowerTargets(input).insideWallboxAmps, 0);
   input.batterySOC = 38.01;
-  assertEquals(calculateTargetAmpsAndPriority(input).insideWallboxAmps, 20);
+  assertEquals(calculatePowerTargets(input).insideWallboxAmps, 20);
   input.wallboxChargeMode.set(L.Inside, Mode.Night);
   for (const [hour, amps] of [
     ["21:59:24", 0],
@@ -226,7 +208,7 @@ test("mode SOC boundaries and night boundaries follow strict documented margins"
     ["08:00", 0],
   ] as const) {
     input.timeOfDay = Temporal.PlainTime.from(hour);
-    assertEquals(calculateTargetAmpsAndPriority(input).insideWallboxAmps, amps);
+    assertEquals(calculatePowerTargets(input).insideWallboxAmps, amps);
   }
 });
 
@@ -234,5 +216,5 @@ test("a charger still starting needs 10 A rather than the continuation threshold
   const input = state();
   input.gridPower = 4560; // 9 A available
   input.wallboxVictronStatus.set(L.Inside, S.StartCharging);
-  assertEquals(calculateTargetAmpsAndPriority(input).insideWallboxAmps, 0);
+  assertEquals(calculatePowerTargets(input).insideWallboxAmps, 0);
 });

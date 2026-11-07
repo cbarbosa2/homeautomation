@@ -2,7 +2,7 @@ import { test } from "node:test";
 import { Temporal } from "../temporal.ts";
 import { deepStrictEqual as assertEquals } from "node:assert/strict";
 import {
-  calculateTargetAmpsAndPriority,
+  calculatePowerTargets,
   type InputState,
 } from "./dynamic-power-calculator.ts";
 import {
@@ -17,7 +17,7 @@ import {
 
 function createDefaultState(): InputState {
   return {
-    primaryWallboxLocation: WallboxLocation.Inside,
+    preferredWallboxLocation: WallboxLocation.Inside,
     gridPower: 0,
     batteryMinSOC: 20,
     batterySOC: 50,
@@ -40,27 +40,26 @@ function createDefaultState(): InputState {
   };
 }
 
-test("calculateTargetAmpsAndPriority basic SunOnly", () => {
+test("calculatePowerTargets basic SunOnly", () => {
   const state = createDefaultState();
-  const result = calculateTargetAmpsAndPriority(state);
+  const result = calculatePowerTargets(state);
   assertEquals(typeof result.insideWallboxAmps, "number");
   assertEquals(typeof result.outsideWallboxAmps, "number");
   assertEquals(typeof result.batteryChargePower, "number");
-  assertEquals(result.priorityDecision, { kind: "retain" });
 });
 
-test("calculateTargetAmpsAndPriority Off disables charging", () => {
+test("calculatePowerTargets Off disables charging", () => {
   const state = createDefaultState();
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Off);
-  const result = calculateTargetAmpsAndPriority(state);
+  const result = calculatePowerTargets(state);
   assertEquals(result.insideWallboxAmps, 0);
 });
 
-test("calculateTargetAmpsAndPriority Night mode off-peak", () => {
+test("calculatePowerTargets Night mode off-peak", () => {
   const state = createDefaultState();
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Night);
   state.timeOfDay = Temporal.PlainTime.from("23:00");
-  const result = calculateTargetAmpsAndPriority(state);
+  const result = calculatePowerTargets(state);
   assertEquals(typeof result.insideWallboxAmps, "number");
 });
 
@@ -76,32 +75,25 @@ test("inside BMW charge limit applies only to automatic capped modes", () => {
     state.insideVehicleSOC = 80;
     state.wallboxChargeMode.set(WallboxLocation.Inside, mode);
     state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.On);
-    assertEquals(calculateTargetAmpsAndPriority(state).insideWallboxAmps, 0);
-    assertEquals(calculateTargetAmpsAndPriority(state).priorityDecision, {
-      kind: "set",
-      location: WallboxLocation.Outside,
-    });
+    assertEquals(calculatePowerTargets(state).insideWallboxAmps, 0);
 
     state.insideVehicleSOC = 79;
-    assertEquals(calculateTargetAmpsAndPriority(state).insideWallboxAmps, 20);
+    assertEquals(calculatePowerTargets(state).insideWallboxAmps, 20);
     state.insideVehicleSOC = undefined;
-    assertEquals(calculateTargetAmpsAndPriority(state).insideWallboxAmps, 20);
+    assertEquals(calculatePowerTargets(state).insideWallboxAmps, 20);
     state.insideVehicleSOC = 80;
     state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.On);
-    assertEquals(calculateTargetAmpsAndPriority(state).insideWallboxAmps, 20);
+    assertEquals(calculatePowerTargets(state).insideWallboxAmps, 20);
   }
 });
 
-test("calculateTargetAmpsAndPriority changes primary wallbox", () => {
+test("calculatePowerTargets changes primary wallbox", () => {
   const state = createDefaultState();
   // Simulate concedePriority for inside, not for outside
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Off);
   state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.On);
-  const result = calculateTargetAmpsAndPriority(state);
-  assertEquals(result.priorityDecision, {
-    kind: "set",
-    location: WallboxLocation.Outside,
-  });
+  const result = calculatePowerTargets(state);
+  assertEquals(result.outsideWallboxAmps, 28);
 });
 
 test("batteryChargePower with moderate grid power", () => {
@@ -114,7 +106,7 @@ test("batteryChargePower with moderate grid power", () => {
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Off);
   state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Off);
 
-  const result = calculateTargetAmpsAndPriority(state);
+  const result = calculatePowerTargets(state);
   assertEquals(result.batteryChargePower, 4720);
 });
 
@@ -129,7 +121,7 @@ test("batteryChargePower with no grid power", () => {
   state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Off);
 
   assertEquals(
-    calculateTargetAmpsAndPriority(state).batteryChargePower,
+    calculatePowerTargets(state).batteryChargePower,
     MAX_BATTERY_CHARGE_POWER,
   );
 });
@@ -145,7 +137,7 @@ test("batteryChargePower with high grid power", () => {
   state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Off);
 
   assertEquals(
-    calculateTargetAmpsAndPriority(state).batteryChargePower,
+    calculatePowerTargets(state).batteryChargePower,
     MIN_BATTERY_CHARGE_POWER,
   );
 });
@@ -161,7 +153,7 @@ test("batteryChargePower with car charging", () => {
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.On);
   state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Off);
 
-  const result = calculateTargetAmpsAndPriority(state);
+  const result = calculatePowerTargets(state);
   assertEquals(result.insideWallboxAmps, 20);
   assertEquals(result.batteryChargePower, MAX_BATTERY_CHARGE_POWER - 20 * 240);
 });
@@ -171,7 +163,7 @@ test("wallbox amps with excess battery power", () => {
   state.batteryPower = 4000;
   state.pvInverterPower = 8000;
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Manual);
-  assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 16);
+  assertEquals(calculatePowerTargets(state).outsideWallboxAmps, 16);
 });
 
 test("wallbox amps when already charging with high power", () => {
@@ -180,7 +172,7 @@ test("wallbox amps when already charging with high power", () => {
   state.pvInverterPower = 8000;
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Manual);
   state.wallboxPower.set(WallboxLocation.Outside, 3500);
-  assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 31);
+  assertEquals(calculatePowerTargets(state).outsideWallboxAmps, 31);
 });
 
 test("wallbox amps when no PV power available", () => {
@@ -188,7 +180,7 @@ test("wallbox amps when no PV power available", () => {
   state.batteryPower = 4000;
   state.pvInverterPower = 0;
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Manual);
-  assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 0);
+  assertEquals(calculatePowerTargets(state).outsideWallboxAmps, 0);
 });
 
 test("wallbox amps with battery at 95% or above gets maximum power", () => {
@@ -198,7 +190,7 @@ test("wallbox amps with battery at 95% or above gets maximum power", () => {
   state.batterySOC = 99;
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Manual);
   state.wallboxPower.set(WallboxLocation.Outside, 3500);
-  assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 32);
+  assertEquals(calculatePowerTargets(state).outsideWallboxAmps, 32);
 });
 
 test("wallbox amps when battery not full and not charging", () => {
@@ -208,7 +200,7 @@ test("wallbox amps when battery not full and not charging", () => {
   state.batterySOC = 90;
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Manual);
   state.wallboxPower.set(WallboxLocation.Outside, 0);
-  assertEquals(calculateTargetAmpsAndPriority(state).outsideWallboxAmps, 0);
+  assertEquals(calculatePowerTargets(state).outsideWallboxAmps, 0);
 });
 
 test("On mode uses shared fallback when PV telemetry is unavailable", () => {
@@ -221,5 +213,5 @@ test("On mode uses shared fallback when PV telemetry is unavailable", () => {
   );
   state.timeOfDay = Temporal.PlainTime.from("20:00");
   // set maximum amps for inside wallbox
-  assertEquals(calculateTargetAmpsAndPriority(state).insideWallboxAmps, 12);
+  assertEquals(calculatePowerTargets(state).insideWallboxAmps, 12);
 });

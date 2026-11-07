@@ -61,6 +61,7 @@ export interface GlobalState {
   wallboxVictronStatus: Map<WallboxLocation, WallboxStatus>;
   wallboxSetCurrent: Map<WallboxLocation, number>; // target current in amps
   wallboxChargeMode: Map<WallboxLocation, WallboxChargeMode>;
+  preferredWallboxLocation: WallboxLocation;
 }
 
 /**
@@ -82,6 +83,7 @@ export const globals: GlobalState = {
   wallboxCurrent: new Map(),
   wallboxVictronStatus: new Map(),
   wallboxSetCurrent: new Map(),
+  preferredWallboxLocation: WallboxLocation.Inside,
   wallboxChargeMode: new Map([
     [WallboxLocation.Inside, WallboxChargeMode.SunOnly],
     [WallboxLocation.Outside, WallboxChargeMode.SunOnly],

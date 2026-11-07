@@ -4,7 +4,7 @@ import { type Clock, lisbonTime, timeUntilMorning } from "../lisbon-clock.ts";
 import type { MqttClient } from "../mqtt-client.ts";
 import { CommandBuilder, type SystemState } from "./command-builder.ts";
 import {
-  calculateTargetAmpsAndPriority,
+  calculatePowerTargets,
   type InputState,
 } from "./dynamic-power-calculator.ts";
 import { runCommands } from "./power-controller.ts";
@@ -14,7 +14,7 @@ const VEHICLE_SOC_MAX_AGE = Temporal.Duration.from({ minutes: 90 });
 
 type Readings = Omit<
   InputState & SystemState,
-  | "primaryWallboxLocation"
+  | "preferredWallboxLocation"
   | "wallboxChargeMode"
   | "timeOfDay"
   | "remainingNight"
@@ -23,6 +23,7 @@ type Readings = Omit<
 interface Dependencies {
   telemetry: () => Readings;
   modes: () => Map<WallboxLocation, WallboxChargeMode>;
+  preference: () => WallboxLocation;
   insideVehicleSoc?: () => VehicleSoc | undefined;
   clock: Clock;
   publisher: Pick<MqttClient, "publishJson">;
@@ -31,7 +32,6 @@ interface Dependencies {
 
 /** Owns one automatic charging cycle and its state across successive ticks. */
 export class AutomaticChargingCycle {
-  private primary: WallboxLocation | undefined;
   private readonly builder: CommandBuilder;
   private running = false;
 
@@ -60,17 +60,13 @@ export class AutomaticChargingCycle {
       const state = {
         ...telemetry(),
         insideVehicleSOC,
-        primaryWallboxLocation: this.primary,
+        preferredWallboxLocation: this.dependencies.preference(),
         wallboxChargeMode: modes(),
         timeOfDay: lisbonTime(now).toPlainTime(),
         remainingNight: timeUntilMorning(now),
       };
-      const targets = calculateTargetAmpsAndPriority(state);
-      if (targets.priorityDecision.kind === "clear") {
-        this.primary = undefined;
-      } else if (targets.priorityDecision.kind === "set") {
-        this.primary = targets.priorityDecision.location;
-      }
+      const targets = calculatePowerTargets(state);
+
       // Preserve intent even if publication fails or is disabled. Capacity is
       // released by fresh device confirmation, not by transport success.
       const commands = this.builder.createCommandsFromPowerSettings(

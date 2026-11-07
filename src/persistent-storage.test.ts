@@ -13,7 +13,7 @@ test("authenticated mode save survives reloading storage", async () => {
   const accessKeyName = "JSONBIN_ACCESS_KEY";
   const originalKey = process.env[accessKeyName];
   process.env[accessKeyName] = "test-access-key";
-  let stored = { inside: 6, outside: 4 };
+  let stored = { inside: 6, outside: 4, preferredWallboxLocation: 0 };
   globalThis.fetch = (_input, init) => {
     if (new Headers(init?.headers).get("X-Access-Key") !== "test-access-key") {
       return Promise.resolve(new Response(null, { status: 403 }));
@@ -22,8 +22,16 @@ test("authenticated mode save survives reloading storage", async () => {
     return Promise.resolve(Response.json(stored));
   };
   try {
-    await savePersistentStorage({ inside: 2, outside: 2 });
-    assertEquals(await loadPersistentStorage(), { inside: 2, outside: 2 });
+    await savePersistentStorage({
+      inside: 2,
+      outside: 2,
+      preferredWallboxLocation: 0,
+    });
+    assertEquals(await loadPersistentStorage(), {
+      inside: 2,
+      outside: 2,
+      preferredWallboxLocation: 0,
+    });
   } finally {
     globalThis.fetch = originalFetch;
     if (originalKey === undefined) delete process.env[accessKeyName];
@@ -36,7 +44,12 @@ test("rejected storage writes propagate to the caller", async () => {
   globalThis.fetch = () => Promise.resolve(new Response(null, { status: 403 }));
   try {
     await assertRejects(
-      () => savePersistentStorage({ inside: 2, outside: 2 }),
+      () =>
+        savePersistentStorage({
+          inside: 2,
+          outside: 2,
+          preferredWallboxLocation: 0,
+        }),
       (error: unknown) =>
         error instanceof Error && error.message.includes("403"),
     );
@@ -61,11 +74,20 @@ test("saves stay ordered and continue after a failed write", async () => {
   };
   try {
     const first = assertRejects(
-      () => savePersistentStorage({ inside: 2, outside: 4 }),
+      () =>
+        savePersistentStorage({
+          inside: 2,
+          outside: 4,
+          preferredWallboxLocation: 0,
+        }),
       (error: unknown) =>
         error instanceof Error && error.message.includes("403"),
     );
-    const second = savePersistentStorage({ inside: 5, outside: 2 });
+    const second = savePersistentStorage({
+      inside: 5,
+      outside: 2,
+      preferredWallboxLocation: 0,
+    });
     await Promise.resolve();
     assertEquals(started, [2]);
     release();
@@ -92,7 +114,11 @@ test("writes use the master key to disable versioning even when an access key ex
     return Promise.resolve(Response.json({}));
   };
   try {
-    await savePersistentStorage({ inside: 2, outside: 2 });
+    await savePersistentStorage({
+      inside: 2,
+      outside: 2,
+      preferredWallboxLocation: 0,
+    });
   } finally {
     globalThis.fetch = originalFetch;
     keys.forEach((key, i) => {

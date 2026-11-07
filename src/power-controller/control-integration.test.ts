@@ -55,12 +55,14 @@ function installation(enabled = true, startupCharging = false) {
   const writes: Write[] = [];
   let onPublish: (write: Write) => Promise<void> = () => Promise.resolve();
   let reads = 0;
+  let preference = L.Inside;
   const dependencies = {
     telemetry: () => {
       reads++;
       return telemetry.snapshot();
     },
     modes: () => modes,
+    preference: () => preference,
     insideVehicleSoc: () => insideVehicleSoc,
     clock: () => now,
     enabled,
@@ -94,6 +96,9 @@ function installation(enabled = true, startupCharging = false) {
     tick,
     advance,
     readCount: () => reads,
+    prefer: (location: L) => {
+      preference = location;
+    },
     setTime: (value: string) => {
       now = Temporal.Instant.from(value);
     },
@@ -173,8 +178,9 @@ test("cycle reserves capacity until both settings and measured power confirm red
   assert(has(writes, outside("StartStop"), 1));
 });
 
-test("cycle retains first-start priority through power pauses and resets it on restart", async () => {
+test("cycle retains selected preference through power pauses and cycle recreation", async () => {
   const h = installation();
+  h.prefer(L.Outside);
   h.values.set(outside("Status"), S.Charging);
   h.advance();
   h.refresh();
@@ -198,17 +204,30 @@ test("cycle retains first-start priority through power pauses and resets it on r
   h.values.set(P.gridPower, 0);
   assert(has(await h.settle(), outside("SetCurrent"), 28));
   h.restart();
-  assert(has(await h.tick(), inside("SetCurrent"), 20));
+  assert(has(await h.tick(), outside("SetCurrent"), 28));
 });
 
-test("cycle gives Inside the startup tie", async () => {
+test("cycle responds to a new preference and regains it after disconnect", async () => {
+  const h = installation(true, true);
+  await h.tick();
+  h.prefer(L.Outside);
+  const reductions = await h.tick();
+  assert(has(reductions, inside("StartStop"), 0));
+  assert(has(await h.settle(), outside("SetCurrent"), 28));
+  h.values.set(outside("Status"), S.Disconnected);
+  assert(has(await h.settle(), inside("SetCurrent"), 20));
+  h.values.set(outside("Status"), S.Charging);
+  assert(has(await h.settle(), outside("SetCurrent"), 28));
+});
+
+test("cycle uses default Inside preference at startup", async () => {
   const h = installation(true, true);
   const writes = await h.tick();
   assert(has(writes, inside("SetCurrent"), 20));
   assert(has(writes, outside("SetCurrent"), 8));
 });
 
-test("cycle transfers priority when the first charger becomes ineligible", async () => {
+test("cycle allocates to the other charger while the preferred charger is ineligible", async () => {
   for (const reason of [
     "off",
     "manual",
@@ -221,6 +240,7 @@ test("cycle transfers priority when the first charger becomes ineligible", async
     h.values.set(outside("Status"), S.Charging);
     h.advance();
     h.refresh();
+    h.prefer(L.Outside);
     assert(has(await h.tick(), outside("SetCurrent"), 28), reason);
     if (reason === "off") h.modes.set(L.Outside, Mode.Off);
     if (reason === "manual") h.modes.set(L.Outside, Mode.Manual);
@@ -381,8 +401,9 @@ test("disabled publication still advances reservations and smoothing", async () 
   assert(has(await h.settle(), outside("StartStop"), 1));
 });
 
-test("disabled publication still commits priority", async () => {
+test("disabled publication preserves selected preference", async () => {
   const h = installation(false);
+  h.prefer(L.Outside);
   h.values.set(outside("Status"), S.Charging);
   h.refresh();
   await h.tick();

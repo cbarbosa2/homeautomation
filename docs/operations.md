@@ -16,7 +16,7 @@ The service and BMW setup use Node's native environment loader to read `.env` fr
 | `FORECAST_SOLAR_API_KEY`, `VICTRON_API_KEY` | Solar forecast API credentials. |
 | `VICTRON_PORTAL_ID` | Required Victron portal ID used in MQTT topics; a single topic segment without wildcards. |
 | `VICTRON_INSTALLATION_ID` | Required positive decimal VRM installation ID used for forecast API requests. |
-| `JSONBIN_ID` | Remote storage identifier for persisted charge modes. |
+| `JSONBIN_ID` | Remote storage identifier for persisted charge modes and charger preference. |
 | `JSONBIN_ACCESS_KEY` | JSONBin access key with Bins Read and Update permissions. |
 | `JSONBIN_MASTER_KEY` | JSONBin master key; preferred for writes to disable versioning on public bins. Reads prefer the access key. |
 | `BMW_CARDATA_CLIENT_ID` | Owner API client ID from the BMW CarData portal. Optional until BMW setup is complete. |
@@ -81,8 +81,9 @@ documents explicit reads for static settings.
 [EV charger status definitions](https://github.com/victronenergy/node-red-contrib-victron/blob/master/src/services/services.json)
 identify 8–14 as faults. Unknown/reserved states and RFID waiting cannot authorize
 charging. Connected/waiting, low-SOC and power/phase transition states may retain
-eligibility; charging status supplies start history. Full and disconnected
-vehicles release priority.
+eligibility. Full and disconnected
+vehicles cannot charge but retain their saved preference, regaining priority when
+eligible.
 
 The existing battery output is `Settings/CGwacs/MaxChargePower`, in watts;
 zero is a bounded limit (the unrestricted setting is -1), as represented in
@@ -93,8 +94,13 @@ applies. A received
 settings echo alone is not evidence of physical curtailment. No live hardware
 commands are part of automated validation.
 
-Charge-mode changes apply immediately. The dashboard reports success only after
-JSONBin confirms the save; failures show that the mode may revert after restart.
+Charge-mode commands apply immediately and give that charger priority, even when
+the mode is unchanged. Dashboard dropdowns prepare a selection; press Set to apply
+it and claim priority. The dashboard reports success only after JSONBin confirms
+both modes and preference were saved; failures show that mode and priority may
+revert after restart. The saved `preferredWallboxLocation` uses numeric locations
+(0 Inside, 1 Outside); absent or invalid preference defaults to Inside. Startup
+restoration does not change preference based on mode-loading order.
 Physical switch save failures are logged. Writes are serialized and pending writes
 are drained during graceful shutdown. Requests time out after 30 seconds.
 Configure a JSONBin credential in the service's `.env` before restarting; the bin

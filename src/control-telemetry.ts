@@ -1,7 +1,7 @@
 import { VICTRON_PORTAL_ID } from "./constants.ts";
 import { type Clock, systemClock } from "./lisbon-clock.ts";
 import { Temporal } from "./temporal.ts";
-import { globals, WallboxLocation as L, WallboxStatus } from "./globals.ts";
+import { globals, WallboxLocation as L } from "./globals.ts";
 import { finite } from "./utils/index.ts";
 
 export const CONTROL_PATHS = {
@@ -30,8 +30,7 @@ export const REFRESH_PATHS = [
 /** Validity belongs to each reading; a keepalive is not a measurement. */
 export class ControlTelemetry {
   private readings = new Map<string, { value: number; at: Temporal.Instant }>();
-  private previousStatus = new Map<L, number>();
-  private starts = new Map<L, Temporal.Instant>();
+
   constructor(private now: Clock = systemClock) {}
 
   record(topic: string, payload: unknown): void {
@@ -63,26 +62,12 @@ export class ControlTelemetry {
     }
     const value: number = rawValue;
     this.readings.set(path, { value, at: this.now() });
-    for (const l of [L.Inside, L.Outside]) {
-      if (path !== wallboxPath(l, "Status")) continue;
-      if (
-        value === WallboxStatus.Charging &&
-        this.previousStatus.get(l) !== value
-      ) {
-        // Both charging on first observation have indistinguishable start order.
-        this.starts.set(
-          l,
-          this.previousStatus.has(l)
-            ? this.now()
-            : Temporal.Instant.fromEpochMilliseconds(0),
-        );
-      }
-      this.previousStatus.set(l, value);
-    }
   }
+
   invalidate(): void {
     this.readings.clear();
   }
+
   value(path: string): number | undefined {
     const reading = this.readings.get(path);
     const now = this.now();
@@ -92,6 +77,7 @@ export class ControlTelemetry {
       ? reading.value
       : undefined;
   }
+
   snapshot() {
     const pvInverterPower = this.value(CONTROL_PATHS.pvInverterPower);
     const map = (field: string) =>
@@ -119,7 +105,6 @@ export class ControlTelemetry {
       wallboxVictronStatus: map("Status"),
       wallboxSetCurrent: map("SetCurrent"),
       wallboxStartStop: map("StartStop"),
-      chargingStartedAt: new Map(this.starts),
       observedAt: new Map(
         [...this.readings]
           .filter(([path]) => this.value(path) !== undefined)

@@ -13,15 +13,12 @@ import { LoadOmieTask } from "./tasks/load-omie-task.ts";
 import { scheduler } from "./task-scheduler.ts";
 import { MqttToPrometheusTask } from "./tasks/mqtt-to-prometheus-task.ts";
 import { SetSocLimitTask } from "./tasks/set-soc-limit-task.ts";
-import { globals, WallboxLocation } from "./globals.ts";
-import {
-  flushPersistentStorage,
-  loadPersistentStorage,
-} from "./persistent-storage.ts";
+import { globals } from "./globals.ts";
+import { flushPersistentStorage } from "./persistent-storage.ts";
 import { AutomaticChargingCycle } from "./power-controller/automatic-charging-cycle.ts";
 import { DYNAMIC_POWER_INTERVAL } from "./power-controller/power-constants.ts";
 import { setupWallSwitchHandler } from "./charge-mode/wall-switch-handler.ts";
-import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
+import { restorePersistedChargeSettings } from "./charge-mode/charge-mode-switcher.ts";
 import { getVehicleSoc, loadVehicleSoc } from "./bmw-cardata/bmw-cardata.ts";
 import { METRICS } from "./prometheus/metrics.ts";
 
@@ -110,6 +107,7 @@ class HomeAutomationApp {
     const chargingCycle = new AutomaticChargingCycle({
       telemetry: () => controlTelemetry.snapshot(),
       modes: () => globals.wallboxChargeMode,
+      preference: () => globals.preferredWallboxLocation,
       insideVehicleSoc: getVehicleSoc,
       clock: systemClock,
       publisher: this.mqttClient,
@@ -137,23 +135,7 @@ class HomeAutomationApp {
 
   private async loadPersistedSettings(): Promise<void> {
     try {
-      const data = await loadPersistentStorage();
-      if (data.inside != null) {
-        await setChargeMode(
-          this.metrics,
-          WallboxLocation.Inside,
-          data.inside,
-          false,
-        );
-      }
-      if (data.outside != null) {
-        await setChargeMode(
-          this.metrics,
-          WallboxLocation.Outside,
-          data.outside,
-          false,
-        );
-      }
+      await restorePersistedChargeSettings(this.metrics);
       await logInfo("💾 Persistent storage loaded successfully");
     } catch (error) {
       await logError(`❌ Failed to load persistent storage: ${String(error)}`);

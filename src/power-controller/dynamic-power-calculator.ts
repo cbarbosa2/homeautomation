@@ -3,7 +3,7 @@ import { canCharge, wallboxAmps } from "./wallbox-policy.ts";
 import {
   WallboxChargeMode as Mode,
   WallboxLocation as Location,
-  WallboxStatus as Status,
+  type WallboxStatus as Status,
 } from "../globals.ts";
 import { finite, SYSTEM_VOLTAGE } from "../utils/index.ts";
 import { MAX_BATTERY_CHARGE_POWER, MAX_GRID_AMPS } from "./power-constants.ts";
@@ -17,26 +17,17 @@ enum ChargingRequest {
   Manual = "manual",
 }
 
-export type PriorityDecision =
-  | { kind: "retain" }
-  | { kind: "clear" }
-  | {
-      kind: "set";
-      location: Location;
-    };
-
 export interface CalculatedTargetResults {
   insideWallboxAmps: number | undefined;
   outsideWallboxAmps: number | undefined;
   batteryChargePower: number | undefined;
-  priorityDecision: PriorityDecision;
   sharedBudgetWatts?: number;
 }
 
 export interface InputState {
   telemetryValid?: boolean;
   insideVehicleSOC?: number | undefined;
-  primaryWallboxLocation: Location | undefined;
+  preferredWallboxLocation: Location;
   gridPower: number | undefined;
   batteryMinSOC: number | undefined;
   batterySOC: number | undefined;
@@ -46,13 +37,12 @@ export interface InputState {
   wallboxPower: Map<Location, number>;
   wallboxVictronStatus: Map<Location, Status>;
   wallboxChargeMode: Map<Location, Mode>;
-  chargingStartedAt?: Map<Location, Temporal.Instant>;
   timeOfDay: Temporal.PlainTime;
   remainingNight?: Temporal.Duration;
 }
 
 /** Allocate each watt once. Missing inputs never provide evidence for a mode. */
-export function calculateTargetAmpsAndPriority(
+export function calculatePowerTargets(
   state: InputState,
 ): CalculatedTargetResults {
   const automatic = LOCATIONS.filter(
@@ -98,31 +88,8 @@ export function calculateTargetAmpsAndPriority(
     : 0;
   const requests = new Map(LOCATIONS.map((l) => [l, request(state, l)]));
 
-  let primary = state.primaryWallboxLocation;
-  const eligible = (l: Location) =>
-    requests.get(l) !== ChargingRequest.Off &&
-    requests.get(l) !== ChargingRequest.Manual;
-  if (primary !== undefined && !eligible(primary)) {
-    primary = LOCATIONS.find((l) => eligible(l));
-  }
-  if (primary === undefined) {
-    const started = LOCATIONS.filter(
-      (l) =>
-        eligible(l) && state.wallboxVictronStatus.get(l) === Status.Charging,
-    );
-    started.sort((a, b) =>
-      Temporal.Instant.compare(
-        state.chargingStartedAt?.get(a) ??
-          Temporal.Instant.fromEpochMilliseconds(0),
-        state.chargingStartedAt?.get(b) ??
-          Temporal.Instant.fromEpochMilliseconds(0),
-      ),
-    );
-    primary = started[0];
-  }
-
   const order =
-    primary === Location.Outside
+    state.preferredWallboxLocation === Location.Outside
       ? [Location.Outside, Location.Inside]
       : LOCATIONS;
   let remaining = budget;
@@ -153,12 +120,6 @@ export function calculateTargetAmpsAndPriority(
       Math.min(MAX_BATTERY_CHARGE_POWER, remaining),
     ),
     sharedBudgetWatts: budget,
-    priorityDecision:
-      primary === state.primaryWallboxLocation
-        ? { kind: "retain" }
-        : primary === undefined
-          ? { kind: "clear" }
-          : { kind: "set", location: primary },
   };
 }
 

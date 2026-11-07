@@ -1,5 +1,6 @@
 // Functions to load and save persistent storage using jsonbin.io
 
+import type { WallboxLocation } from "./globals.ts";
 import { JSONBIN_ID } from "./constants.ts";
 
 function storageHeaders(write = false): Headers {
@@ -22,11 +23,13 @@ export function flushPersistentStorage(): Promise<void> {
 const BIN_BASE_URL = "https://api.jsonbin.io/v3/b/";
 
 interface StorageValueResponse {
+  preferredWallboxLocation?: unknown;
   inside: number | undefined;
   outside: number | undefined;
 }
 
 interface StorageValueRequest {
+  preferredWallboxLocation: WallboxLocation;
   inside: number;
   outside: number;
 }

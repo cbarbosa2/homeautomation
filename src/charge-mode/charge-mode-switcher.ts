@@ -1,5 +1,8 @@
 import { globals, WallboxChargeMode, WallboxLocation } from "../globals.ts";
-import { savePersistentStorage } from "../persistent-storage.ts";
+import {
+  loadPersistentStorage,
+  savePersistentStorage,
+} from "../persistent-storage.ts";
 import { METRICS } from "../prometheus/metrics.ts";
 import type { PrometheusMetrics } from "../prometheus/prometheus.ts";
 import { logError, logInfo, logWarn } from "../logger.ts";
@@ -10,7 +13,10 @@ export async function setChargeMode(
   mode: WallboxChargeMode,
   persistSetting: boolean = true,
 ): Promise<void> {
-  if (!Object.values(WallboxChargeMode).includes(mode)) {
+  if (
+    typeof mode !== "number" ||
+    !Object.values(WallboxChargeMode).includes(mode)
+  ) {
     logWarn(`Mode ${mode} is not a valid WallboxChargeMode`);
     return;
   }
@@ -27,7 +33,10 @@ export async function setChargeMode(
   );
 
   if (persistSetting) {
+    globals.preferredWallboxLocation = location;
+
     await savePersistentStorage({
+      preferredWallboxLocation: globals.preferredWallboxLocation,
       inside:
         globals.wallboxChargeMode.get(WallboxLocation.Inside) ??
         WallboxChargeMode.SunOnly,
@@ -37,8 +46,26 @@ export async function setChargeMode(
     }).catch((error) => {
       logError(`❌ Failed to save persistent storage: ${String(error)}`);
       throw new Error(
-        "Mode applied, but could not be saved. It may revert after restart.",
+        "Mode and priority applied, but could not be saved. Both may revert after restart.",
       );
     });
+  }
+}
+
+/** Restore settings without treating load order as a new user selection. */
+export async function restorePersistedChargeSettings(
+  metrics: PrometheusMetrics,
+): Promise<void> {
+  const data = await loadPersistentStorage();
+  globals.preferredWallboxLocation =
+    data.preferredWallboxLocation === WallboxLocation.Outside
+      ? WallboxLocation.Outside
+      : WallboxLocation.Inside;
+
+  if (data.inside != null) {
+    await setChargeMode(metrics, WallboxLocation.Inside, data.inside, false);
+  }
+  if (data.outside != null) {
+    await setChargeMode(metrics, WallboxLocation.Outside, data.outside, false);
   }
 }
