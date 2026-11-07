@@ -21,7 +21,10 @@ test("API reports persistence failure and later saved modes restore after reset"
   const request = () =>
     new Request("http://localhost/api/wallbox-charge-mode", {
       method: "POST",
-      body: JSON.stringify({ location: "Inside", value: WallboxChargeMode.On }),
+      body: JSON.stringify({
+        location: "Inside",
+        value: WallboxChargeMode.Max,
+      }),
     });
   try {
     globalThis.fetch = () =>
@@ -34,7 +37,7 @@ test("API reports persistence failure and later saved modes restore after reset"
     assertEquals(error.error.includes("may revert after restart"), true);
     assertEquals(
       globals.wallboxChargeMode.get(WallboxLocation.Inside),
-      WallboxChargeMode.On,
+      WallboxChargeMode.Max,
     );
 
     assertEquals(globals.preferredWallboxLocation, WallboxLocation.Inside);
@@ -55,18 +58,22 @@ test("API reports persistence failure and later saved modes restore after reset"
     // biome-ignore lint/complexity/useLiteralKeys: TypeScript permits private test access only with bracket notation.
     const success = await server["handleSetWallboxChargeMode"](request());
     assertEquals(await success.json(), { success: true });
-    await setChargeMode(metrics, WallboxLocation.Outside, WallboxChargeMode.On);
+    await setChargeMode(
+      metrics,
+      WallboxLocation.Outside,
+      WallboxChargeMode.Max,
+    );
     globals.wallboxChargeMode.clear();
     globals.preferredWallboxLocation = WallboxLocation.Inside;
     await restorePersistedChargeSettings(metrics);
     assertEquals(globals.preferredWallboxLocation, WallboxLocation.Outside);
     assertEquals(
       globals.wallboxChargeMode.get(WallboxLocation.Inside),
-      WallboxChargeMode.On,
+      WallboxChargeMode.Max,
     );
     assertEquals(
       globals.wallboxChargeMode.get(WallboxLocation.Outside),
-      WallboxChargeMode.On,
+      WallboxChargeMode.Max,
     );
   } finally {
     globalThis.fetch = originalFetch;
@@ -83,8 +90,8 @@ test("mode commands save ordered snapshots and same-mode commands claim preferen
   const metrics = new PrometheusMetrics();
   const writes: unknown[] = [];
   globals.wallboxChargeMode = new Map([
-    [WallboxLocation.Inside, WallboxChargeMode.On],
-    [WallboxLocation.Outside, WallboxChargeMode.On],
+    [WallboxLocation.Inside, WallboxChargeMode.Max],
+    [WallboxLocation.Outside, WallboxChargeMode.Max],
   ]);
   globalThis.fetch = async (_input, init) => {
     writes.push(JSON.parse(String(init?.body)));
@@ -94,25 +101,25 @@ test("mode commands save ordered snapshots and same-mode commands claim preferen
     const first = setChargeMode(
       metrics,
       WallboxLocation.Outside,
-      WallboxChargeMode.On,
+      WallboxChargeMode.Max,
     );
     const second = setChargeMode(
       metrics,
       WallboxLocation.Inside,
-      WallboxChargeMode.On,
+      WallboxChargeMode.Max,
     );
     const third = setChargeMode(
       metrics,
       WallboxLocation.Outside,
-      WallboxChargeMode.On,
+      WallboxChargeMode.Max,
     );
     assertEquals(globals.preferredWallboxLocation, WallboxLocation.Outside);
     await Promise.all([first, second, third]);
     assertEquals(
       writes,
       [1, 0, 1].map((preferredWallboxLocation) => ({
-        inside: WallboxChargeMode.On,
-        outside: WallboxChargeMode.On,
+        inside: WallboxChargeMode.Max,
+        outside: WallboxChargeMode.Max,
         preferredWallboxLocation,
       })),
     );
@@ -122,7 +129,7 @@ test("mode commands save ordered snapshots and same-mode commands claim preferen
       const result = await server["handleSetWallboxChargeMode"](
         new Request("http://localhost/api/wallbox-charge-mode", {
           method: "POST",
-          body: JSON.stringify({ location, value: WallboxChargeMode.On }),
+          body: JSON.stringify({ location, value: WallboxChargeMode.Max }),
         }),
       );
       assertEquals(result.status, 200);
@@ -170,7 +177,7 @@ test("restoration preserves saved preference and defaults legacy or invalid pref
       globalThis.fetch = async (_input, init) => {
         assertEquals(init?.method, "GET");
         return Response.json({
-          inside: WallboxChargeMode.On,
+          inside: WallboxChargeMode.Max,
           outside: WallboxChargeMode.Night,
           preferredWallboxLocation: preference,
         });
@@ -185,14 +192,14 @@ test("restoration preserves saved preference and defaults legacy or invalid pref
       assertEquals(
         [...globals.wallboxChargeMode],
         [
-          [WallboxLocation.Inside, WallboxChargeMode.On],
+          [WallboxLocation.Inside, WallboxChargeMode.Max],
           [WallboxLocation.Outside, WallboxChargeMode.Night],
         ],
       );
       // Page reloads must display restored priority without claiming it anew.
       // biome-ignore lint/complexity/useLiteralKeys: TypeScript permits private test access only with bracket notation.
       assertEquals(await server["handleGetWallboxChargeMode"]().json(), {
-        Inside: WallboxChargeMode.On,
+        Inside: WallboxChargeMode.Max,
         Outside: WallboxChargeMode.Night,
         preferredLocation:
           preference === WallboxLocation.Outside ? "Outside" : "Inside",
@@ -201,6 +208,72 @@ test("restoration preserves saved preference and defaults legacy or invalid pref
     globalThis.fetch = async () => new Response(null, { status: 503 });
     await assertRejects(() => restorePersistedChargeSettings(metrics));
     assertEquals(globals.preferredWallboxLocation, WallboxLocation.Inside);
+  } finally {
+    globalThis.fetch = originalFetch;
+    globals.wallboxChargeMode = originalModes;
+    globals.preferredWallboxLocation = originalPreference;
+    metrics.getRegister().clear();
+  }
+});
+
+test("all six raw numbers round-trip through API and storage without migration", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalModes = globals.wallboxChargeMode;
+  const originalPreference = globals.preferredWallboxLocation;
+  const metrics = new PrometheusMetrics();
+  const server = new HttpServer(metrics);
+  let saved = {
+    inside: 1,
+    outside: 6,
+    preferredWallboxLocation: WallboxLocation.Outside,
+  };
+  globalThis.fetch = async (_input, init) => {
+    if (init?.method === "PUT") saved = JSON.parse(String(init.body));
+    return Response.json(saved);
+  };
+  try {
+    for (const value of [1, 2, 3, 4, 5, 6]) {
+      for (const location of ["Inside", "Outside"]) {
+        // biome-ignore lint/complexity/useLiteralKeys: private route tested without network or hardware.
+        const response = await server["handleSetWallboxChargeMode"](
+          new Request("http://localhost/api/wallbox-charge-mode", {
+            method: "POST",
+            body: JSON.stringify({ location, value }),
+          }),
+        );
+        assertEquals(response.status, 200);
+        globals.wallboxChargeMode = new Map();
+        await restorePersistedChargeSettings(metrics);
+        // biome-ignore lint/complexity/useLiteralKeys: private route tested without network or hardware.
+        const current = await server["handleGetWallboxChargeMode"]().json();
+        assertEquals(current[location], value);
+        assertEquals(current.preferredLocation, location);
+      }
+    }
+    for (const value of [0, 7, -1, 1.5, "invalid", null]) {
+      // biome-ignore lint/complexity/useLiteralKeys: private route tested without network or hardware.
+      const response = await server["handleSetWallboxChargeMode"](
+        new Request("http://localhost/api/wallbox-charge-mode", {
+          method: "POST",
+          body: JSON.stringify({ location: "Inside", value }),
+        }),
+      );
+      assertEquals(response.status, 400);
+    }
+    saved = {
+      inside: 1,
+      outside: 6,
+      preferredWallboxLocation: WallboxLocation.Outside,
+    };
+    await restorePersistedChargeSettings(metrics);
+    assertEquals(
+      globals.wallboxChargeMode.get(WallboxLocation.Inside),
+      WallboxChargeMode.Manual,
+    );
+    assertEquals(
+      globals.wallboxChargeMode.get(WallboxLocation.Outside),
+      WallboxChargeMode.Max,
+    );
   } finally {
     globalThis.fetch = originalFetch;
     globals.wallboxChargeMode = originalModes;

@@ -6,6 +6,10 @@ import { HttpServer } from "./http-server.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { scheduler } from "./task-scheduler.ts";
 import { CONTROL_PATHS, controlTelemetry } from "./control-telemetry.ts";
+import {
+  unknownDischargeStatus,
+  type BatteryDischargeStatus,
+} from "./power-controller/battery-support-controller.ts";
 import { Temporal } from "./temporal.ts";
 
 // Exercise the real TCP adapter without starting MQTT or scheduled automation.
@@ -23,7 +27,16 @@ test("Node HTTP adapter preserves dashboard, APIs, metrics and request bodies", 
     const dashboard = await fetch(`${base}/`);
     equal(dashboard.status, 200);
     match(dashboard.headers.get("content-type") ?? "", /text\/html/);
-    equal((await dashboard.text()).includes("__BUILD_TIMESTAMP__"), false);
+    const html = await dashboard.text();
+    equal(html.includes("__BUILD_TIMESTAMP__"), false);
+    for (const location of ["inside", "outside"]) {
+      match(
+        html,
+        new RegExp(
+          `<select id="${location}-mode"[^>]*><option value="1">Manual</option><option value="2">Sun</option><option value="3">Reserve</option><option value="4">Battery</option><option value="5">Night</option><option value="6">Max</option></select>`,
+        ),
+      );
+    }
     const telemetry = await fetch(`${base}/metrics`);
     equal(telemetry.status, 200);
     match(await telemetry.text(), /mqtt_connection_status/);
@@ -76,7 +89,12 @@ test("battery API exposes fresh SOC independently and clears invalid, expired an
     const response = await fetch(url);
     equal(response.status, 200);
     equal(response.headers.get("cache-control"), "no-store");
-    return response.json();
+    const { discharge, ...readings } = await response.json();
+    deepStrictEqual(discharge, {
+      state: "unknown",
+      reason: "Discharge has not been checked yet.",
+    });
+    return readings;
   };
   controlTelemetry.invalidate();
 
@@ -152,6 +170,30 @@ test("HTTP shutdown closes a stalled connection at its deadline", async (context
   } finally {
     context.mock.timers.reset();
     socket.destroy();
+    await server.stop();
+    metrics.getRegister().clear();
+  }
+});
+
+test("battery API reads live controller discharge status on every request", async () => {
+  let discharge: BatteryDischargeStatus = unknownDischargeStatus();
+  const metrics = new PrometheusMetrics();
+  const server = new HttpServer(metrics, () => discharge);
+  const port = await server.start(0);
+  try {
+    for (const state of [
+      "unknown",
+      "checking",
+      "confirmed",
+      "blocked",
+      "unknown",
+    ] as const) {
+      discharge = { state, reason: `Controller reports ${state}.` };
+      const response = await fetch(`http://127.0.0.1:${port}/api/battery`);
+      equal(response.headers.get("cache-control"), "no-store");
+      deepStrictEqual((await response.json()).discharge, discharge);
+    }
+  } finally {
     await server.stop();
     metrics.getRegister().clear();
   }

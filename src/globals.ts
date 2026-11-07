@@ -14,12 +14,12 @@ export const events = {
 };
 
 export enum WallboxChargeMode {
-  Off = 1,
-  SunOnly = 2,
-  ESSOnly = 3,
-  Night = 4,
-  On = 5,
-  Manual = 6,
+  Manual = 1,
+  Sun = 2,
+  Reserve = 3,
+  Battery = 4,
+  Night = 5,
+  Max = 6,
 }
 
 export enum WallboxStatus {
@@ -85,8 +85,8 @@ export const globals: GlobalState = {
   wallboxSetCurrent: new Map(),
   preferredWallboxLocation: WallboxLocation.Inside,
   wallboxChargeMode: new Map([
-    [WallboxLocation.Inside, WallboxChargeMode.SunOnly],
-    [WallboxLocation.Outside, WallboxChargeMode.SunOnly],
+    [WallboxLocation.Inside, WallboxChargeMode.Sun],
+    [WallboxLocation.Outside, WallboxChargeMode.Sun],
   ]),
 };
 

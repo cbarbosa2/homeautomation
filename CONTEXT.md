@@ -22,13 +22,36 @@ The highest wallbox charging power permitted by charger limits, grid capacity,
 and wallbox priority.
 
 **Wallbox priority**:
-The first claim on available charging power held by the vehicle that began
-charging first, while its charging eligibility persists. A pause caused solely by
-insufficient power does not release that claim.
+The first claim on available charging power held by the wallbox whose mode was
+most recently selected, including selecting the same mode again. The preference
+persists while that wallbox cannot charge.
 
 **Manual mode**:
 A wallbox mode in which the user controls charging and accepts responsibility for
 its grid impact; automatic current and start/stop intervention is excluded.
+
+### Agreed mode vocabulary
+
+**Max mode**:
+Unrestricted-source automatic EV charging at maximum possible power.
+_Avoid_: On
+
+**Night mode**:
+Scheduled Max charging during the night and Sun charging during the day.
+
+**Battery mode**:
+Battery-supported automatic EV charging with limited grid import.
+
+**Reserve mode**:
+Nighttime battery-supported EV charging that preserves energy for the next day,
+combined with Sun charging during the day.
+_Avoid_: ESS, ESS Only
+
+**Sun mode**:
+Automatic EV charging using solar surplus.
+_Avoid_: Sun Only
+
+### Control conditions
 
 **Night**:
 The period from 22:00 inclusive to 08:00 exclusive in Europe/Lisbon.

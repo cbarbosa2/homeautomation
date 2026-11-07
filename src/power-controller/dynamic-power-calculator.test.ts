@@ -33,14 +33,14 @@ function createDefaultState(): InputState {
       [WallboxLocation.Outside, WallboxStatus.Connected],
     ]),
     wallboxChargeMode: new Map([
-      [WallboxLocation.Inside, WallboxChargeMode.SunOnly],
-      [WallboxLocation.Outside, WallboxChargeMode.SunOnly],
+      [WallboxLocation.Inside, WallboxChargeMode.Sun],
+      [WallboxLocation.Outside, WallboxChargeMode.Sun],
     ]),
     timeOfDay: Temporal.PlainTime.from("12:00"),
   };
 }
 
-test("calculatePowerTargets basic SunOnly", () => {
+test("calculatePowerTargets basic Sun", () => {
   const state = createDefaultState();
   const result = calculatePowerTargets(state);
   assertEquals(typeof result.insideWallboxAmps, "number");
@@ -48,9 +48,9 @@ test("calculatePowerTargets basic SunOnly", () => {
   assertEquals(typeof result.batteryChargePower, "number");
 });
 
-test("calculatePowerTargets Off disables charging", () => {
+test("calculatePowerTargets Sun pauses without surplus", () => {
   const state = createDefaultState();
-  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Off);
+  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Sun);
   const result = calculatePowerTargets(state);
   assertEquals(result.insideWallboxAmps, 0);
 });
@@ -65,8 +65,9 @@ test("calculatePowerTargets Night mode off-peak", () => {
 
 test("inside BMW charge limit applies only to automatic capped modes", () => {
   for (const mode of [
-    WallboxChargeMode.SunOnly,
-    WallboxChargeMode.ESSOnly,
+    WallboxChargeMode.Sun,
+    WallboxChargeMode.Reserve,
+    WallboxChargeMode.Battery,
     WallboxChargeMode.Night,
   ]) {
     const state = createDefaultState();
@@ -74,7 +75,10 @@ test("inside BMW charge limit applies only to automatic capped modes", () => {
     state.batteryPower = 8000;
     state.insideVehicleSOC = 80;
     state.wallboxChargeMode.set(WallboxLocation.Inside, mode);
-    state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.On);
+    state.wallboxChargeMode.set(
+      WallboxLocation.Outside,
+      WallboxChargeMode.Manual,
+    );
     assertEquals(calculatePowerTargets(state).insideWallboxAmps, 0);
 
     state.insideVehicleSOC = 79;
@@ -82,7 +86,7 @@ test("inside BMW charge limit applies only to automatic capped modes", () => {
     state.insideVehicleSOC = undefined;
     assertEquals(calculatePowerTargets(state).insideWallboxAmps, 20);
     state.insideVehicleSOC = 80;
-    state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.On);
+    state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Max);
     assertEquals(calculatePowerTargets(state).insideWallboxAmps, 20);
   }
 });
@@ -90,8 +94,8 @@ test("inside BMW charge limit applies only to automatic capped modes", () => {
 test("calculatePowerTargets changes primary wallbox", () => {
   const state = createDefaultState();
   // Simulate concedePriority for inside, not for outside
-  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Off);
-  state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.On);
+  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Sun);
+  state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Max);
   const result = calculatePowerTargets(state);
   assertEquals(result.outsideWallboxAmps, 28);
 });
@@ -103,8 +107,8 @@ test("batteryChargePower with moderate grid power", () => {
     batteryMinSOC: 55,
     timeOfDay: Temporal.PlainTime.from("23:00"),
   };
-  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Off);
-  state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Off);
+  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Sun);
+  state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Sun);
 
   const result = calculatePowerTargets(state);
   assertEquals(result.batteryChargePower, 4720);
@@ -117,8 +121,8 @@ test("batteryChargePower with no grid power", () => {
     batteryMinSOC: 55,
     timeOfDay: Temporal.PlainTime.from("23:00"),
   };
-  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Off);
-  state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Off);
+  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Sun);
+  state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Sun);
 
   assertEquals(
     calculatePowerTargets(state).batteryChargePower,
@@ -133,8 +137,8 @@ test("batteryChargePower with high grid power", () => {
     batteryMinSOC: 55,
     timeOfDay: Temporal.PlainTime.from("23:00"),
   };
-  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Off);
-  state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Off);
+  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Sun);
+  state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Sun);
 
   assertEquals(
     calculatePowerTargets(state).batteryChargePower,
@@ -150,8 +154,8 @@ test("batteryChargePower with car charging", () => {
     batterySOC: 5,
   };
   state.wallboxPower.set(WallboxLocation.Inside, 18 * 240);
-  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.On);
-  state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Off);
+  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Max);
+  state.wallboxChargeMode.set(WallboxLocation.Outside, WallboxChargeMode.Sun);
 
   const result = calculatePowerTargets(state);
   assertEquals(result.insideWallboxAmps, 20);
@@ -183,14 +187,14 @@ test("wallbox amps when no PV power available", () => {
   assertEquals(calculatePowerTargets(state).outsideWallboxAmps, 0);
 });
 
-test("wallbox amps with battery at 95% or above gets maximum power", () => {
+test("full battery does not imply unused discharge capacity", () => {
   const state = createDefaultState();
   state.batteryPower = 0;
   state.pvInverterPower = 8000;
   state.batterySOC = 99;
   state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Manual);
   state.wallboxPower.set(WallboxLocation.Outside, 3500);
-  assertEquals(calculatePowerTargets(state).outsideWallboxAmps, 32);
+  assertEquals(calculatePowerTargets(state).outsideWallboxAmps, 14);
 });
 
 test("wallbox amps when battery not full and not charging", () => {
@@ -203,10 +207,10 @@ test("wallbox amps when battery not full and not charging", () => {
   assertEquals(calculatePowerTargets(state).outsideWallboxAmps, 0);
 });
 
-test("On mode uses shared fallback when PV telemetry is unavailable", () => {
+test("Max mode uses shared fallback when PV telemetry is unavailable", () => {
   const state = createDefaultState();
   state.pvInverterPower = undefined;
-  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.On);
+  state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Max);
   state.wallboxVictronStatus.set(
     WallboxLocation.Inside,
     WallboxStatus.Connected,

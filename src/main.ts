@@ -28,11 +28,23 @@ class HomeAutomationApp {
   private mqttClient: MqttClient;
   private metrics: PrometheusMetrics;
   private httpServer: HttpServer;
+  private chargingCycle: AutomaticChargingCycle;
 
   constructor() {
     this.metrics = new PrometheusMetrics();
     this.mqttClient = new MqttClient(this.metrics);
-    this.httpServer = new HttpServer(this.metrics);
+    this.chargingCycle = new AutomaticChargingCycle({
+      telemetry: () => controlTelemetry.snapshot(),
+      modes: () => globals.wallboxChargeMode,
+      preference: () => globals.preferredWallboxLocation,
+      insideVehicleSoc: getVehicleSoc,
+      clock: systemClock,
+      publisher: this.mqttClient,
+      enabled: POWER_CONTROL_ENABLED,
+    });
+    this.httpServer = new HttpServer(this.metrics, () =>
+      this.chargingCycle.getBatteryDischargeStatus(),
+    );
   }
 
   async start(): Promise<void> {
@@ -104,17 +116,8 @@ class HomeAutomationApp {
       return mqttAwakeTask.execute();
     });
 
-    const chargingCycle = new AutomaticChargingCycle({
-      telemetry: () => controlTelemetry.snapshot(),
-      modes: () => globals.wallboxChargeMode,
-      preference: () => globals.preferredWallboxLocation,
-      insideVehicleSoc: getVehicleSoc,
-      clock: systemClock,
-      publisher: this.mqttClient,
-      enabled: POWER_CONTROL_ENABLED,
-    });
     scheduler.interval("Dynamic power", DYNAMIC_POWER_INTERVAL, () => {
-      return chargingCycle.tick();
+      return this.chargingCycle.tick();
     });
 
     const loadForecastTask = new LoadForecastTask(this.metrics);

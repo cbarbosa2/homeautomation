@@ -30,7 +30,7 @@ Store both Victron identifiers in the ignored `.env` file, never in tracked sour
 
 Set `BMW_CARDATA_CLIENT_ID` in the ignored `.env` file and subscribe that client to **CarData API** in the BMW customer portal. Run `npm run bmw:setup` from the repository root. Open the verification URL printed by the command and authorize the device using the displayed code. The setup command selects the only PRIMARY vehicle on the account, creates or reuses a container for `vehicle.drivetrain.electricEngine.charging.level`, `vehicle.powertrain.electric.battery.stateOfCharge.displayed`, and `vehicle.drivetrain.batteryManagement.header`, saves the VIN and container ID in `.env`, and stores rotating tokens in the ignored `.bmw-cardata-tokens.json` file. If there is more than one PRIMARY vehicle, set `BMW_CARDATA_VIN` in `.env` before rerunning setup. Keep both files private with mode `0600`.
 
-Restart the service after setup. It reads the three SOC fields on startup and every half hour at minutes 05 and 35, selecting the valid value with the most recent BMW timestamp. It exposes the SOC at `/api/bmw-soc`, in the dashboard, and as `bmw_i3_soc` with `bmw_i3_soc_timestamp_seconds`. The timestamp is essential because vehicle updates can lag behind API polling. An SOC reading no more than 90 minutes old stops the inside wallbox at 80% in Sun Only, ESS Only, and Night modes. Missing or older readings allow charging under the usual mode rules. On and Manual are unaffected. If the refresh token expires after prolonged downtime, rerun setup to authorize again. See the [BMW CarData integration guide](https://bmw-cardata.bmwgroup.com/customer/public/api-documentation).
+Restart the service after setup. It reads the three SOC fields on startup and every half hour at minutes 05 and 35, selecting the valid value with the most recent BMW timestamp. It exposes the SOC at `/api/bmw-soc`, in the dashboard, and as `bmw_i3_soc` with `bmw_i3_soc_timestamp_seconds`. The timestamp is essential because vehicle updates can lag behind API polling. An SOC reading no more than 90 minutes old stops the inside wallbox at 80% in Sun, Reserve, Battery and Night modes. Missing or older readings allow charging under the usual mode rules. Max and Manual are unaffected. If the refresh token expires after prolonged downtime, rerun setup to authorize again. See the [BMW CarData integration guide](https://bmw-cardata.bmwgroup.com/customer/public/api-documentation).
 
 Run setup on each host where the service will read BMW data. The deployment scripts do not transfer `.env` or `.bmw-cardata-tokens.json`; on `bee.local`, set the client ID in `/home/carlos/homeautomation/.env` and run `npm run bmw:setup` from `/home/carlos/homeautomation`. The setup script is not part of normal service startup.
 
@@ -43,17 +43,26 @@ With the default port:
 - Prometheus metrics: <http://localhost:1881/metrics>
 - Health: <http://localhost:1881/health>
 
-The health endpoint returns `OK`; it does not verify MQTT connectivity or external services. Metrics include process metrics, MQTT message counts and connection status, errors, and device/energy telemetry. Definitions are in [metrics.ts](../src/prometheus/metrics.ts); registration is in [prometheus.ts](../src/prometheus/prometheus.ts).
+The health endpoint returns `OK`; it does not verify MQTT connectivity or external services. Metrics include process metrics, MQTT message counts and connection status, errors, and device/energy telemetry. Charge-mode gauges use 1=Manual, 2=Sun, 3=Reserve, 4=Battery, 5=Night and 6=Max. Definitions are in [metrics.ts](../src/prometheus/metrics.ts); registration is in [prometheus.ts](../src/prometheus/prometheus.ts).
 
 The Home Energy dashboard displays current home battery SOC and minimum SOC,
 wallbox mode controls, BMW SOC, and a compact list of scheduled jobs. Job cron
 expressions are shown in UTC. `GET /api/battery` returns
-`{ "soc": 72, "minSoc": 30 }` from validated control telemetry, with each value
+`{ "soc": 72, "minSoc": 30, "discharge": { "state": "confirmed", "reason": "The controller has observed the battery discharging." } }`.
+SOC values come from validated control telemetry, with each value
 independently `null` when missing, invalid, disconnected, or more than 60 seconds
 old. The response is not cached. The dashboard polls battery readings every ten
 seconds after the preceding request completes and shows unavailable values on
 refresh failure. These values are read-only; wallbox mode and priority changes
 still require pressing Set.
+
+The discharge indicator reports the existing controller assessment: Confirmed,
+Checking, Blocked, or Unknown, with an explanation. SOC above minimum alone does
+not confirm discharge. Failed discovery blocks further attempts until SOC rises
+one percentage point from the failure baseline or minimum SOC changes. Invalid
+control telemetry or a controller evaluation older than 60 seconds produces
+Unknown. This display does not initiate discharge checks or change charging.
+
 
 ## Automation telemetry and timing
 
@@ -66,7 +75,7 @@ Missing, malformed, nonfinite, or more than 60-second-old readings are unavailab
 Missing PV inverter power counts as zero at any hour, since the inverter may not
 report when sunlight is insufficient. A broker disconnect invalidates all control
 readings immediately. Allocation uses
-one 12 A budget until required readings return, with wallboxes ahead of battery.
+one 12 A budget until required readings return, with eligible Max/nighttime Night wallboxes ahead of battery. Solar and battery-supported requests require fresh evidence.
 Mode conditions still apply and Manual loads are never controlled.
 
 Automatic increases reserve capacity until fresh device settings and measured
@@ -78,6 +87,18 @@ rounding current and battery limits down. Grid measurements include Manual loads
 Solar availability is bounded by total AC/DC PV and the energy balance
 `automatic wallbox power + signed battery power - grid import`, so grid-funded
 battery charging is not reused as solar surplus.
+
+Battery-supported modes discover available discharge with a bounded 10 A startup,
+then whole-amp increases after fresh device confirmation. They target whole-house
+import below 100 W; Sun targets zero. An observed discharge ceiling limits further
+increases after import reaches the target. If import exceeds 200 W continuously
+for more than 15 seconds without observed discharge, both EVs stop probing until
+minimum SOC changes or SOC rises at least one point above its failure value.
+Mode changes and stale recovery retain this block; process restart clears it.
+See [automation rules](automation-rules.md#battery-support-discovery) for exact
+conditions. Real inverter response times, measured-power tolerance (half an amp)
+and the retained 15-tick increase smoothing need observation after deployment;
+validation uses simulated devices and never sends hardware commands.
 
 SOC actions run at Lisbon 22:01 and 08:00, including DST. The evening job requires
 fresh battery SOC and tomorrow's date-specific Forecast.Solar result (Wh, fetched
@@ -115,7 +136,7 @@ mode values plus `preferredLocation` (`"Inside"` or `"Outside"`). This response 
 not cached. The badge is refreshed after Set attempts, including failed saves,
 because runtime priority may already have changed. This refresh does not alter
 pending dropdown selections. Priority indicates preference when eligible, even
-if that charger is currently disconnected, Off, or Manual.
+if that charger is currently disconnected or Manual.
 The saved `preferredWallboxLocation` uses numeric locations
 (0 Inside, 1 Outside); absent or invalid preference defaults to Inside. Startup
 restoration does not change preference based on mode-loading order.
@@ -128,18 +149,61 @@ Settings writes send `X-Bin-Versioning: false` to avoid exhausting bin versions.
 Public bins require the master key to honor this header. Configure
 `JSONBIN_MASTER_KEY` for public bins; existing history is not deleted.
 
-## Node.js rollout and rollback
+## Mode numbers and physical controls
+
+The API and saved settings use numeric values directly, without a compatibility
+field or automatic migration. On deployment, **manually reselect both modes**.
+Existing clients, cached dashboards and monitoring labels must adopt these meanings:
+
+| Stored/API number | Previous meaning | New meaning |
+| --- | --- | --- |
+| 1 | Off | Manual |
+| 2 | Sun Only | Sun |
+| 3 | ESS Only | Reserve |
+| 4 | Night | Battery |
+| 5 | On | Night |
+| 6 | Manual | Max |
+
+For example, POST `/api/wallbox-charge-mode` with
+`{ "location": "Inside", "value": 4 }` selects Battery and claims priority.
+GET returns the selected numeric modes and preferred location; temporary pauses
+do not alter these settings. There is no public Off option; use Manual for user
+control or select a suitable automatic policy.
+
+| Click count | Down | Up |
+| --- | --- | --- |
+| 1 | Reserve (3) | Battery (4) |
+| 2 | Sun (2) | Night (5) |
+| 3 | Manual (1) | Max (6) |
+
+Inside down/up use event IDs 0/1; outside down/up use 3/2. The separate 6 A
+wallbox-current gesture selects Manual and resets the current setting to 7 A.
+Every mode selection, including repeated selections, claims priority.
+
+## Deployment and rollback
 
 The Linux service uses Node.js 26.13 or newer in the 26.x line, with compiled ESM at `dist/src/bootstrap.js`. npm and development dependencies are needed when building on the host; systemd executes the compiled JavaScript directly. Upgrading a developer machine's Node installation does not update `bee.local`.
 
-For a host still running the former Deno service, perform the one-time cutover below with permission to install packages and replace/reload the systemd unit. Deployment scripts do not perform that cutover automatically.
+### Host setup
 
-1. Install Node.js 26.13 or newer in the 26.x LTS line and npm using your host's trusted package source or the official [Node distributions](https://nodejs.org/en/download). The service requires `/usr/bin/node`; verify `/usr/bin/node --version`, `node --version`, and `npm --version` as `carlos`. If Node is installed elsewhere, change `ExecStart` and both deployment scripts together. A shell-only version manager does not configure systemd.
-2. Record the running Git revision, or back up the source tree for a local-copy deployment. Back up `/etc/systemd/system/homeautomation.service` and retain Deno for rollback. Preserve the host's `.env` and rotating BMW token files with ownership `carlos` and mode `0600`; do not replace them with local copies or restore old rotating tokens during rollback.
-3. On the local machine, run `npm ci`, `npm run analyze`, and `npm run build`. On the host, stop the service before replacing its source/dependencies. Transfer or check out the migration, then run `npm ci` and `npm run build` as `carlos` from `/home/carlos/homeautomation`. Both commands must succeed before startup. Builds require development dependencies, so do not use `npm ci --omit=dev` for this workflow.
-4. Copy the updated unit with `sudo cp homeautomation.service /etc/systemd/system/`, run `sudo systemctl daemon-reload`, and start with `sudo systemctl start homeautomation`. Its working directory and filesystem protection remain the same; Node runs the precompiled entrypoint without npm or compiler access at service startup.
-5. Check `systemctl status homeautomation`, `journalctl -u homeautomation`, `/health`, the dashboard, and `/metrics` on the configured HTTP port. Confirm MQTT connection status and telemetry freshness. A successful health response only checks HTTP. Do not run a second instance against the same installation during verification.
+1. Install the required Node.js version and npm using your host's trusted package source. The service requires `/usr/bin/node`; verify `/usr/bin/node --version`, `node --version`, and `npm --version` as `carlos`. If Node is installed elsewhere, change `ExecStart` and both deployment scripts together. A shell-only version manager does not configure systemd.
+2. Place the repository at `/home/carlos/homeautomation`. Keep the host's `.env` and rotating BMW token files owned by `carlos` with mode `0600`; do not replace them with local copies.
+3. Run `npm ci` and `npm run build` as `carlos` from the repository root. Both commands must succeed before startup. Builds require development dependencies, so do not use `npm ci --omit=dev` for this workflow.
+4. Install the unit with `sudo cp homeautomation.service /etc/systemd/system/`, run `sudo systemctl daemon-reload`, and enable and start it with `sudo systemctl enable --now homeautomation`. Node runs the precompiled entrypoint without npm or compiler access at service startup.
 
-Subsequent deployment scripts require the migrated systemd unit before stopping the service. They validate locally, check both remote Node binaries, stop the service, update source, install locked dependencies, build remotely, and start only after success. The local-copy script preserves the existing build timestamp; Git deployment refreshes it. Failure after stopping leaves the service stopped for operator recovery.
+### Deploying updates
 
-For rollback, stop the service, restore the recorded source revision/tree and the backed-up systemd unit, reload systemd, and start with the former Deno runtime. Keep current `.env` and BMW tokens: their formats and locations are unchanged. Verify the journal, HTTP endpoints, MQTT connection, and telemetry again. If a build fails during ordinary Node deployment, restore the previous Node revision, rerun `npm ci` and `npm run build`, then start; never restart against a partially built output directory.
+Record the running Git revision, or back up the source tree for a local-copy deployment. Back up the installed systemd unit before changing it. Stop the service before replacing its source or dependencies.
+
+The deployment scripts validate locally, check both remote Node binaries and the installed systemd unit, stop the service, update source, install locked dependencies, build remotely, and start only after success. The local-copy script preserves the existing build timestamp; Git deployment refreshes it. Failure after stopping leaves the service stopped for operator recovery.
+
+Check `systemctl status homeautomation`, `journalctl -u homeautomation`, `/health`, the dashboard, and `/metrics` on the configured HTTP port. Confirm MQTT connection status and telemetry freshness. A successful health response only checks HTTP. Do not run a second instance against the same installation during verification.
+
+### Rollback
+
+Stop the service, restore the recorded source revision/tree, then rerun `npm ci` and `npm run build` before starting. Never restart against a partially built output directory. If the systemd unit changed, restore its backup and run `sudo systemctl daemon-reload` before starting.
+
+Keep the host's current `.env` and BMW tokens; do not restore old rotating tokens. Verify the journal, HTTP endpoints, MQTT connection, and telemetry again.
+
+When rolling back across the mode renumbering, manually reselect both wallbox
+modes under the old numbering too; saved numbers are not translated.

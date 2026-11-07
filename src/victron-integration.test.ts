@@ -65,10 +65,13 @@ test("configured portal ID routes telemetry, subscriptions, refreshes and comman
   };
   const previousModes = new Map(globals.wallboxChargeMode);
   try {
-    globals.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.On);
+    globals.wallboxChargeMode.set(
+      WallboxLocation.Inside,
+      WallboxChargeMode.Max,
+    );
     globals.wallboxChargeMode.set(
       WallboxLocation.Outside,
-      WallboxChargeMode.On,
+      WallboxChargeMode.Max,
     );
     await runCommands(
       Object.values(CommandType).map((type) => ({ type, value: 0 })),

@@ -16,8 +16,10 @@ test("repeated physical selections and Manual triggers persist preference", asyn
   const originalPreference = globals.preferredWallboxLocation;
   const metrics = new PrometheusMetrics();
   const mqtt = new MqttClient(metrics);
-  mqtt.publishJson = async () => {
-    throw new Error("Unexpected hardware command");
+  const commands: { topic: string; value: unknown }[] = [];
+  mqtt.publishJson = async (topic, payload) => {
+    const { value } = payload;
+    commands.push({ topic, value });
   };
   const writes: { preferredWallboxLocation: L }[] = [];
   globalThis.fetch = async (_input, init) => {
@@ -25,10 +27,10 @@ test("repeated physical selections and Manual triggers persist preference", asyn
     return Response.json({});
   };
   globals.wallboxChargeMode = new Map([
-    [L.Inside, Mode.On],
-    [L.Outside, Mode.On],
+    [L.Inside, Mode.Max],
+    [L.Outside, Mode.Max],
   ]);
-  setupWallSwitchHandler(mqtt, metrics);
+  setupWallSwitchHandler(mqtt, metrics, true);
   try {
     for (const [id, location] of [
       [2, L.Outside],
@@ -49,9 +51,38 @@ test("repeated physical selections and Manual triggers persist preference", asyn
     assertEquals(globals.wallboxChargeMode.get(L.Outside), Mode.Manual);
     assertEquals(globals.preferredWallboxLocation, L.Outside);
     assertEquals(
+      commands.map(({ topic, value }) => ({
+        path: topic.split("/").slice(2).join("/"),
+        value,
+      })),
+      [
+        { path: "evcharger/40/SetCurrent", value: 7 },
+        { path: "evcharger/41/SetCurrent", value: 7 },
+      ],
+    );
+    assertEquals(
       writes.map((write) => write.preferredWallboxLocation),
       [L.Outside, L.Inside, L.Outside, L.Outside, L.Inside, L.Outside],
     );
+    for (const [id, location, modes] of [
+      [0, L.Inside, [Mode.Reserve, Mode.Sun, Mode.Manual]],
+      [1, L.Inside, [Mode.Battery, Mode.Night, Mode.Max]],
+      [2, L.Outside, [Mode.Battery, Mode.Night, Mode.Max]],
+      [3, L.Outside, [Mode.Reserve, Mode.Sun, Mode.Manual]],
+    ] as const) {
+      for (const [index, event] of [
+        "single_push",
+        "double_push",
+        "triple_push",
+      ].entries()) {
+        await events.wallSwitchUpdated.emit({
+          params: { events: [{ id, event }] },
+        });
+        assertEquals(globals.wallboxChargeMode.get(location), modes[index]);
+        assertEquals(globals.preferredWallboxLocation, location);
+        assertEquals(writes.at(-1)?.preferredWallboxLocation, location);
+      }
+    }
   } finally {
     globalThis.fetch = originalFetch;
     globals.wallboxChargeMode = originalModes;

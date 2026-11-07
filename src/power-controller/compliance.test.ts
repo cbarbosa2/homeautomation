@@ -29,8 +29,8 @@ export function state(): InputState {
       [L.Outside, S.Connected],
     ]),
     wallboxChargeMode: new Map([
-      [L.Inside, Mode.On],
-      [L.Outside, Mode.On],
+      [L.Inside, Mode.Max],
+      [L.Outside, Mode.Max],
     ]),
     timeOfDay: Temporal.PlainTime.from("12:00"),
   };
@@ -47,7 +47,7 @@ import { CommandBuilder } from "./command-builder.ts";
 import { CommandType } from "./power-controller.ts";
 test("an active charger stops even when measured power is zero", () => {
   const input = state();
-  input.wallboxChargeMode.set(L.Inside, Mode.Off);
+  input.wallboxChargeMode.set(L.Inside, Mode.Sun);
   input.wallboxVictronStatus.set(L.Inside, S.Charging);
   const commands = new CommandBuilder().createCommandsFromPowerSettings(
     {
@@ -67,8 +67,8 @@ test("an active charger stops even when measured power is zero", () => {
 test("grid-funded battery charging is not solar surplus", () => {
   const input = state();
   input.wallboxChargeMode = new Map([
-    [L.Inside, Mode.SunOnly],
-    [L.Outside, Mode.SunOnly],
+    [L.Inside, Mode.Sun],
+    [L.Outside, Mode.Sun],
   ]);
   input.gridPower = 4000;
   input.batteryPower = 4000;
@@ -78,8 +78,8 @@ test("grid-funded battery charging is not solar surplus", () => {
 test("DC solar is shared once, without an inverter-only gate", () => {
   const input = state();
   input.wallboxChargeMode = new Map([
-    [L.Inside, Mode.SunOnly],
-    [L.Outside, Mode.SunOnly],
+    [L.Inside, Mode.Sun],
+    [L.Outside, Mode.Sun],
   ]);
   input.batteryPower = 6000;
   input.pvChargerPower = 6000;
@@ -114,7 +114,7 @@ test("fallback is one 12 A budget with evidence required for solar modes", () =>
     ],
     [12, 0, 0],
   );
-  input.wallboxChargeMode.set(L.Inside, Mode.SunOnly);
+  input.wallboxChargeMode.set(L.Inside, Mode.Sun);
   result = calculatePowerTargets(input);
   assertEquals([result.insideWallboxAmps, result.outsideWallboxAmps], [0, 12]);
 });
@@ -164,21 +164,22 @@ test("preferred charger resumes allocation after temporary ineligibility", () =>
     input.wallboxVictronStatus.set(L.Outside, S.Connected);
     assertEquals(calculatePowerTargets(input).outsideWallboxAmps, 28);
   }
-  for (const mode of [Mode.Off, Mode.Manual, Mode.SunOnly]) {
+  for (const mode of [Mode.Reserve, Mode.Manual, Mode.Sun]) {
     const input = state();
     input.preferredWallboxLocation = L.Outside;
     input.wallboxChargeMode.set(L.Outside, mode);
     input.batterySOC = 20;
     assertEquals(calculatePowerTargets(input).insideWallboxAmps, 20);
-    input.wallboxChargeMode.set(L.Outside, Mode.On);
+    input.wallboxChargeMode.set(L.Outside, Mode.Max);
     assertEquals(calculatePowerTargets(input).outsideWallboxAmps, 28);
   }
 });
 
 test("mode SOC boundaries and night boundaries follow strict documented margins", () => {
-  for (const mode of [Mode.SunOnly, Mode.ESSOnly, Mode.Night]) {
+  for (const mode of [Mode.Sun, Mode.Reserve, Mode.Night]) {
     const input = state();
     input.wallboxChargeMode.set(L.Inside, mode);
+    input.wallboxChargeMode.set(L.Outside, Mode.Manual);
     input.pvChargerPower = 4800;
     input.batteryPower = 4800;
     input.batterySOC = 21;
@@ -188,12 +189,17 @@ test("mode SOC boundaries and night boundaries follow strict documented margins"
     input.batteryPower = 0;
     input.pvChargerPower = 0;
     input.batterySOC = 95;
-    assertEquals(calculatePowerTargets(input).insideWallboxAmps, 20);
+    assertEquals(calculatePowerTargets(input).insideWallboxAmps, 0);
+    input.batterySOC = 95.01;
+    input.batterySupportWatts = 2400;
+    assertEquals(calculatePowerTargets(input).insideWallboxAmps, 10);
     input.batterySOC = 94.99;
     assertEquals(calculatePowerTargets(input).insideWallboxAmps, 0);
   }
   const input = state();
-  input.wallboxChargeMode.set(L.Inside, Mode.ESSOnly);
+  input.wallboxChargeMode.set(L.Inside, Mode.Reserve);
+  input.wallboxChargeMode.set(L.Outside, Mode.Manual);
+  input.batterySupportWatts = 4800;
   input.timeOfDay = Temporal.PlainTime.from("23:30");
   input.remainingNight = Temporal.Duration.from({ hours: 9 });
   input.batterySOC = 38;

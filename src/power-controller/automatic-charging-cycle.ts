@@ -1,4 +1,4 @@
-import type { WallboxChargeMode, WallboxLocation } from "../globals.ts";
+import { WallboxChargeMode, type WallboxLocation } from "../globals.ts";
 import type { VehicleSoc } from "../bmw-cardata/bmw-cardata.ts";
 import { type Clock, lisbonTime, timeUntilMorning } from "../lisbon-clock.ts";
 import type { MqttClient } from "../mqtt-client.ts";
@@ -9,6 +9,8 @@ import {
 } from "./dynamic-power-calculator.ts";
 import { runCommands } from "./power-controller.ts";
 import { Temporal } from "../temporal.ts";
+
+import { BatterySupportController } from "./battery-support-controller.ts";
 
 const VEHICLE_SOC_MAX_AGE = Temporal.Duration.from({ minutes: 90 });
 
@@ -33,10 +35,18 @@ interface Dependencies {
 /** Owns one automatic charging cycle and its state across successive ticks. */
 export class AutomaticChargingCycle {
   private readonly builder: CommandBuilder;
+  private readonly support: BatterySupportController;
   private running = false;
 
   constructor(private readonly dependencies: Dependencies) {
     this.builder = new CommandBuilder(dependencies.clock);
+    this.support = new BatterySupportController(dependencies.clock);
+  }
+
+  getBatteryDischargeStatus() {
+    return this.support.getDischargeStatus(
+      this.dependencies.telemetry().telemetryValid !== false,
+    );
   }
 
   /** Busy triggers are skipped, not queued. Publication failures reach the caller. */
@@ -61,11 +71,15 @@ export class AutomaticChargingCycle {
         ...telemetry(),
         insideVehicleSOC,
         preferredWallboxLocation: this.dependencies.preference(),
-        wallboxChargeMode: modes(),
+        wallboxChargeMode: new Map(modes()),
         timeOfDay: lisbonTime(now).toPlainTime(),
         remainingNight: timeUntilMorning(now),
       };
-      const targets = calculatePowerTargets(state);
+      const batterySupportWatts = this.support.allowanceFor(
+        state,
+        this.builder,
+      );
+      const targets = calculatePowerTargets({ ...state, batterySupportWatts });
 
       // Preserve intent even if publication fails or is disabled. Capacity is
       // released by fresh device confirmation, not by transport success.
@@ -73,8 +87,11 @@ export class AutomaticChargingCycle {
         state,
         targets,
       );
+      this.support.recordCommands(this.builder);
       await runCommands(commands, publisher, enabled, (location) =>
-        modes().get(location),
+        modes().get(location) === state.wallboxChargeMode.get(location)
+          ? modes().get(location)
+          : WallboxChargeMode.Manual,
       );
     } finally {
       this.running = false;

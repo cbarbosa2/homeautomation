@@ -173,12 +173,14 @@ export const METRICS = {
     ESS_WALLBOX_INSIDE_CHARGE_MODE: {
       name: "ess_wallbox_inside_charge_mode",
       title: "Inside Wallbox Charge Mode",
-      description: "Inside wallbox charge mode (1..6)",
+      description:
+        "Inside wallbox charge mode (1=Manual, 2=Sun, 3=Reserve, 4=Battery, 5=Night, 6=Max)",
     },
     ESS_WALLBOX_OUTSIDE_CHARGE_MODE: {
       name: "ess_wallbox_outside_charge_mode",
       title: "Outside Wallbox Charge Mode",
-      description: "Outside wallbox charge mode (1..6)",
+      description:
+        "Outside wallbox charge mode (1=Manual, 2=Sun, 3=Reserve, 4=Battery, 5=Night, 6=Max)",
     },
     ESS_SHED_TEMPERATURE: {
       name: "ess_shed_temperature",

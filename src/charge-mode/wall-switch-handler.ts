@@ -1,3 +1,4 @@
+import { POWER_CONTROL_ENABLED } from "../constants.ts";
 import { events, WallboxChargeMode, WallboxLocation } from "../globals.ts";
 import type { MqttClient } from "../mqtt-client.ts";
 import {
@@ -8,18 +9,18 @@ import type { PrometheusMetrics } from "../prometheus/prometheus.ts";
 import { setChargeMode } from "./charge-mode-switcher.ts";
 
 const mapIdAndPushesToChargeMode = new Map([
-  ["0_1", WallboxChargeMode.ESSOnly],
-  ["0_2", WallboxChargeMode.SunOnly],
-  ["0_3", WallboxChargeMode.Off],
-  ["1_1", WallboxChargeMode.Night],
-  ["1_2", WallboxChargeMode.On],
-  ["1_3", WallboxChargeMode.Manual],
-  ["2_1", WallboxChargeMode.Night],
-  ["2_2", WallboxChargeMode.On],
-  ["2_3", WallboxChargeMode.Manual],
-  ["3_1", WallboxChargeMode.ESSOnly],
-  ["3_2", WallboxChargeMode.SunOnly],
-  ["3_3", WallboxChargeMode.Off],
+  ["0_1", WallboxChargeMode.Reserve],
+  ["0_2", WallboxChargeMode.Sun],
+  ["0_3", WallboxChargeMode.Manual],
+  ["1_1", WallboxChargeMode.Battery],
+  ["1_2", WallboxChargeMode.Night],
+  ["1_3", WallboxChargeMode.Max],
+  ["2_1", WallboxChargeMode.Battery],
+  ["2_2", WallboxChargeMode.Night],
+  ["2_3", WallboxChargeMode.Max],
+  ["3_1", WallboxChargeMode.Reserve],
+  ["3_2", WallboxChargeMode.Sun],
+  ["3_3", WallboxChargeMode.Manual],
 ]);
 
 const AMPS_FORCING_MANUAL_MODE = 6;
@@ -27,6 +28,7 @@ const AMPS_FORCING_MANUAL_MODE = 6;
 export function setupWallSwitchHandler(
   mqttClient: MqttClient,
   metrics: PrometheusMetrics,
+  publicationEnabled = POWER_CONTROL_ENABLED,
 ): void {
   events.wallSwitchUpdated.subscribe((payload) => {
     return handleWallSwitch(metrics, payload);
@@ -38,8 +40,14 @@ export function setupWallSwitchHandler(
         WallboxLocation.Inside,
         WallboxChargeMode.Manual,
       );
-      setWallboxOutOfManualCurrent(mqttClient, CommandType.InsideCurrent);
-      await saved;
+      await Promise.all([
+        saved,
+        setWallboxOutOfManualCurrent(
+          mqttClient,
+          CommandType.InsideCurrent,
+          publicationEnabled,
+        ),
+      ]);
     }
   });
   events.wallboxCurrentOutsideUpdated.subscribe(async (payload) => {
@@ -49,8 +57,14 @@ export function setupWallSwitchHandler(
         WallboxLocation.Outside,
         WallboxChargeMode.Manual,
       );
-      setWallboxOutOfManualCurrent(mqttClient, CommandType.OutsideCurrent);
-      await saved;
+      await Promise.all([
+        saved,
+        setWallboxOutOfManualCurrent(
+          mqttClient,
+          CommandType.OutsideCurrent,
+          publicationEnabled,
+        ),
+      ]);
     }
   });
 }
@@ -58,8 +72,9 @@ export function setupWallSwitchHandler(
 function setWallboxOutOfManualCurrent(
   mqttClient: MqttClient,
   commandType: CommandType,
+  publicationEnabled: boolean,
 ) {
-  runCommands(
+  return runCommands(
     [
       {
         type: commandType,
@@ -67,6 +82,9 @@ function setWallboxOutOfManualCurrent(
       },
     ],
     mqttClient,
+    publicationEnabled,
+    // This explicit user gesture resets the setting after selecting Manual.
+    () => undefined,
   );
 }
 

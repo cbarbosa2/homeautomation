@@ -39,10 +39,10 @@ export async function setChargeMode(
       preferredWallboxLocation: globals.preferredWallboxLocation,
       inside:
         globals.wallboxChargeMode.get(WallboxLocation.Inside) ??
-        WallboxChargeMode.SunOnly,
+        WallboxChargeMode.Sun,
       outside:
         globals.wallboxChargeMode.get(WallboxLocation.Outside) ??
-        WallboxChargeMode.SunOnly,
+        WallboxChargeMode.Sun,
     }).catch((error) => {
       logError(`❌ Failed to save persistent storage: ${String(error)}`);
       throw new Error(

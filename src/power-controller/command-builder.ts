@@ -41,14 +41,33 @@ interface Reservation {
 /** Reductions are immediate. Increases wait for smoothing and device feedback. */
 export class CommandBuilder {
   private history = new Map<L, number[]>();
+  private modes = new Map<L, Mode>();
   private reservations = new Map<Device, Reservation>();
   constructor(private now: Clock = systemClock) {}
+
+  public commitments(): Map<
+    L,
+    { watts: number; target: number; since: Temporal.Instant | undefined }
+  > {
+    return new Map(
+      LOCATIONS.flatMap((l) => {
+        const reservation = this.reservations.get(l);
+        return reservation ? [[l, { ...reservation }] as const] : [];
+      }),
+    );
+  }
 
   public createCommandsFromPowerSettings(
     state: SystemState,
     targets: CalculatedTargetResults,
   ): PowerCommand[] {
     const desired = new Map<Device, number>();
+    for (const l of LOCATIONS) {
+      const mode = state.wallboxChargeMode?.get(l);
+      if (mode !== this.modes.get(l)) this.history.delete(l);
+      if (mode !== undefined) this.modes.set(l, mode);
+      if (this.reservations.has(l)) this.refreshReservation(l, state);
+    }
     for (const l of LOCATIONS) {
       const target =
         l === L.Inside ? targets.insideWallboxAmps : targets.outsideWallboxAmps;
@@ -57,7 +76,6 @@ export class CommandBuilder {
         target === undefined
       ) {
         this.history.delete(l);
-        this.reservations.delete(l);
         continue;
       }
       const history = this.history.get(l) ?? [];
@@ -86,7 +104,18 @@ export class CommandBuilder {
     for (const [device, wanted] of desired) {
       const reservation = this.reservations.get(device) as Reservation;
       const others = [...this.reservations].reduce(
-        (sum, [d, r]) => sum + (d === device ? 0 : r.watts),
+        (sum, [d, r]) =>
+          sum +
+          (d === device
+            ? 0
+            : Math.max(
+                0,
+                r.watts -
+                  (d !== "battery" &&
+                  state.wallboxChargeMode?.get(d) === Mode.Manual
+                    ? (state.wallboxPower.get(d) ?? 0)
+                    : 0),
+              )),
         0,
       );
       const headroom = Math.max(
@@ -94,6 +123,17 @@ export class CommandBuilder {
         (targets.sharedBudgetWatts ?? Infinity) - others,
       );
       let watts = Math.min(wanted, headroom);
+      if (device !== "battery") {
+        for (const constraint of targets.supplyConstraints ?? []) {
+          if (!constraint.locations.includes(device)) continue;
+          const committed = constraint.locations.reduce(
+            (sum, l) =>
+              sum + (l === device ? 0 : (this.reservations.get(l)?.watts ?? 0)),
+            0,
+          );
+          watts = Math.min(watts, Math.max(0, constraint.watts - committed));
+        }
+      }
       if (device !== "battery") {
         const amps = wallboxAmps(
           device,
@@ -210,6 +250,14 @@ export class CommandBuilder {
         since: undefined,
         pendingPeak: watts,
       });
+    } else if (
+      fresh &&
+      device !== "battery" &&
+      state.wallboxChargeMode?.get(device) === Mode.Manual
+    ) {
+      old.watts = Math.max(configured, measured);
+      old.target = configured;
+      old.pendingPeak = configured;
     } else if (
       fresh &&
       old.target < old.watts &&

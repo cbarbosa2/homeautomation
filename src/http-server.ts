@@ -11,12 +11,20 @@ import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
 import { getVehicleSoc } from "./bmw-cardata/bmw-cardata.ts";
 import { CONTROL_PATHS, controlTelemetry } from "./control-telemetry.ts";
 
+import {
+  type BatteryDischargeStatus,
+  unknownDischargeStatus,
+} from "./power-controller/battery-support-controller.ts";
+
 export class HttpServer {
   private server: Server | null = null;
   private metrics: PrometheusMetrics;
   private readonly buildTimestamp: string;
 
-  constructor(metrics: PrometheusMetrics) {
+  constructor(
+    metrics: PrometheusMetrics,
+    private readonly readDischargeStatus: () => BatteryDischargeStatus = unknownDischargeStatus,
+  ) {
     this.metrics = metrics;
     this.buildTimestamp = this.readBuildTimestamp();
   }
@@ -58,6 +66,7 @@ export class HttpServer {
           {
             soc: controlTelemetry.value(CONTROL_PATHS.batterySOC) ?? null,
             minSoc: controlTelemetry.value(CONTROL_PATHS.batteryMinSOC) ?? null,
+            discharge: this.readDischargeStatus(),
           },
           { headers: { "Cache-Control": "no-store" } },
         );
@@ -207,10 +216,10 @@ export class HttpServer {
     // Return current modes and the preference restored at startup.
     const inside =
       globals.wallboxChargeMode.get(WallboxLocation.Inside) ??
-      WallboxChargeMode.Off;
+      WallboxChargeMode.Sun;
     const outside =
       globals.wallboxChargeMode.get(WallboxLocation.Outside) ??
-      WallboxChargeMode.Off;
+      WallboxChargeMode.Sun;
     return Response.json(
       {
         Inside: inside,
