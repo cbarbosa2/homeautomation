@@ -128,9 +128,7 @@ class HomeAutomationApp {
     });
 
     const setSocLimitTask = new SetSocLimitTask(this.mqttClient);
-    scheduler.cron("Lisbon SOC schedule", "* * * * *", () =>
-      setSocLimitTask.tick(),
-    );
+    scheduler.cron("Setup Min SOC", "* * * * *", () => setSocLimitTask.tick());
   }
 
   private async loadPersistedSettings(): Promise<void> {
