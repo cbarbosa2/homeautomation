@@ -125,6 +125,9 @@ export class CommandBuilder {
       let watts = Math.min(wanted, headroom);
       if (device !== "battery") {
         for (const constraint of targets.supplyConstraints ?? []) {
+          // Unrestricted requests still count against limited EVs' reservations,
+          // but are bounded themselves only by installation headroom.
+          if (targets.unrestrictedLocations?.includes(device)) continue;
           if (!constraint.locations.includes(device)) continue;
           const committed = constraint.locations.reduce(
             (sum, l) =>

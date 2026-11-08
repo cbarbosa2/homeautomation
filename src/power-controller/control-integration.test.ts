@@ -1275,3 +1275,17 @@ test("discharge headroom increases nominal current without ratcheting down on lo
   assert(!has(await h.tick(), outside("SetCurrent"), 25));
   assertEquals(h.values.get(outside("SetCurrent")), 26);
 });
+
+for (const mode of [Mode.Max, Mode.Night]) {
+  test(`preferred unrestricted mode ${mode} is not capped by the other charger's battery allowance`, async () => {
+    const h = installation();
+    h.modes.set(L.Inside, Mode.Battery);
+    h.modes.set(L.Outside, mode);
+    if (mode === Mode.Night) h.setTime("2026-11-08T23:00:00Z");
+    h.refresh();
+    h.prefer(L.Outside);
+    const writes = await h.tick();
+    assert(has(writes, outside("SetCurrent"), 28));
+    assert(!has(writes, inside("StartStop"), 1));
+  });
+}

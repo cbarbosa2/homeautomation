@@ -27,6 +27,7 @@ export interface CalculatedTargetResults {
   batteryChargePower: number | undefined;
   sharedBudgetWatts?: number;
   supplyConstraints?: SupplyConstraint[];
+  unrestrictedLocations?: Location[];
 }
 
 export interface InputState {
@@ -204,5 +205,8 @@ export function calculatePowerTargets(
         : Math.floor(Math.min(MAX_BATTERY_CHARGE_POWER, remaining)),
     sharedBudgetWatts: resources.installation,
     supplyConstraints: constraints,
+    unrestrictedLocations: LOCATIONS.filter(
+      (l) => policies.get(l)?.supply === "unrestricted",
+    ),
   };
 }

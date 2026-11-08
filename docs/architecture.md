@@ -45,7 +45,9 @@ fresh import above 1000 W; lower import preserves its timer and measured
 discharge resets it. After more than 30 seconds without discharge, fresh import
 above 1000 W forces a zero allocation for that wallbox. Watchdogs use control
 observation timestamps, with independent stop intent passed to pure allocation.
-Power-related stops create a per-wallbox 15-minute retry deadline in
+Unrestricted Max and nighttime Night requests remain exempt from source budgets
+while their reservations still count against limited requests; shared installation
+headroom applies to all automatic commands. Power-related stops create a per-wallbox 15-minute retry deadline in
 the shared battery-support controller; allocation treats waiting wallboxes as
 solar-only so they cannot consume another wallbox's battery allowance. Deadlines
 start from command-building stop intent, including failed or disabled publication.
