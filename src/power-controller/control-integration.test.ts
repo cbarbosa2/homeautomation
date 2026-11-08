@@ -1256,3 +1256,22 @@ test("import above 100 W with real discharge does not reduce Battery charging", 
     assert(!has(await h.step(), inside("StartStop"), 0));
   assert((h.values.get(inside("SetCurrent")) ?? 0) > 10);
 });
+
+test("discharge headroom increases nominal current without ratcheting down on lower measured voltage", async () => {
+  const h = batteryInstallation(10000, false, Infinity, 230);
+  h.modes.set(L.Inside, Mode.Manual);
+  h.modes.set(L.Outside, Mode.Battery);
+  h.prefer(L.Outside);
+  await h.tick();
+  await h.run(700);
+  assertEquals(h.values.get(outside("SetCurrent")), 26);
+  assert(h.samples.slice(-20).every((s) => s.outside === 5980));
+  // Replay the live transient: a new setting is echoed before its full load.
+  h.values.set(outside("Ac/Power"), 5202);
+  h.values.set(P.batteryPower, -4989);
+  h.values.set(P.gridPower, 46.3);
+  h.advance();
+  h.refresh();
+  assert(!has(await h.tick(), outside("SetCurrent"), 25));
+  assertEquals(h.values.get(outside("SetCurrent")), 26);
+});

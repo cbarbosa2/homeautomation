@@ -234,17 +234,6 @@ export class BatterySupportController {
             !eligible.some((l) => !this.usesDischargeTarget(state, l))
           ? undefined
           : 99;
-    // Battery power is signed: positive charging is divertible solar, while
-    // negative discharge is capacity already used by the house and the EVs.
-    const capacity = dischargeTarget
-      ? Math.max(
-          0,
-          resources.measured +
-            (state.batteryPower as number) +
-            MAX_BATTERY_DISCHARGE_POWER,
-        )
-      : Infinity;
-    this.allowance = Math.min(this.allowance, capacity);
     const commitments = builder.commitments();
     const committed = resources.automatic.reduce(
       (sum, l) =>
@@ -255,6 +244,22 @@ export class BatterySupportController {
         ),
       0,
     );
+    // Add measured discharge headroom to the reserved nominal current. Lower
+    // actual voltage or a ramping vehicle must not shrink an unchanged command.
+    const capacity = dischargeTarget
+      ? Math.max(
+          0,
+          committed +
+            (state.batteryPower as number) +
+            MAX_BATTERY_DISCHARGE_POWER,
+        )
+      : Infinity;
+    if (
+      dischargeTarget &&
+      (state.batteryPower as number) < -MAX_BATTERY_DISCHARGE_POWER
+    )
+      this.allowance = Math.min(this.allowance, capacity);
+
     const demand = eligible.some(
       (l) =>
         (this.commands.get(l)?.watts ?? 0) > 0 ||

@@ -51,9 +51,10 @@ One eligible wallbox at a time starts at **10 A**, in priority order, subject to
 installation headroom and outstanding device commands. Continuing loads increase
 in whole-amp steps only after fresh settings and measured power confirm the
 preceding command, retaining increase smoothing. Battery and Reserve use fresh
-signed battery power and total automatic EV demand to calculate remaining
-headroom up to the shared 6000 W discharge ceiling, including household and
-Manual consumption. No observed discharge is required to start.
+signed battery power to add remaining discharge headroom to reserved automatic
+EV current, up to the shared 6000 W discharge ceiling. This includes household
+and Manual consumption without mistaking lower measured voltage or vehicle
+ramp-up for a need to reduce the current setting. No observed discharge is required to start.
 
 Startup and increases allow a bounded 30-second inverter response window,
 starting when command building first produces the nonzero allocation rather

@@ -136,6 +136,8 @@ after fresh device settings, charging status and positive measured power confirm
 the preceding command. Power need not match nominal 240 V watts. Battery and
 battery-supported Reserve target measured battery discharge up to 6000 W,
 including household and Manual demand, rather than grid import below 100 W.
+Remaining discharge headroom is added to reserved nominal current; lower
+measured EV watts during voltage changes or ramp-up do not alone reduce current.
 Sun and daytime Night's above-95% exception retain the below-100 W target;
 ordinary Sun targets zero. The 30-second inverter response window begins at the first
 nonzero built startup allocation, excluding smoothing and reservation waits;
