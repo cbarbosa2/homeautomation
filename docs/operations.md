@@ -40,6 +40,7 @@ With the default port:
 
 - Dashboard: <http://localhost:1881/>
 - Home battery readings: <http://localhost:1881/api/battery>
+- Daily solar forecasts: <http://localhost:1881/api/solar-forecasts>
 - Hourly electricity prices: <http://localhost:1881/api/electricity-prices>
 - Prometheus metrics: <http://localhost:1881/metrics>
 - Health: <http://localhost:1881/health>
@@ -221,3 +222,21 @@ Keep the host's current `.env` and BMW tokens; do not restore old rotating token
 
 When rolling back across the mode renumbering, manually reselect both wallbox
 modes under the old numbering too; saved numbers are not translated.
+
+## Solar forecast comparison
+
+The Solar forecast panel compares Forecast.Solar and Victron for today and the
+next three Europe/Lisbon dates. Paired bars share a kWh scale; hover, focus or tap
+for exact values. Victron uses the existing 1.5 adjustment for inverter production.
+Missing values appear as gaps; zero is a valid forecast. Each source displays its
+last successful update time. Provider failures retain the previous dated snapshot;
+values do not shift into a different date as midnight passes.
+
+`GET /api/solar-forecasts` returns `timeZone: "Europe/Lisbon"`, `updatedAt` with
+nullable `forecastSolar` and `victron` ISO timestamps, and four `days`, each with
+`date`, `forecastSolarWh` and `victronWh`. Energy values are in Wh and independently
+`null` when missing, negative or nonfinite. The endpoint reads cached snapshots,
+performs no external requests, and sends `Cache-Control: no-store`. The dashboard
+refreshes every minute after the previous request completes. Failed dashboard
+requests clear the chart and retry automatically. Forecast loading, metrics and
+battery target calculations retain their existing behavior.

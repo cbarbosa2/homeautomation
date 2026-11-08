@@ -80,6 +80,10 @@ export class HttpServer {
         return this.handleGetElectricityPrices();
       }
 
+      if (url.pathname === "/api/solar-forecasts" && request.method === "GET") {
+        return this.handleGetSolarForecasts();
+      }
+
       if (url.pathname === "/api/bmw-soc" && request.method === "GET") {
         const value = getVehicleSoc();
         return Response.json(
@@ -183,6 +187,35 @@ export class HttpServer {
       logError(`Failed to read index.html: ${String(error)}`);
       return new Response("Dashboard not found", { status: 500 });
     }
+  }
+
+  private handleGetSolarForecasts(): Response {
+    const today = lisbonTime(systemClock()).toPlainDate();
+    const { forecastSolar, victron } = globals.solarForecastDisplay;
+    const valid = (value: number | undefined) =>
+      value !== undefined && Number.isFinite(value) && value >= 0
+        ? value
+        : null;
+    const days = Array.from({ length: 4 }, (_, index) => {
+      const date = today.add({ days: index }).toString();
+      return {
+        date,
+        forecastSolarWh: valid(forecastSolar?.values.get(date)),
+        victronWh: valid(victron?.values.get(date)),
+      };
+    });
+
+    return Response.json(
+      {
+        timeZone: "Europe/Lisbon",
+        updatedAt: {
+          forecastSolar: forecastSolar?.fetchedAt.toString() ?? null,
+          victron: victron?.fetchedAt.toString() ?? null,
+        },
+        days,
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   private handleGetElectricityPrices(): Response {

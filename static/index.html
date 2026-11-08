@@ -122,6 +122,26 @@
       .price-detail { min-height: 18px; margin-top: 8px; color: var(--muted); font-size: 11px; }
       .price-empty { padding: 6px 0; color: var(--muted); font-size: 12px; }
       @media (max-width: 600px) { .price-charts { padding: 0 16px 12px; } .price-bars { gap: 1px; } }
+      .solar-chart { padding: 0 20px 14px; }
+      .solar-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-bottom: 12px; font-size: 11px; color: var(--muted); }
+      .solar-key::before { content: ""; display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 2px; background: var(--green); }
+      .solar-key[data-source="victron"]::before { background: #b27c2e; }
+      .solar-plot { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 8px; }
+      .solar-scale { position: relative; height: 100px; font-size: 10px; color: var(--muted); }
+      .solar-scale span { position: absolute; right: 0; }
+      .solar-scale span:last-child { bottom: 0; }
+      .solar-bars, .solar-dates { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+      .solar-bars { height: 100px; border-bottom: 1px solid #b7c5b9; background: #fafbf8; }
+      .solar-group { display: flex; justify-content: center; gap: 5px; min-width: 0; }
+      .solar-slot { position: relative; flex: 1; max-width: 30px; min-width: 0; border: 0; padding: 0; background: transparent; color: var(--green); }
+      .solar-slot[data-source="victron"] { color: #b27c2e; }
+      .solar-bar { position: absolute; bottom: 0; left: 0; right: 0; min-height: 2px; border-radius: 3px 3px 0 0; background: currentColor; }
+      .solar-slot[data-source="victron"] .solar-bar { background: repeating-linear-gradient(135deg, currentColor, currentColor 4px, #caa367 4px, #caa367 6px); }
+      .solar-slot:focus-visible { outline-offset: 1px; z-index: 1; }
+      .solar-dates { margin: 5px 0 0 36px; text-align: center; font-size: 11px; color: var(--muted); }
+      .solar-date { display: block; font-size: 10px; }
+      .solar-updates { display: flex; flex-wrap: wrap; gap: 3px 16px; margin-top: 8px; font-size: 10px; color: var(--muted); }
+      @media (max-width: 600px) { .solar-chart { padding: 0 16px 12px; } .solar-bars, .solar-dates { gap: 8px; } }
       footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px 24px; padding: 4px 4px 16px; font-size: 11px; color: var(--muted); }
       footer nav { display: flex; gap: 20px; }
       footer a { color: var(--muted); text-underline-offset: 4px; }
@@ -208,6 +228,17 @@
           <p id="prices-status" class="feedback" role="status">Loading prices…</p>
           <div id="price-days"></div>
           <p id="price-detail" class="price-detail" role="status" hidden></p>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="solar-title">
+        <div class="section-header"><h2 id="solar-title">Solar forecast</h2><span class="schedule-label">kWh · Lisbon</span></div>
+        <div class="solar-chart">
+          <div class="solar-legend"><span class="solar-key">Forecast.Solar</span><span class="solar-key" data-source="victron">Victron</span></div>
+          <p id="solar-status" class="feedback" role="status">Loading forecasts…</p>
+          <div id="solar-days"></div>
+          <p id="solar-detail" class="price-detail" role="status" hidden></p>
+          <div id="solar-updates" class="solar-updates"></div>
         </div>
       </section>
 
@@ -313,6 +344,103 @@
           byId("bmw-observed").textContent = "Could not refresh BMW data.";
         } finally {
           setTimeout(loadBmwSoc, 60000);
+        }
+      }
+
+      function renderSolarForecasts(value) {
+        if (value?.timeZone !== "Europe/Lisbon" || value?.days?.length !== 4 || !value.updatedAt ||
+            !value.days.every((day) => /^\d{4}-\d{2}-\d{2}$/.test(day.date))) {
+          throw new Error("Invalid forecast data");
+        }
+        const sources = [
+          { key: "forecastSolar", field: "forecastSolarWh", name: "Forecast.Solar" },
+          { key: "victron", field: "victronWh", name: "Victron" },
+        ];
+        const available = (wh) => typeof wh === "number" && Number.isFinite(wh) && wh >= 0;
+        const values = value.days.flatMap((day) => sources.map((source) => day[source.field])).filter(available);
+        const upper = Math.max(1, Math.ceil(Math.max(0, ...values) / 1000 / 5) * 5);
+        const chart = byId("solar-days");
+        chart.replaceChildren();
+        const updates = byId("solar-updates");
+        updates.replaceChildren();
+        for (const source of sources) {
+          const label = document.createElement("span");
+          const updatedAt = value.updatedAt[source.key];
+          label.textContent = `${source.name} · ${updatedAt ? `Updated ${lisbonFormat.format(new Date(updatedAt))}` : "No update yet"}`;
+          updates.append(label);
+        }
+        const missing = sources.filter((source) => !value.days.some((day) => available(day[source.field])));
+        feedback(byId("solar-status"), values.length === 0 ? "Solar forecasts not available yet." :
+          missing.length ? `${missing.map((source) => source.name).join(" and ")} forecast unavailable.` : "");
+        byId("solar-detail").hidden = values.length === 0;
+        byId("solar-detail").textContent = "Hover, focus or tap a bar for its forecast. Gaps indicate unavailable values.";
+        if (values.length === 0) return;
+
+        const plot = document.createElement("div");
+        plot.className = "solar-plot";
+        const scale = document.createElement("div");
+        scale.className = "solar-scale";
+        scale.setAttribute("aria-hidden", "true");
+        for (const bound of [upper, 0]) {
+          const tick = document.createElement("span");
+          tick.textContent = String(bound);
+          scale.append(tick);
+        }
+        const bars = document.createElement("div");
+        bars.className = "solar-bars";
+        bars.setAttribute("role", "group");
+        bars.setAttribute("aria-label", "Daily solar forecasts in kWh, Forecast.Solar then Victron for each day");
+        const dates = document.createElement("div");
+        dates.className = "solar-dates";
+        value.days.forEach((day, index) => {
+          const name = index === 0 ? "Today" : index === 1 ? "Tomorrow" : day.date.slice(5).split("-").reverse().join("/");
+          const group = document.createElement("div");
+          group.className = "solar-group";
+          for (const source of sources) {
+            const wh = day[source.field];
+            const valid = available(wh);
+            const slot = document.createElement(valid ? "button" : "span");
+            slot.className = "solar-slot";
+            slot.dataset.source = source.key;
+            const description = `${source.name}, ${day.date} · ${valid ? `${wh / 1000} kWh` : "Unavailable"}`;
+            slot.setAttribute("aria-label", description);
+            slot.title = description;
+            if (valid) {
+              slot.type = "button";
+              const bar = document.createElement("span");
+              bar.className = "solar-bar";
+              bar.style.height = `${wh / 1000 / upper * 100}%`;
+              slot.append(bar);
+              const show = () => { byId("solar-detail").textContent = description; };
+              for (const event of ["mouseenter", "focus", "click"]) slot.addEventListener(event, show);
+            }
+            group.append(slot);
+          }
+          bars.append(group);
+          const label = document.createElement("div");
+          label.textContent = name;
+          if (index < 2) {
+            const date = document.createElement("span");
+            date.className = "solar-date";
+            date.textContent = day.date.slice(5).split("-").reverse().join("/");
+            label.append(date);
+          }
+          dates.append(label);
+        });
+        plot.append(scale, bars);
+        chart.append(plot, dates);
+      }
+
+      async function loadSolarForecasts() {
+        try {
+          renderSolarForecasts(await requestJson("/api/solar-forecasts"));
+        } catch (_) {
+          byId("solar-days").replaceChildren();
+          byId("solar-updates").replaceChildren();
+          byId("solar-detail").hidden = true;
+          feedback(byId("solar-status"), "Could not refresh forecasts. Retrying automatically.", "error");
+        } finally {
+          setTimeout(loadSolarForecasts, 60000);
         }
       }
 
@@ -549,6 +677,7 @@
       }
       byId("retry-modes").addEventListener("click", loadChargeModes);
       byId("retry-tasks").addEventListener("click", loadTasks);
+      loadSolarForecasts();
       loadPrices();
       loadBattery();
       loadChargeModes();

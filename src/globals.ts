@@ -43,7 +43,16 @@ export enum WallboxLocation {
   Outside,
 }
 
+export interface ForecastDisplaySnapshot {
+  values: Map<string, number>;
+  fetchedAt: Temporal.Instant;
+}
+
 export interface GlobalState {
+  solarForecastDisplay: {
+    forecastSolar: ForecastDisplaySnapshot | null;
+    victron: ForecastDisplaySnapshot | null;
+  };
   solarForecastByDate: SolarForecasts;
   // Display-only values in Wh; control uses the dated forecast map.
   solarForecastNextDays: number[];
@@ -68,6 +77,7 @@ export interface GlobalState {
  * Most values are read from MQTT, but not all.
  */
 export const globals: GlobalState = {
+  solarForecastDisplay: { forecastSolar: null, victron: null },
   solarForecastByDate: new SolarForecasts(),
   solarForecastNextDays: [],
   victronNextDays: [],

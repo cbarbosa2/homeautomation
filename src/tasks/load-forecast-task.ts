@@ -75,6 +75,11 @@ export class LoadForecastTask {
         { wattHours, fetchedAt: now },
       ]),
     );
+    globals.solarForecastDisplay.forecastSolar = {
+      values: new Map(entries),
+      fetchedAt: now,
+    };
+
     return Array.from(
       { length: 4 },
       (_, index) =>
@@ -106,6 +111,31 @@ export class LoadForecastTask {
     }
 
     const jsonResponse = (await response.json()) as VictronResponse;
+
+    const values = new Map<string, number>();
+    for (const [timestamp, wattHours] of jsonResponse.records
+      .vrm_pv_charger_yield_fc) {
+      if (
+        typeof timestamp !== "number" ||
+        !Number.isSafeInteger(timestamp) ||
+        typeof wattHours !== "number" ||
+        !Number.isFinite(wattHours) ||
+        wattHours < 0
+      )
+        continue;
+
+      try {
+        // VRM stats records use epoch milliseconds; query bounds use seconds.
+        const date = lisbonTime(
+          Temporal.Instant.fromEpochMilliseconds(timestamp),
+        ).toPlainDate();
+        const adjusted = Math.floor(wattHours * 1.5);
+        if (Number.isFinite(adjusted)) values.set(date.toString(), adjusted);
+      } catch {
+        // An invalid timestamp must not shift later days into its position.
+      }
+    }
+    globals.solarForecastDisplay.victron = { values, fetchedAt: systemClock() };
 
     // add 50% more to account for Inverter as that would require an additional HTTP call, not worth it
     return jsonResponse.records.vrm_pv_charger_yield_fc.map((value) =>

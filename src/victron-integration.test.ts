@@ -95,6 +95,7 @@ test("configured portal ID routes telemetry, subscriptions, refreshes and comman
 
 test("forecast request uses the configured installation ID", async () => {
   const originalFetch = globalThis.fetch;
+  const previousDisplay = { ...globals.solarForecastDisplay };
   const previousForecast = globals.solarForecastByDate;
   const previousSolar = globals.solarForecastNextDays;
   const previousVictron = globals.victronNextDays;
@@ -127,6 +128,7 @@ test("forecast request uses the configured installation ID", async () => {
     );
   } finally {
     globalThis.fetch = originalFetch;
+    globals.solarForecastDisplay = previousDisplay;
     globals.solarForecastByDate = previousForecast;
     globals.solarForecastNextDays = previousSolar;
     globals.victronNextDays = previousVictron;

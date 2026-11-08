@@ -275,3 +275,74 @@ test("electricity prices API returns Lisbon days and nullable hourly tariff pric
     metrics.getRegister().clear();
   }
 });
+
+test("solar forecasts API aligns four Lisbon dates and keeps missing, zero and invalid values distinct", async (context) => {
+  let now = Temporal.Instant.from("2026-07-02T22:59:00Z");
+  context.mock.method(Temporal.Now, "instant", () => now);
+  const previous = globals.solarForecastDisplay;
+  globals.solarForecastDisplay = { forecastSolar: null, victron: null };
+  const metrics = new PrometheusMetrics();
+  const server = new HttpServer(metrics);
+  const port = await server.start(0);
+  const read = async () => {
+    const response = await fetch(
+      `http://127.0.0.1:${port}/api/solar-forecasts`,
+    );
+    equal(response.status, 200);
+    equal(response.headers.get("cache-control"), "no-store");
+    return response.json();
+  };
+
+  try {
+    const emptyDay = (date: string) => ({
+      date,
+      forecastSolarWh: null,
+      victronWh: null,
+    });
+    deepStrictEqual(await read(), {
+      timeZone: "Europe/Lisbon",
+      updatedAt: { forecastSolar: null, victron: null },
+      days: [2, 3, 4, 5].map((day) => emptyDay(`2026-07-0${day}`)),
+    });
+    globals.solarForecastDisplay = {
+      forecastSolar: {
+        fetchedAt: now,
+        values: new Map([
+          ["2026-07-04", 12345],
+          ["2026-07-02", 0],
+          ["2026-07-03", Number.NaN],
+          ["2026-07-05", -1],
+        ]),
+      },
+      victron: {
+        fetchedAt: now,
+        values: new Map([
+          ["2026-07-03", 5000],
+          ["2026-07-04", Number.POSITIVE_INFINITY],
+        ]),
+      },
+    };
+    deepStrictEqual((await read()).days, [
+      { date: "2026-07-02", forecastSolarWh: 0, victronWh: null },
+      { date: "2026-07-03", forecastSolarWh: null, victronWh: 5000 },
+      { date: "2026-07-04", forecastSolarWh: 12345, victronWh: null },
+      emptyDay("2026-07-05"),
+    ]);
+    now = Temporal.Instant.from("2026-07-02T23:00:00Z");
+    const rolled = await read();
+    equal(rolled.days[0].date, "2026-07-03");
+    equal(rolled.days[3].date, "2026-07-06");
+    equal(rolled.updatedAt.forecastSolar, "2026-07-02T22:59:00Z");
+    for (const instant of ["2026-10-25T00:30:00Z", "2026-10-25T01:30:00Z"]) {
+      now = Temporal.Instant.from(instant);
+      deepStrictEqual(
+        (await read()).days,
+        [25, 26, 27, 28].map((day) => emptyDay(`2026-10-${day}`)),
+      );
+    }
+  } finally {
+    globals.solarForecastDisplay = previous;
+    await server.stop();
+    metrics.getRegister().clear();
+  }
+});
