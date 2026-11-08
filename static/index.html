@@ -229,7 +229,7 @@
       </section>
 
       <section class="panel" aria-labelledby="prices-title">
-        <div class="section-header"><h2 id="prices-title">Electricity prices</h2><span class="label">c/kWh · Lisbon</span></div>
+        <div class="section-header"><h2 id="prices-title">Electricity prices</h2><span class="label">c/kWh</span></div>
         <div class="price-charts">
           <p id="prices-status" class="feedback" role="status">Loading prices…</p>
           <div id="price-days"></div>
@@ -238,7 +238,7 @@
       </section>
 
       <section class="panel" aria-labelledby="solar-title">
-        <div class="section-header"><h2 id="solar-title">Solar forecast</h2><span class="schedule-label">kWh · Lisbon</span></div>
+        <div class="section-header"><h2 id="solar-title">Solar forecast</h2><span class="schedule-label">kWh</span></div>
         <div class="solar-chart">
           <div class="solar-legend"><span class="solar-key">Forecast.Solar</span><span class="solar-key" data-source="victron">Victron</span></div>
           <p id="solar-status" class="feedback" role="status">Loading forecasts…</p>
@@ -315,7 +315,7 @@
         // Date converts the API timestamp only at this display boundary.
         const timestamp = typeof at === "string" ? new Date(at) : null;
         byId(`battery-${kind}-voltage-at`).textContent = timestamp && Number.isFinite(timestamp.getTime())
-          ? `${cellTimestampFormat.format(timestamp)} · Lisbon` : "Timestamp unavailable";
+          ? cellTimestampFormat.format(timestamp) : "Timestamp unavailable";
       }
 
       function renderBattery(value, failed = false) {
@@ -386,7 +386,7 @@
           byId("bmw-soc").textContent = isPercent(value?.percent) ? `${percentFormat.format(value.percent)}% SOC` : "SOC unavailable";
           // Date converts the external ISO timestamp only at this display boundary.
           byId("bmw-observed").textContent = value?.observedAt
-            ? `BMW reading · ${lisbonFormat.format(new Date(value.observedAt))} · Lisbon`
+            ? `BMW reading · ${lisbonFormat.format(new Date(value.observedAt))}`
             : "";
         } catch (_) {
           byId("bmw-soc").textContent = "SOC unavailable";
