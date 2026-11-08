@@ -1,3 +1,4 @@
+import { BATTERY_CELL_PATHS } from "./battery-cell-telemetry.ts";
 import { test } from "node:test";
 import {
   deepStrictEqual as assertEquals,
@@ -51,7 +52,7 @@ test("configured portal ID routes telemetry, subscriptions, refreshes and comman
   }).execute();
   assertEquals(
     reads,
-    ["keepalive", ...REFRESH_PATHS].map(
+    ["keepalive", ...REFRESH_PATHS, ...Object.values(BATTERY_CELL_PATHS)].map(
       (path) => `R/${VICTRON_PORTAL_ID}/${path}`,
     ),
   );

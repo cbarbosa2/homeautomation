@@ -1,3 +1,4 @@
+import { batteryCellTelemetry } from "./battery-cell-telemetry.ts";
 import { readFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -68,6 +69,7 @@ export class HttpServer {
             soc: controlTelemetry.value(CONTROL_PATHS.batterySOC) ?? null,
             minSoc: controlTelemetry.value(CONTROL_PATHS.batteryMinSOC) ?? null,
             discharge: this.readDischargeStatus(),
+            ...batteryCellTelemetry.snapshot(),
           },
           { headers: { "Cache-Control": "no-store" } },
         );

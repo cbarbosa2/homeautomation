@@ -71,6 +71,29 @@ no-store`. The dashboard refreshes every minute after the preceding request
 completes; failed refreshes clear the chart and retry automatically. Price loading
 retains its existing hourly schedule and calculation.
 
+The battery panel displays the lowest minimum and highest maximum cell voltages
+observed over the last 12 hours, with two decimal places and a V suffix. Each
+extreme includes its captured pack name (for example `Pack-03#`) and observation
+date and time, including seconds, in Europe/Lisbon. Equal extreme values use the
+most recent observation. Timestamps represent MQTT receipt time, not device time.
+
+`GET /api/battery` returns unrounded `minCellVoltage` and `maxCellVoltage`, their
+associated `minVoltagePackName` and `maxVoltagePackName`, and ISO timestamps
+`minCellVoltageAt` and `maxCellVoltageAt`. Pack names preserve the complete text
+received from `battery/512/System/MinVoltageCellId` and `MaxVoltageCellId`.
+Voltage and pack topics arrive separately; each voltage captures the latest
+corresponding valid pack received within the preceding 60 seconds. Later pack
+updates do not change historical observations. A missing pack name remains
+`null` without hiding the voltage or timestamp.
+
+The rolling window includes observations exactly 12 hours old. Missing voltages
+and timestamps are `null` when the window has no valid samples. Malformed
+messages and MQTT disconnects retain history until it expires; disconnects clear
+current pack readings. History lives in memory, so after restart the window
+contains only observations collected since startup. Display readings are requested
+every 30 seconds and the dashboard refreshes every ten seconds. These historical
+values do not affect charging telemetry validity or live Prometheus voltage gauges.
+
 The discharge indicator reports the existing controller assessment: Confirmed,
 Checking, Blocked, or Unknown, with an explanation. SOC above minimum alone does
 not confirm discharge. Failed discovery blocks further attempts until SOC rises

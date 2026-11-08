@@ -1,3 +1,7 @@
+import {
+  BATTERY_CELL_PATHS,
+  batteryCellTelemetry,
+} from "../battery-cell-telemetry.ts";
 import { VICTRON_PORTAL_ID } from "../constants.ts";
 import { controlTelemetry } from "../control-telemetry.ts";
 import { events, globals, WallboxLocation } from "../globals.ts";
@@ -18,6 +22,16 @@ export class MqttToPrometheusTask {
   }
 
   subscribeTopics(): void {
+    for (const path of [
+      BATTERY_CELL_PATHS.minVoltagePackName,
+      BATTERY_CELL_PATHS.maxVoltagePackName,
+    ]) {
+      this.mqttClient.subscribeWithHandler(
+        `N/${VICTRON_PORTAL_ID}/${path}`,
+        (topic, data) => batteryCellTelemetry.record(topic, data),
+      );
+    }
+
     for (const instance of [40, 41]) {
       this.mqttClient.subscribeWithHandler(
         `N/${VICTRON_PORTAL_ID}/evcharger/${instance}/StartStop`,
@@ -178,6 +192,7 @@ export class MqttToPrometheusTask {
   ): void {
     this.mqttClient.subscribeWithHandler(topic, (_, data) => {
       controlTelemetry.record(topic, data);
+      batteryCellTelemetry.record(topic, data);
       const raw =
         data !== null && typeof data === "object" && "value" in data
           ? data.value

@@ -1,3 +1,4 @@
+import { batteryCellTelemetry } from "./battery-cell-telemetry.ts";
 import { controlTelemetry } from "./control-telemetry.ts";
 import mqtt from "mqtt";
 import type { MqttClient as MqttClientType } from "mqtt";
@@ -51,10 +52,12 @@ export class MqttClient {
         this.client.on("close", () => {
           this.isConnected = false;
           controlTelemetry.invalidate();
+          batteryCellTelemetry.invalidate();
         });
 
         this.client.on("offline", () => {
           controlTelemetry.invalidate();
+          batteryCellTelemetry.invalidate();
           logWarn("⚠️ MQTT client offline");
           this.isConnected = false;
           this.metrics.recordMqttConnection(false);

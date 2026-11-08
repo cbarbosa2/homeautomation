@@ -68,6 +68,9 @@
       .battery-fill { height: 100%; background: var(--green); border-radius: inherit; }
       .minimum-marker { position: absolute; top: -5px; bottom: -5px; width: 0; border-left: 2px solid #263e2c; transform: translateX(-1px); }
       .scale { display: flex; justify-content: space-between; margin-top: 6px; color: #61715f; font-size: 11px; }
+      .battery-cells { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-column: 1 / -1; gap: 12px; margin-top: 12px; padding-top: 10px; border-top: 1px solid #d4dfcf; }
+      .cell-voltage { margin-top: 4px; font-size: 18px; font-variant-numeric: tabular-nums; }
+      .cell-pack { margin-top: 3px; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
       .battery-discharge { grid-column: 1 / -1; margin-top: 12px; padding-top: 10px; border-top: 1px solid #d4dfcf; }
       .discharge-heading { display: flex; align-items: center; gap: 12px; }
       #battery-discharge-status[data-state="confirmed"] { color: var(--green); }
@@ -199,6 +202,10 @@
           <span id="minimum-marker" class="minimum-marker" hidden aria-hidden="true"></span>
         </div>
         <div class="scale" aria-hidden="true"><span>0%</span><span>100%</span></div>
+        <div class="battery-cells">
+          <div><p class="label">Min cell voltage · last 12 hours</p><p id="battery-min-cell-voltage" class="cell-voltage">Loading…</p><p id="battery-min-voltage-pack" class="cell-pack">Loading pack…</p><p id="battery-min-voltage-at" class="cell-pack">Loading timestamp…</p></div>
+          <div><p class="label">Max cell voltage · last 12 hours</p><p id="battery-max-cell-voltage" class="cell-voltage">Loading…</p><p id="battery-max-voltage-pack" class="cell-pack">Loading pack…</p><p id="battery-max-voltage-at" class="cell-pack">Loading timestamp…</p></div>
+        </div>
         <div class="battery-discharge" role="status">
           <div class="discharge-heading"><span class="label">Discharge</span><span id="battery-discharge-status" class="badge">Unknown</span></div>
           <p id="battery-discharge-reason">Loading controller status…</p>
@@ -297,7 +304,24 @@
         element.append(unit);
       }
 
+      const cellTimestampFormat = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Europe/Lisbon", dateStyle: "medium", timeStyle: "medium",
+      });
+
+      function showCellVoltage(kind, voltage, packName, at) {
+        byId(`battery-${kind}-cell-voltage`).textContent = typeof voltage === "number" && Number.isFinite(voltage) && voltage >= 0
+          ? `${voltage.toFixed(2)} V` : "Unavailable";
+        byId(`battery-${kind}-voltage-pack`).textContent = typeof packName === "string" && packName.trim()
+          ? packName : "Pack unavailable";
+        // Date converts the API timestamp only at this display boundary.
+        const timestamp = typeof at === "string" ? new Date(at) : null;
+        byId(`battery-${kind}-voltage-at`).textContent = timestamp && Number.isFinite(timestamp.getTime())
+          ? `${cellTimestampFormat.format(timestamp)} · Lisbon` : "Timestamp unavailable";
+      }
+
       function renderBattery(value, failed = false) {
+        showCellVoltage("min", value?.minCellVoltage, value?.minVoltagePackName, value?.minCellVoltageAt);
+        showCellVoltage("max", value?.maxCellVoltage, value?.maxVoltagePackName, value?.maxCellVoltageAt);
         const soc = isPercent(value?.soc) ? value.soc : null;
         const minSoc = isPercent(value?.minSoc) ? value.minSoc : null;
         showPercent(byId("battery-soc"), soc, "soc-number");

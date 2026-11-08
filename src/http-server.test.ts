@@ -90,7 +90,34 @@ test("battery API exposes fresh SOC independently and clears invalid, expired an
     const response = await fetch(url);
     equal(response.status, 200);
     equal(response.headers.get("cache-control"), "no-store");
-    const { discharge, ...readings } = await response.json();
+    const {
+      discharge,
+      minCellVoltage,
+      maxCellVoltage,
+      minVoltagePackName,
+      maxVoltagePackName,
+      minCellVoltageAt,
+      maxCellVoltageAt,
+      ...readings
+    } = await response.json();
+    deepStrictEqual(
+      {
+        minCellVoltage,
+        maxCellVoltage,
+        minVoltagePackName,
+        maxVoltagePackName,
+        minCellVoltageAt,
+        maxCellVoltageAt,
+      },
+      {
+        minCellVoltage: null,
+        maxCellVoltage: null,
+        minVoltagePackName: null,
+        maxVoltagePackName: null,
+        minCellVoltageAt: null,
+        maxCellVoltageAt: null,
+      },
+    );
     deepStrictEqual(discharge, {
       state: "unknown",
       reason: "Discharge has not been checked yet.",
