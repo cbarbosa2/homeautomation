@@ -171,3 +171,22 @@ test("four-point discharge margin applies to Battery, Reserve and the full-SOC e
     equal(chargeModePolicy(s, L.Inside).supply, soc > 24 ? "battery" : "solar");
   }
 });
+
+test("a waiting wallbox cannot use another wallbox's battery allowance", () => {
+  const s = state(M.Battery);
+  s.wallboxChargeMode.set(L.Outside, M.Battery);
+  s.batterySupportWatts = 6720;
+  s.batterySupportBlockedLocations = new Set([L.Inside]);
+  let targets = calculatePowerTargets(s);
+  equal(targets.insideWallboxAmps, 0);
+  equal(targets.outsideWallboxAmps, 28);
+  s.pvChargerPower = 2400;
+  s.gridPower = -2400;
+  targets = calculatePowerTargets(s);
+  equal(targets.insideWallboxAmps, 10);
+  equal(targets.outsideWallboxAmps, 18);
+  deepStrictEqual(targets.supplyConstraints?.[0], {
+    locations: [L.Inside],
+    watts: 2400,
+  });
+});

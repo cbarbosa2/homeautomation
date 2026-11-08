@@ -50,18 +50,27 @@ in whole-amp steps only after fresh settings and measured power confirm the
 preceding command, retaining increase smoothing. No observed battery discharge
 is required to start or continue.
 
-Startup and increases allow a bounded 15-second inverter response window,
+Startup and increases allow a bounded 30-second inverter response window,
 starting when command building first produces the nonzero allocation rather
 than while smoothing or reservations delay it. Repeated commands do not extend
 that window. Fresh grid import above the target beyond that response causes
 reductions; charging stops below the 7 A continuation threshold. Sun retains its
 zero-import target when sharing power with a battery-supported EV.
 
-There are no discharge probes, learned ceilings, failure baselines or retry
-cooldowns. Normal allocation may restart charging while SOC remains eligible,
-subject to fresh telemetry, command confirmation and smoothing. Insufficient
-physical capacity can therefore cause recurring bounded starts or current
-adjustments. Genuine solar surplus remains usable according to each mode's rules.
+After power regulation or insufficient available power stops an active or pending
+battery-supported allocation, that wallbox waits **15 minutes** before another
+battery-supported start. The delay starts with the first zero allocation built
+for that stop; repeated stop commands do not extend it. Each failed retry starts
+a new delay. The other wallbox may still charge according to priority. Genuine
+solar surplus remains usable during the delay.
+
+This applies to Battery, nighttime Reserve and the above-95% exception. SOC
+ineligibility, vehicle cutoff, disconnection and stale telemetry do not create a
+retry delay. Existing delays survive telemetry interruptions and priority changes,
+but a selected mode change clears that wallbox's delay. Delays are held in memory
+and discarded on service restart. At expiry, normal eligibility, fresh telemetry,
+command confirmation and smoothing still apply. There are no discharge probes,
+learned ceilings or failure baselines.
 
 Household and Manual loads remain outside automatic intervention. If these loads
 or an unrestricted EV require import above a constrained EV's whole-house target,

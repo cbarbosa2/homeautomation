@@ -524,7 +524,7 @@ function assertBoundedImport(samples: { grid: number }[], target = 99) {
   let aboveTarget = 0;
   for (const sample of samples) {
     aboveTarget = sample.grid > target ? aboveTarget + 1 : 0;
-    assert(aboveTarget <= 16, JSON.stringify(samples));
+    assert(aboveTarget <= 31, JSON.stringify(samples));
   }
   assert(samples.some((s) => s.grid <= target));
 }
@@ -598,7 +598,8 @@ test("7 A charging at actual supply voltage is continuing, not a blocked startup
   const h = batteryInstallation(1800, false, Infinity, 230);
   await h.tick();
   await h.run(60);
-  const tail = h.samples.slice(-40);
+  // Assess continuation after the initial 30-second startup response window.
+  const tail = h.samples.slice(31);
   assert(tail.some((s) => s.inside === 1610));
   assert(tail.every((s) => s.inside >= 1610 && s.inside < 10 * 230));
   assertBoundedImport(h.samples);
@@ -626,7 +627,7 @@ test("failed restart publication retains its reservation and cannot start the ot
       throw new Error("restart transport unavailable");
     h.values.set(path, Number(value));
   });
-  h.advance(Temporal.Duration.from({ minutes: 5 }));
+  h.advance(Temporal.Duration.from({ minutes: 15 }));
   let rejected = false;
   for (let i = 0; i < 30 && !rejected; i++) {
     try {
@@ -667,7 +668,7 @@ test("startup response time excludes smoothing and repeated starts do not renew 
   h.values.set(P.gridPower, 2500);
   h.values.set(P.batteryPower, -1);
   // Device has not yet acknowledged the start: each tick repeats it.
-  for (let i = 0; i < 15; i++) {
+  for (let i = 0; i < 30; i++) {
     h.advance();
     h.refresh();
     assert(!has(await h.tick(), inside("StartStop"), 0));
@@ -922,20 +923,18 @@ test("registered ingestion feeds fallback, recovery and original observation tim
   assert(has(writes, inside("StartStop"), 0));
 });
 
-test("zero discharge stops on grid feedback and recovers without SOC changes or cooldown", async () => {
+test("power stops delay only the stopped wallbox's battery restart by 15 minutes", async () => {
   const h = batteryInstallation(0, true);
   await h.tick();
-  assertEquals(h.dischargeStatus().state, "available");
-  await h.run(16);
+  await h.run(31);
   assertEquals(h.values.get(inside("StartStop")), 0);
   const stopped = h.writes.length;
-  h.prefer(L.Outside);
   h.capacity(4000);
   await h.run(60);
+  assert(!has(h.writes.slice(stopped), inside("StartStop"), 1));
   assert(has(h.writes.slice(stopped), outside("StartStop"), 1));
-  assertEquals(h.values.get(P.batterySOC), 50);
-  assertEquals(h.values.get(P.batteryMinSOC), 20);
   assertEquals(h.dischargeStatus().state, "available");
+  assertEquals(h.values.get(P.batterySOC), 50);
 });
 
 test("continuing battery charging stops at the four-point margin and minimum changes take effect", async () => {
@@ -953,15 +952,147 @@ test("continuing battery charging stops at the four-point margin and minimum cha
   assertEquals(h.dischargeStatus().state, "available");
 });
 
-test("insufficient capacity allows normal restarts without a learned ceiling", async () => {
+test("insufficient capacity retries at 15 minutes and each failed attempt starts a new delay", async () => {
   const h = batteryInstallation(0);
   await h.tick();
-  await h.run(100);
-  const starts = h.writes.filter(
-    (w) => w.path === inside("StartStop") && w.value === 1,
-  );
-  assert(starts.length > 1);
+  await h.run(31);
+  assertEquals(h.values.get(inside("StartStop")), 0);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const stopped = h.writes.length;
+    await h.run(899);
+    assert(!has(h.writes.slice(stopped), inside("StartStop"), 1));
+    // Eligibility returns at exactly 15 minutes, then 15 samples permit a start.
+    await h.run(14);
+    assert(!has(h.writes.slice(stopped), inside("StartStop"), 1));
+    assert(has(await h.step(), inside("StartStop"), 1));
+    await h.run(31);
+    assertEquals(h.values.get(inside("StartStop")), 0);
+  }
   assertBoundedImport(h.samples);
   assert(h.samples.every((s) => s.inside <= 2400));
-  assertEquals(h.dischargeStatus().state, "available");
+});
+
+for (const mode of [Mode.Battery, Mode.Reserve, Mode.Sun, Mode.Night]) {
+  test(`retry delay survives stale telemetry and priority changes in mode ${mode}`, async () => {
+    const h = batteryInstallation(0);
+    h.modes.set(L.Inside, mode);
+    if (mode === Mode.Reserve) h.setTime("2026-09-27T22:00:00Z");
+    if (mode === Mode.Sun || mode === Mode.Night)
+      h.values.set(P.batterySOC, 96);
+    h.refresh();
+    await h.tick();
+    await h.run(31);
+    assertEquals(h.values.get(inside("StartStop")), 0);
+    const stopped = h.writes.length;
+    h.capacity(4000);
+    h.prefer(L.Outside);
+    h.advance(Temporal.Duration.from({ seconds: 61 }));
+    await h.tick();
+    await h.run(838);
+    assert(!has(h.writes.slice(stopped), inside("StartStop"), 1));
+    await h.run(16);
+    assert(has(h.writes.slice(stopped), inside("StartStop"), 1));
+  });
+}
+
+test("solar surplus remains usable during the battery retry delay", async () => {
+  const h = batteryInstallation(0);
+  await h.tick();
+  await h.run(31);
+  const stopped = h.writes.length;
+  h.solar(3000);
+  await h.run(40);
+  assert(has(h.writes.slice(stopped), inside("StartStop"), 1));
+  assert(h.samples.slice(-10).every((s) => s.inside <= 3000 && s.grid <= 0));
+});
+
+for (const reset of ["mode", "restart"]) {
+  test(`${reset} clears the wallbox retry deadline`, async () => {
+    const h = batteryInstallation(0);
+    await h.tick();
+    await h.run(31);
+    const stopped = h.writes.length;
+    h.capacity(4000);
+    if (reset === "restart") h.restart();
+    else {
+      h.modes.set(L.Inside, Mode.Manual);
+      await h.step();
+      h.modes.set(L.Inside, Mode.Battery);
+    }
+    await h.run(40);
+    assert(has(h.writes.slice(stopped), inside("StartStop"), 1));
+  });
+}
+
+test("a current increase gets a 30-second inverter response window", async () => {
+  const h = batteryInstallation(2400);
+  await h.tick();
+  for (let i = 0; i < 40 && h.values.get(inside("SetCurrent")) !== 11; i++)
+    await h.step();
+  assertEquals(h.values.get(inside("SetCurrent")), 11);
+  await h.run(30);
+  assertEquals(h.values.get(inside("SetCurrent")), 11);
+  await h.step();
+  assertEquals(h.values.get(inside("SetCurrent")), 10);
+});
+
+test("one wallbox entering retry does not stop the other continuing wallbox", async () => {
+  const h = batteryInstallation(6400, true);
+  await h.tick();
+  await h.run(250);
+  assertEquals(h.values.get(inside("StartStop")), 1);
+  assertEquals(h.values.get(outside("StartStop")), 1);
+  h.capacity(3500);
+  await h.run(70);
+  assertEquals(h.values.get(inside("StartStop")), 1);
+  assertEquals(h.values.get(outside("StartStop")), 0);
+  assert(
+    h.samples.slice(-20).every((s) => s.inside >= 1680 && s.outside === 0),
+  );
+});
+
+for (const cause of ["telemetry", "vehicle", "disconnect"]) {
+  test(`${cause} stop does not create a battery retry delay`, async () => {
+    const h = batteryInstallation(4000);
+    await h.tick();
+    await h.run(40);
+    if (cause === "telemetry") {
+      h.telemetry.invalidate();
+      await h.tick();
+    } else if (cause === "vehicle") {
+      h.setInsideVehicleSoc(80);
+      await h.step();
+    } else {
+      h.values.set(inside("Status"), S.Disconnected);
+      h.refresh();
+      await h.tick();
+    }
+    assertEquals(h.values.get(inside("StartStop")), 0);
+    const stopped = h.writes.length;
+    h.setInsideVehicleSoc(undefined);
+    await h.run(40);
+    assert(has(h.writes.slice(stopped), inside("StartStop"), 1));
+  });
+}
+
+test("failed stop publication retains the original retry deadline", async () => {
+  const h = batteryInstallation(0);
+  await h.tick();
+  await h.run(30);
+  h.onPublish(async ({ path, value }) => {
+    if (path === inside("StartStop") && value === 0)
+      throw new Error("stop transport unavailable");
+    h.values.set(path, Number(value));
+  });
+  await assertRejects(h.step(), /stop transport unavailable/);
+  const stopped = h.writes.length;
+  h.onPublish(async ({ path, value }) => {
+    h.values.set(path, Number(value));
+  });
+  h.capacity(4000);
+  await h.run(899);
+  assert(!has(h.writes.slice(stopped), inside("StartStop"), 1));
+  await h.run(14);
+  assert(!has(h.writes.slice(stopped), inside("StartStop"), 1));
+  assert(has(await h.step(), inside("StartStop"), 1));
 });

@@ -32,6 +32,7 @@ export interface CalculatedTargetResults {
 export interface InputState {
   telemetryValid?: boolean;
   batterySupportWatts?: number;
+  batterySupportBlockedLocations?: ReadonlySet<Location>;
   insideVehicleSOC?: number | undefined;
   preferredWallboxLocation: Location;
   gridPower: number | undefined;
@@ -97,6 +98,14 @@ export function effectivePolicies(
   const policies = new Map(
     LOCATIONS.map((l) => [l, chargeModePolicy(state, l)]),
   );
+  // A retry delay restricts battery support, but genuine solar remains usable.
+  for (const [l, policy] of policies) {
+    if (
+      policy.supply === "battery" &&
+      state.batterySupportBlockedLocations?.has(l)
+    )
+      policies.set(l, { supply: "solar", reason: "battery-retry" });
+  }
   const resources = powerResources(state);
   let remaining = resources.installation;
   let unrestricted = 0;

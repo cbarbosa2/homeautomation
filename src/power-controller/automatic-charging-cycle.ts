@@ -79,7 +79,11 @@ export class AutomaticChargingCycle {
         state,
         this.builder,
       );
-      const targets = calculatePowerTargets({ ...state, batterySupportWatts });
+      const targets = calculatePowerTargets({
+        ...state,
+        batterySupportWatts,
+        batterySupportBlockedLocations: this.support.retryBlockedLocations(),
+      });
 
       // Preserve intent even if publication fails or is disabled. Capacity is
       // released by fresh device confirmation, not by transport success.

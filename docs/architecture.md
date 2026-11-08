@@ -37,6 +37,12 @@ Mode changes clear obsolete increase history and pending battery startup intent.
 publication cancels remaining wallbox commands computed for the previous mode;
 the next tick evaluates the new policy. Unconfirmed physical consumption remains
 reserved, including when control passes to Manual, until fresh settings and power
-allow its release. Stale readings reset battery regulation intent. There is no learned discharge
-ceiling, failure baseline or cooldown to retain. Battery regulation state and
-command reservations are not persisted across process restart.
+allow its release. Battery-support startup and increase response windows last
+30 seconds. Power-related stops create a per-wallbox 15-minute retry deadline in
+the shared battery-support controller; allocation treats waiting wallboxes as
+solar-only so they cannot consume another wallbox's battery allowance. Deadlines
+start from command-building stop intent, including failed or disabled publication.
+Stale readings reset battery regulation intent but retain retry deadlines, as do
+priority changes. Selected mode changes clear the affected wallbox's deadline.
+There is no learned discharge ceiling or failure baseline. Battery regulation
+state, retry deadlines and command reservations are not persisted across restart.

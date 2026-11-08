@@ -134,14 +134,18 @@ Battery-supported modes assume discharge is available strictly above minimum
 SOC + 4 percentage points. They start one EV at 10 A and increase by whole amps
 after fresh device settings, charging status and positive measured power confirm
 the preceding command. Power need not match nominal 240 V watts. They target whole-house import below 100 W;
-Sun targets zero. The 15-second inverter response window begins at the first
+Sun targets zero. The 30-second inverter response window begins at the first
 nonzero built startup allocation, excluding smoothing and reservation waits;
 repeated commands do not renew it. Fresh import feedback reduces charging when
 the response allowance expires. No observed discharge is required.
 
-There are no learned ceilings, failure baselines or cooldowns. Normal allocation
-can restart after a stop without SOC recovery. If the battery cannot physically
-supply enough power, bounded starts and current adjustments may recur. See
+There are no learned ceilings or failure baselines. After a power-related stop,
+the affected wallbox waits 15 minutes before another battery-supported start;
+the other wallbox and genuine solar charging remain eligible. Each failed retry
+starts a new delay. Telemetry interruptions and priority changes retain deadlines;
+selected mode changes and service restarts clear them. SOC, vehicle and telemetry
+eligibility stops do not create a retry delay. Normal allocation, command
+confirmation and increase smoothing still apply when the delay expires. See
 [automation rules](automation-rules.md#battery-support-regulation). Real inverter
 response times and retained 15-tick increase smoothing need observation after deployment; automated validation uses
 simulated devices and never sends hardware commands.

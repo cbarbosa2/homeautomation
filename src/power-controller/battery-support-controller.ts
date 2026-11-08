@@ -1,11 +1,12 @@
 import type { Clock } from "../lisbon-clock.ts";
 import { Temporal } from "../temporal.ts";
 import { CONTROL_PATHS as P, wallboxPath } from "../device-topics.ts";
-import type { WallboxLocation as L } from "../globals.ts";
+import type { WallboxChargeMode, WallboxLocation as L } from "../globals.ts";
 import { MAX_AMPS_PER_LOCATION } from "./power-constants.ts";
 import { SYSTEM_VOLTAGE } from "../utils/index.ts";
 import {
   batteryDischargeAvailable,
+  chargeModePolicy,
   validTelemetry,
 } from "./charge-mode-policy.ts";
 import { isCharging } from "./wallbox-policy.ts";
@@ -17,7 +18,8 @@ import {
 } from "./dynamic-power-calculator.ts";
 import type { SystemState, CommandBuilder } from "./command-builder.ts";
 
-const RESPONSE_WINDOW = Temporal.Duration.from({ seconds: 15 });
+const RESPONSE_WINDOW = Temporal.Duration.from({ seconds: 30 });
+const RETRY_DELAY = Temporal.Duration.from({ minutes: 15 });
 
 type State = InputState & SystemState;
 
@@ -43,6 +45,9 @@ export class BatterySupportController {
   private response: { since: Temporal.Instant; increment: number } | undefined;
   private batteryLocations: L[] = [];
   private commands = new Map<L, { watts: number; since: Temporal.Instant }>();
+  private retryAfter = new Map<L, Temporal.Instant>();
+  private modes = new Map<L, WallboxChargeMode>();
+  private powerStopCandidates = new Set<L>();
   private allowance = 0;
   private evaluatedAt: Temporal.Instant | undefined;
   private dischargeStatus = unknownDischargeStatus();
@@ -87,10 +92,37 @@ export class BatterySupportController {
   }
 
   allowanceFor(state: State, builder: CommandBuilder): number {
-    const allowance = this.calculateAllowance(state, builder);
+    this.powerStopCandidates.clear();
+    for (const [l, mode] of state.wallboxChargeMode) {
+      const changed = this.modes.has(l) && this.modes.get(l) !== mode;
+      if (changed) this.retryAfter.delete(l);
+      this.modes.set(l, mode);
+      const deadline = this.retryAfter.get(l);
+      if (deadline && Temporal.Instant.compare(this.clock(), deadline) >= 0)
+        this.retryAfter.delete(l);
+      if (
+        !changed &&
+        !this.retryAfter.has(l) &&
+        validTelemetry(state) &&
+        chargeModePolicy(state, l).supply === "battery" &&
+        (this.commands.get(l)?.watts ?? state.wallboxPower.get(l) ?? 0) > 0
+      )
+        this.powerStopCandidates.add(l);
+    }
+    const allowance = this.calculateAllowance(
+      {
+        ...state,
+        batterySupportBlockedLocations: this.retryBlockedLocations(),
+      },
+      builder,
+    );
     this.dischargeStatus = this.statusFor(state);
     this.evaluatedAt = this.clock();
     return allowance;
+  }
+
+  retryBlockedLocations(): ReadonlySet<L> {
+    return new Set(this.retryAfter.keys());
   }
 
   private calculateAllowance(state: State, builder: CommandBuilder): number {
@@ -99,8 +131,13 @@ export class BatterySupportController {
       (l) => policies.get(l)?.supply === "battery",
     );
     this.batteryLocations = eligible;
+    // Retry transitions must not reset the other wallbox's regulation intent.
+    const ordinaryPolicies = effectivePolicies({
+      ...state,
+      batterySupportBlockedLocations: new Set(),
+    });
     const signature = JSON.stringify(
-      [...state.wallboxChargeMode, ...policies].map(([l, p]) => [l, p]),
+      [...state.wallboxChargeMode, ...ordinaryPolicies].map(([l, p]) => [l, p]),
     );
     if (!validTelemetry(state) || signature !== this.signature) {
       this.startup = undefined;
@@ -251,6 +288,12 @@ export class BatterySupportController {
 
   recordCommands(builder: CommandBuilder): void {
     for (const [l, commitment] of builder.commitments()) {
+      // Record stop intent once, even if publication fails or is disabled.
+      if (commitment.target === 0 && this.powerStopCandidates.has(l)) {
+        this.retryAfter.set(l, this.clock().add(RETRY_DELAY));
+        this.powerStopCandidates.delete(l);
+      }
+
       if (
         this.startup?.location === l &&
         this.startup.since === undefined &&
