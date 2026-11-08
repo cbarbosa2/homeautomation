@@ -265,6 +265,11 @@ export class CommandBuilder {
       measured < old.watts
     ) {
       old.watts = Math.max(configured, measured, old.pendingPeak);
+      // The historical peak has now been covered by fresh device feedback.
+      // Retain it for this observation, then require another fresh confirmation
+      // before releasing the remaining capacity to the latest target.
+      old.pendingPeak = old.target;
+      old.since = this.now();
     } else {
       old.watts = Math.max(
         old.watts,

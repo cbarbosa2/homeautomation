@@ -4,8 +4,13 @@ import {
   ok as assert,
 } from "node:assert/strict";
 import { Temporal } from "../temporal.ts";
-import { WallboxLocation, WallboxStatus } from "../globals.ts";
-import { CONTROL_PATHS } from "../device-topics.ts";
+import {
+  WallboxChargeMode,
+  WallboxLocation,
+  WallboxStatus,
+} from "../globals.ts";
+import { CONTROL_PATHS, REFRESH_PATHS } from "../device-topics.ts";
+import { BatterySupportController } from "./battery-support-controller.ts";
 import type { CalculatedTargetResults } from "./dynamic-power-calculator.ts";
 import { CommandBuilder, type SystemState } from "./command-builder.ts";
 import { CommandType, type PowerCommand } from "./power-controller.ts";
@@ -32,6 +37,69 @@ function createTargets(
     ...overrides,
   };
 }
+
+test("confirmed stop releases sequential reductions and permits battery discovery", () => {
+  let now = Temporal.Instant.from("2026-11-08T13:45:55Z");
+  const outside = WallboxLocation.Outside;
+  const builder = new CommandBuilder(() => now);
+  const state = {
+    ...createSystemState({
+      batteryMaxChargePower: 0,
+      wallboxPower: new Map([
+        [WallboxLocation.Inside, 0],
+        [outside, 3360],
+      ]),
+      wallboxVictronStatus: new Map([
+        [WallboxLocation.Inside, WallboxStatus.Disconnected],
+        [outside, WallboxStatus.Charging],
+      ]),
+      wallboxSetCurrent: new Map([[outside, 14]]),
+      wallboxStartStop: new Map([[outside, 1]]),
+    }),
+    batteryPower: 700,
+    gridPower: 50,
+    batterySOC: 38,
+    batteryMinSOC: 5,
+    pvInverterPower: 350,
+    pvChargerPower: 750,
+    preferredWallboxLocation: outside,
+    timeOfDay: Temporal.PlainTime.from("13:45"),
+    wallboxChargeMode: new Map([
+      [WallboxLocation.Inside, WallboxChargeMode.Sun],
+      [outside, WallboxChargeMode.Battery],
+    ]),
+    observedAt: new Map(REFRESH_PATHS.map((path) => [path, now])),
+  };
+  const setTarget = (amps: number) =>
+    builder.createCommandsFromPowerSettings(
+      state,
+      createTargets({ outsideWallboxAmps: amps, sharedBudgetWatts: 10000 }),
+    );
+  for (const amps of [14, 13, 12, 0]) {
+    setTarget(amps);
+    now = now.add({ seconds: 1 });
+  }
+
+  state.wallboxPower.set(outside, 0);
+  state.wallboxStartStop?.set(outside, 0);
+  state.wallboxSetCurrent?.set(outside, 8);
+  state.wallboxVictronStatus.set(outside, WallboxStatus.WaitingForStart);
+  state.observedAt = new Map(REFRESH_PATHS.map((path) => [path, now]));
+  setTarget(0);
+
+  // Keep the peak until another fresh confirmation covers all pending commands.
+  assertEquals(builder.commitments().get(outside)?.watts, 3120);
+  now = now.add({ seconds: 1 });
+  setTarget(0);
+  assertEquals(builder.commitments().get(outside)?.watts, 3120);
+  state.observedAt = new Map(REFRESH_PATHS.map((path) => [path, now]));
+  setTarget(0);
+  assertEquals(builder.commitments().get(outside)?.watts, 0);
+
+  const support = new BatterySupportController(() => now);
+  assertEquals(support.allowanceFor(state, builder), 2400);
+  assertEquals(support.getDischargeStatus(true).state, "checking");
+});
 
 test("CommandBuilder should create wallbox current commands", () => {
   const builder = new CommandBuilder();
