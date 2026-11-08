@@ -4,23 +4,6 @@ A Node.js/TypeScript service controlling a home battery and two EV wallboxes thr
 
 The stack uses npm for dependency management, TypeScript's compiler for strict checking and ESM builds, Node's test runner, and Biome for linting and formatting. MQTT uses `mqtt`; HTTP uses Node's HTTP server with `@hono/node-server`; scheduling uses `node-cron`; monitoring uses `prom-client`. See [development](docs/development.md) for the build workflow and [architecture](docs/architecture.md) for service interactions.
 
-## EV Charge Modes
-
-| ID | Mode | Behavior |
-| --- | --- | --- |
-| 1 | Manual | No automatic wallbox current or start/stop commands. |
-| 2 | Sun | Solar surplus; target zero whole-house grid import. |
-| 3 | Reserve | Battery support at night while preserving the next-day reserve; Sun by day. |
-| 4 | Battery | Battery support down to minimum SOC; genuine solar remains usable at the floor. |
-| 5 | Night | Max at night; Sun by day. |
-| 6 | Max | Maximum possible charging using grid, battery and solar. |
-
-Battery-supported operation targets whole-house grid import below 100 W and
-confirms discharge through controlled probes. See the [automation rules](docs/automation-rules.md)
-for eligibility, full-SOC exceptions and BMW limits. Saved mode numbers are
-intentionally reinterpreted at deployment; [manually reselect both modes](docs/operations.md#mode-numbers-and-physical-controls),
-and update clients and monitoring labels.
-
 ## Documentation
 
 - [Automation rules](docs/automation-rules.md): charging modes, priority, battery targets, and grid protection.
