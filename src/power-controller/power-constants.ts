@@ -9,6 +9,7 @@ export const MIN_BATTERY_CHARGE_POWER = 0;
 
 export const BATTERY_SOC_HIGH = 95;
 export const MAX_BATTERY_CHARGE_POWER = MAX_GRID_AMPS * SYSTEM_VOLTAGE;
+export const MAX_BATTERY_DISCHARGE_POWER = 6000;
 
 export const MAX_AMPS_PER_LOCATION = new Map([
   [WallboxLocation.Inside, 20],

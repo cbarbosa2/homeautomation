@@ -19,15 +19,18 @@ Remaining hours use actual elapsed time until the next Lisbon 08:00, including a
 | 5 | Night | Maximum possible charging at night; Sun by day. |
 | 6 | Max | Maximum possible charging at any time using grid, battery and solar. |
 
-Battery-supported operation targets whole-house grid import below **100 W**.
-Brief excursions are allowed during startup and demand changes. Solar operation
-targets zero import. Battery and nighttime Reserve pause while the battery is
+Battery and battery-supported Reserve increase EV demand toward **6000 W of
+measured battery discharge**, reducing it above that ceiling. They have no
+100 W grid-import target; installation grid protection still applies. The
+above-95% battery-support exception in Sun and daytime Night retains its
+whole-house grid-import target below **100 W**. Solar operation targets zero import. Battery and nighttime Reserve pause while the battery is
 charging below minimum SOC; grid-funded battery charging is not EV headroom.
 
 Strictly **above 95% SOC**, Sun, Reserve and daytime Night use battery-supported
 operation, overriding Reserve's overnight reserve margin. At exactly 95% or below,
 the ordinary rules apply. This exception still requires fresh telemetry and
-SOC strictly above minimum SOC + 4 percentage points; it does not authorize unrestricted grid charging.
+SOC strictly above minimum SOC + 4 percentage points. Reserve uses its 6000 W
+discharge target; Sun and daytime Night retain their below-100 W grid target.
 
 The inside wallbox charges the BMW i3. In Sun, Reserve, Battery and Night, a BMW
 SOC reading of at least 80% and no more than 90 minutes old stops it, including
@@ -47,17 +50,33 @@ minimum SOC + 4 does not permit battery support. There is no extra hysteresis.
 One eligible wallbox at a time starts at **10 A**, in priority order, subject to
 installation headroom and outstanding device commands. Continuing loads increase
 in whole-amp steps only after fresh settings and measured power confirm the
-preceding command, retaining increase smoothing. No observed battery discharge
-is required to start or continue.
+preceding command, retaining increase smoothing. Battery and Reserve use fresh
+signed battery power and total automatic EV demand to calculate remaining
+headroom up to the shared 6000 W discharge ceiling, including household and
+Manual consumption. No observed discharge is required to start.
 
 Startup and increases allow a bounded 30-second inverter response window,
 starting when command building first produces the nonzero allocation rather
 than while smoothing or reservations delay it. Repeated commands do not extend
 that window. Startup retains the full 30 seconds even if the car initially draws
 little power and grid import is already below target, allowing the car and
-inverter to ramp together. Fresh grid import above the target beyond that response causes
-reductions; charging stops below the 7 A continuation threshold. Sun retains its
-zero-import target when sharing power with a battery-supported EV.
+inverter to ramp together. Battery and Reserve reduce demand when fresh battery
+power exceeds 6000 W of discharge; small grid-import excursions do not reduce
+these modes. Sun and daytime Night's battery-support exception still regulate
+against their grid target. Charging stops below the 7 A continuation threshold.
+Sun retains its zero-import target when sharing power with a battery-supported
+EV; a shared grid-constrained request can therefore limit combined allocation.
+
+For Battery and battery-supported Reserve, fresh grid import above **1000 W**
+with no measured battery discharge starts a per-wallbox **30-second** watchdog.
+A later drop to 1000 W or below does **not** reset that timer. Any measured
+negative battery power resets it, even a small discharge. Once more than
+30 seconds have elapsed without discharge, stop the affected wallbox when fresh
+grid import is above 1000 W, then apply its 15-minute retry delay. Missing or
+unchanged observations cannot themselves establish a failure. An ended charging
+attempt or selected mode change discards its watchdog; every retry gets a new
+attempt. Real discharge permits continued charging even with import above 1000 W,
+subject to the discharge ceiling and installation protection.
 
 After power regulation or insufficient available power stops an active or pending
 battery-supported allocation, that wallbox waits **15 minutes** before another

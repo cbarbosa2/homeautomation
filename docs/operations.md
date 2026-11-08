@@ -133,12 +133,21 @@ battery charging is not reused as solar surplus.
 Battery-supported modes assume discharge is available strictly above minimum
 SOC + 4 percentage points. They start one EV at 10 A and increase by whole amps
 after fresh device settings, charging status and positive measured power confirm
-the preceding command. Power need not match nominal 240 V watts. They target whole-house import below 100 W;
-Sun targets zero. The 30-second inverter response window begins at the first
+the preceding command. Power need not match nominal 240 V watts. Battery and
+battery-supported Reserve target measured battery discharge up to 6000 W,
+including household and Manual demand, rather than grid import below 100 W.
+Sun and daytime Night's above-95% exception retain the below-100 W target;
+ordinary Sun targets zero. The 30-second inverter response window begins at the first
 nonzero built startup allocation, excluding smoothing and reservation waits;
 repeated commands do not renew it. Low import during the car's initial ramp does
-not end the startup window early. Fresh import feedback reduces charging when
-the response allowance expires. No observed discharge is required.
+not end the startup window early. In Battery and Reserve, import alone does not
+reduce current while the battery is discharging. Their watchdog starts when
+fresh grid import exceeds 1000 W with no discharge: lower import does not reset
+it, but any measured negative battery power does. After more than 30 seconds
+without discharge, fresh import above 1000 W stops that wallbox and starts its
+15-minute retry delay. Unchanged or stale evidence cannot establish a failure;
+ending the attempt or changing mode discards its watchdog. The existing 28 A
+installation protection still applies.
 
 There are no learned ceilings or failure baselines. After a power-related stop,
 the affected wallbox waits 15 minutes before another battery-supported start;

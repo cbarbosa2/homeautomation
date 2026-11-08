@@ -33,6 +33,7 @@ export interface InputState {
   telemetryValid?: boolean;
   batterySupportWatts?: number;
   batterySupportBlockedLocations?: ReadonlySet<Location>;
+  batterySupportFailedLocations?: ReadonlySet<Location>;
   insideVehicleSOC?: number | undefined;
   preferredWallboxLocation: Location;
   gridPower: number | undefined;
@@ -102,6 +103,13 @@ export function effectivePolicies(
   for (const [l, policy] of policies) {
     if (
       policy.supply === "battery" &&
+      state.batterySupportFailedLocations?.has(l)
+    ) {
+      policies.set(l, { supply: "stopped", reason: "no-discharge" });
+      continue;
+    }
+    if (
+      policy.supply === "battery" &&
       state.batterySupportBlockedLocations?.has(l)
     )
       policies.set(l, { supply: "solar", reason: "battery-retry" });
@@ -125,7 +133,10 @@ export function effectivePolicies(
   for (const [l, policy] of policies) {
     if (
       unrestricted > 0 &&
-      (policy.supply === "solar" || policy.supply === "battery") &&
+      (policy.supply === "solar" ||
+        (policy.supply === "battery" &&
+          state.wallboxChargeMode.get(l) !== Mode.Battery &&
+          state.wallboxChargeMode.get(l) !== Mode.Reserve)) &&
       projectedImport > (policy.supply === "solar" ? 0 : 99)
     )
       policies.set(l, { supply: "stopped", reason: "unrestricted-import" });

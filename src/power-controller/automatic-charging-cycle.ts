@@ -83,6 +83,7 @@ export class AutomaticChargingCycle {
         ...state,
         batterySupportWatts,
         batterySupportBlockedLocations: this.support.retryBlockedLocations(),
+        batterySupportFailedLocations: this.support.failedLocations(),
       });
 
       // Preserve intent even if publication fails or is disabled. Capacity is

@@ -38,7 +38,14 @@ publication cancels remaining wallbox commands computed for the previous mode;
 the next tick evaluates the new policy. Unconfirmed physical consumption remains
 reserved, including when control passes to Manual, until fresh settings and power
 allow its release. Battery-support startup and increase response windows last
-30 seconds. Power-related stops create a per-wallbox 15-minute retry deadline in
+30 seconds. Battery and Reserve regulate against a 6000 W shared discharge
+ceiling instead of the 100 W grid target; Sun and daytime Night's full-SOC
+exception retain grid regulation. A per-wallbox no-discharge watchdog starts on
+fresh import above 1000 W; lower import preserves its timer and measured
+discharge resets it. After more than 30 seconds without discharge, fresh import
+above 1000 W forces a zero allocation for that wallbox. Watchdogs use control
+observation timestamps, with independent stop intent passed to pure allocation.
+Power-related stops create a per-wallbox 15-minute retry deadline in
 the shared battery-support controller; allocation treats waiting wallboxes as
 solar-only so they cannot consume another wallbox's battery allowance. Deadlines
 start from command-building stop intent, including failed or disabled publication.

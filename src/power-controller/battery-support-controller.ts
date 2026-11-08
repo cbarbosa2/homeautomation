@@ -1,8 +1,11 @@
 import type { Clock } from "../lisbon-clock.ts";
 import { Temporal } from "../temporal.ts";
 import { CONTROL_PATHS as P, wallboxPath } from "../device-topics.ts";
-import { type WallboxChargeMode, WallboxLocation as L } from "../globals.ts";
-import { MAX_AMPS_PER_LOCATION } from "./power-constants.ts";
+import { WallboxChargeMode, WallboxLocation as L } from "../globals.ts";
+import {
+  MAX_AMPS_PER_LOCATION,
+  MAX_BATTERY_DISCHARGE_POWER,
+} from "./power-constants.ts";
 import { SYSTEM_VOLTAGE } from "../utils/index.ts";
 import {
   batteryDischargeAvailable,
@@ -36,7 +39,7 @@ export function unknownDischargeStatus(): BatteryDischargeStatus {
   };
 }
 
-/** SOC grants discharge availability; fresh grid feedback regulates EV demand. */
+/** SOC grants availability; fresh battery and grid feedback regulate EV demand. */
 export class BatterySupportController {
   private lastObservation: Temporal.Instant | undefined;
   private signature = "";
@@ -49,6 +52,8 @@ export class BatterySupportController {
   private retryAfter = new Map<L, Temporal.Instant>();
   private modes = new Map<L, WallboxChargeMode>();
   private powerStopCandidates = new Set<L>();
+  private noDischargeSince = new Map<L, Temporal.Instant>();
+  private failureStops = new Set<L>();
   private allowance = 0;
   private evaluatedAt: Temporal.Instant | undefined;
   private dischargeStatus = unknownDischargeStatus();
@@ -96,7 +101,10 @@ export class BatterySupportController {
     this.powerStopCandidates.clear();
     for (const [l, mode] of state.wallboxChargeMode) {
       const changed = this.modes.has(l) && this.modes.get(l) !== mode;
-      if (changed) this.retryAfter.delete(l);
+      if (changed) {
+        this.retryAfter.delete(l);
+        this.noDischargeSince.delete(l);
+      }
       this.modes.set(l, mode);
       const deadline = this.retryAfter.get(l);
       if (deadline && Temporal.Instant.compare(this.clock(), deadline) >= 0)
@@ -110,10 +118,12 @@ export class BatterySupportController {
       )
         this.powerStopCandidates.add(l);
     }
+    this.updateDischargeWatchdog(state);
     const allowance = this.calculateAllowance(
       {
         ...state,
         batterySupportBlockedLocations: this.retryBlockedLocations(),
+        batterySupportFailedLocations: this.failedLocations(),
       },
       builder,
     );
@@ -126,6 +136,50 @@ export class BatterySupportController {
     return new Set(this.retryAfter.keys());
   }
 
+  failedLocations(): ReadonlySet<L> {
+    return new Set(this.failureStops);
+  }
+
+  private usesDischargeTarget(state: State, location: L): boolean {
+    const mode = state.wallboxChargeMode.get(location);
+    return (
+      mode === WallboxChargeMode.Battery || mode === WallboxChargeMode.Reserve
+    );
+  }
+
+  private updateDischargeWatchdog(state: State): void {
+    this.failureStops.clear();
+    const gridAt = state.observedAt?.get(P.gridPower);
+    const batteryAt = state.observedAt?.get(P.batteryPower);
+    if (!validTelemetry(state) || !gridAt || !batteryAt) {
+      return;
+    }
+    const observed =
+      Temporal.Instant.compare(gridAt, batteryAt) < 0 ? gridAt : batteryAt;
+    for (const l of state.wallboxChargeMode.keys()) {
+      const active =
+        (this.commands.get(l)?.watts ?? state.wallboxPower.get(l) ?? 0) > 0;
+      if (
+        !this.usesDischargeTarget(state, l) ||
+        chargeModePolicy(state, l).supply !== "battery" ||
+        !active ||
+        (state.batteryPower as number) < 0
+      ) {
+        this.noDischargeSince.delete(l);
+        continue;
+      }
+      if (!this.noDischargeSince.has(l) && (state.gridPower as number) <= 1000)
+        continue;
+      const since = this.noDischargeSince.get(l) ?? observed;
+      this.noDischargeSince.set(l, since);
+      if (
+        Temporal.Instant.compare(observed, since.add(RESPONSE_WINDOW)) > 0 &&
+        (state.gridPower as number) > 1000
+      )
+        this.failureStops.add(l);
+    }
+  }
+
   private calculateAllowance(state: State, builder: CommandBuilder): number {
     const policies = effectivePolicies(state);
     const eligible = priorityOrder(state).filter(
@@ -136,6 +190,7 @@ export class BatterySupportController {
     const ordinaryPolicies = effectivePolicies({
       ...state,
       batterySupportBlockedLocations: new Set(),
+      batterySupportFailedLocations: new Set(),
     });
     const signature = JSON.stringify(
       [...state.wallboxChargeMode, ...ordinaryPolicies].map(([l, p]) => [l, p]),
@@ -168,11 +223,28 @@ export class BatterySupportController {
     if (!fresh) return this.allowance;
     this.lastObservation = observed;
     const resources = powerResources(state);
+    const dischargeTarget = eligible.some((l) =>
+      this.usesDischargeTarget(state, l),
+    );
     const target =
       [...policies.values()].some((p) => p.supply === "solar") &&
       resources.solar >= 7 * SYSTEM_VOLTAGE
         ? 0
-        : 99;
+        : dischargeTarget &&
+            !eligible.some((l) => !this.usesDischargeTarget(state, l))
+          ? undefined
+          : 99;
+    // Battery power is signed: positive charging is divertible solar, while
+    // negative discharge is capacity already used by the house and the EVs.
+    const capacity = dischargeTarget
+      ? Math.max(
+          0,
+          resources.measured +
+            (state.batteryPower as number) +
+            MAX_BATTERY_DISCHARGE_POWER,
+        )
+      : Infinity;
+    this.allowance = Math.min(this.allowance, capacity);
     const commitments = builder.commitments();
     const committed = resources.automatic.reduce(
       (sum, l) =>
@@ -226,7 +298,7 @@ export class BatterySupportController {
     if (
       this.startup &&
       commandConfirmed(this.startup.location) &&
-      (state.gridPower as number) <= target
+      (target === undefined || (state.gridPower as number) <= target)
     )
       this.startup = undefined;
 
@@ -238,23 +310,38 @@ export class BatterySupportController {
         ) <= 0;
       if (
         responding &&
+        target !== undefined &&
         (state.gridPower as number) > target &&
         (state.gridPower as number) <= target + this.response.increment
       )
         return this.allowance;
-      this.response = undefined;
+      // Keep the response window through low-import samples: settings may be
+      // echoed before the vehicle draws its newly requested current.
+      if (!responding) this.response = undefined;
     }
-    const balanced = Math.max(
-      0,
-      resources.measured + target - (state.gridPower as number),
-    );
-    if ((state.gridPower as number) > target && demand) {
+    if (
+      target !== undefined &&
+      (state.gridPower as number) > target &&
+      demand
+    ) {
+      const balanced = Math.max(
+        0,
+        resources.measured + target - (state.gridPower as number),
+      );
       this.allowance = Math.min(this.allowance, balanced);
       return this.allowance;
     }
+    if (
+      dischargeTarget &&
+      (state.batteryPower as number) <= -MAX_BATTERY_DISCHARGE_POWER
+    )
+      return this.allowance;
     if (this.startup) return this.allowance;
     // Household and Manual import cannot be corrected by starting an EV.
-    if ((state.gridPower as number) - resources.measured > target) {
+    if (
+      target !== undefined &&
+      (state.gridPower as number) - resources.measured > target
+    ) {
       this.allowance = 0;
       return 0;
     }
@@ -281,7 +368,11 @@ export class BatterySupportController {
     const increment =
       location !== undefined ? 10 * SYSTEM_VOLTAGE : SYSTEM_VOLTAGE;
     // Add one amp to the reserved current, not voltage-dependent measured watts.
-    const next = Math.min(resources.installation, committed + increment);
+    const next = Math.min(
+      resources.installation,
+      capacity,
+      committed + increment,
+    );
     if (next - committed < increment) return this.allowance;
     if (location !== undefined) {
       this.startup = { location, since: undefined };

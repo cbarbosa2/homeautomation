@@ -129,8 +129,8 @@ test("mixed unrestricted intent pauses constrained priority without oscillation"
       s.wallboxPower.set(L.Outside, power);
       s.gridPower = power;
       const target = calculatePowerTargets(s);
-      equal(target.insideWallboxAmps, 0);
-      equal(target.outsideWallboxAmps, 28);
+      equal(target.insideWallboxAmps, mode === M.Sun ? 0 : 20);
+      equal(target.outsideWallboxAmps, mode === M.Sun ? 28 : 0);
     }
   }
 });
