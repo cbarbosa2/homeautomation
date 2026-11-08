@@ -260,3 +260,40 @@ test("disconnect retains gauges and history while clearing even fresh pack assoc
   equal(telemetry.cellHistory().minCellVoltage, 3.1);
   equal(gauges.get("ess_battery_min_cell_voltage"), -1);
 });
+
+test("Shelly status notifications and malformed payloads do not reach wall-switch handlers", async () => {
+  const forwarded: unknown[] = [];
+  const handlers = new Map<string, (topic: string, payload: unknown) => void>();
+  const telemetry = new DeviceTelemetry({
+    clock: () => Temporal.Instant.from("2026-11-08T15:11:22Z"),
+    metrics: { setGauge: () => {} },
+    currentUpdated: () => {},
+    wallSwitchUpdated: (payload) => {
+      forwarded.push(payload);
+    },
+  });
+  await telemetry.subscribe({
+    subscribeWithHandler: async (topic, handler) => {
+      handlers.set(topic, handler);
+    },
+  });
+  const handler = handlers.get(shelly);
+  ok(handler);
+  for (const payload of [
+    null,
+    "invalid",
+    {},
+    { params: null },
+    { params: {} },
+    { method: "NotifyStatus", params: { "input:0": { state: false } } },
+    { params: { events: [] } },
+    { params: { events: [null] } },
+    { params: { events: [{ id: 0 }] } },
+    { params: { events: [{ id: "0", event: "single_push" }] } },
+  ])
+    handler(shelly, payload);
+  deepStrictEqual(forwarded, []);
+  const valid = { params: { events: [{ id: 0, event: "single_push" }] } };
+  handler(shelly, valid);
+  deepStrictEqual(forwarded, [valid]);
+});

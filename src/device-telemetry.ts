@@ -16,6 +16,31 @@ export type WallSwitchNotification = {
   params: { events: { id: number; event: string }[] };
 };
 
+function isWallSwitchNotification(
+  payload: unknown,
+): payload is WallSwitchNotification {
+  if (payload === null || typeof payload !== "object" || !("params" in payload))
+    return false;
+  const params = payload.params;
+  if (params === null || typeof params !== "object" || !("events" in params))
+    return false;
+
+  return (
+    Array.isArray(params.events) &&
+    params.events.length > 0 &&
+    params.events.every(
+      (event: unknown) =>
+        event !== null &&
+        typeof event === "object" &&
+        "id" in event &&
+        typeof event.id === "number" &&
+        Number.isInteger(event.id) &&
+        "event" in event &&
+        typeof event.event === "string",
+    )
+  );
+}
+
 interface Dependencies {
   clock: Clock;
   metrics: Pick<PrometheusMetrics, "setGauge">;
@@ -63,11 +88,11 @@ export class DeviceTelemetry {
     );
     subscriptions.push(
       Promise.resolve().then(() =>
-        mqtt.subscribeWithHandler(SHELLY_TOPIC, (_, payload) =>
-          this.dependencies.wallSwitchUpdated(
-            payload as WallSwitchNotification,
-          ),
-        ),
+        mqtt.subscribeWithHandler(SHELLY_TOPIC, (_, payload) => {
+          // The RPC topic also carries status notifications without button events.
+          if (isWallSwitchNotification(payload))
+            this.dependencies.wallSwitchUpdated(payload);
+        }),
       ),
     );
     await Promise.all(subscriptions);
