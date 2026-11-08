@@ -71,8 +71,6 @@
       .battery-cells { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-column: 1 / -1; gap: 12px; margin-top: 12px; padding-top: 10px; border-top: 1px solid #d4dfcf; }
       .cell-voltage { margin-top: 4px; font-size: 18px; font-variant-numeric: tabular-nums; }
       .cell-pack { margin-top: 3px; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
-      .battery-discharge { grid-column: 1 / -1; margin-top: 12px; padding-top: 10px; border-top: 1px solid #d4dfcf; }
-      #battery-discharge-reason { margin-top: 4px; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
       .charger-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 20px; border-top: 1px solid var(--line); }
       .charger-icon { display: grid; place-items: center; height: 30px; border: 1px solid var(--line); border-radius: 8px; color: var(--green); }
       .charger-icon svg { width: 18px; height: 18px; }
@@ -202,9 +200,6 @@
           <div><p class="label">Min cell voltage · last 12 hours</p><p id="battery-min-cell-voltage" class="cell-voltage">Loading…</p><p id="battery-min-voltage-pack" class="cell-pack">Loading pack…</p><p id="battery-min-voltage-at" class="cell-pack">Loading timestamp…</p></div>
           <div><p class="label">Max cell voltage · last 12 hours</p><p id="battery-max-cell-voltage" class="cell-voltage">Loading…</p><p id="battery-max-voltage-pack" class="cell-pack">Loading pack…</p><p id="battery-max-voltage-at" class="cell-pack">Loading timestamp…</p></div>
         </div>
-        <div class="battery-discharge" role="status">
-          <p id="battery-discharge-reason">Loading controller status…</p>
-        </div>
       </section>
 
       <section class="panel" aria-labelledby="charging-title">
@@ -331,10 +326,6 @@
         marker.style.left = `${minSoc ?? 0}%`;
         const available = soc !== null && minSoc !== null;
         feedback(byId("battery-status"), failed ? "Readings unavailable" : available ? "Readings available" : "Waiting for telemetry", available ? "ready" : "");
-        const discharge = failed ? null : value?.discharge;
-        byId("battery-discharge-reason").textContent = typeof discharge?.reason === "string"
-          ? discharge.reason
-          : failed ? "Could not refresh controller status. Retrying automatically." : "Controller status is unavailable.";
       }
 
       async function loadBattery() {
