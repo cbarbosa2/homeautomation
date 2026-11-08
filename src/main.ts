@@ -4,11 +4,16 @@ import { MqttClient } from "./mqtt-client.ts";
 import { logError, logInfo } from "./logger.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { HttpServer } from "./http-server.ts";
-import { controlTelemetry } from "./control-telemetry.ts";
+import { CONTROL_PATHS, controlTelemetry } from "./control-telemetry.ts";
 import { systemClock } from "./lisbon-clock.ts";
-import { POWER_CONTROL_ENABLED } from "./constants.ts";
+import {
+  POWER_CONTROL_ENABLED,
+  FORECAST_SOLAR_API_KEY,
+  VICTRON_API_KEY,
+  VICTRON_INSTALLATION_ID,
+} from "./constants.ts";
 import { MqttAwakeTask } from "./tasks/mqtt-awake-task.ts";
-import { LoadForecastTask } from "./tasks/load-forecast-task.ts";
+import { SolarForecasts } from "./solar-forecasts/solar-forecasts.ts";
 import { LoadOmieTask } from "./tasks/load-omie-task.ts";
 import { scheduler } from "./task-scheduler.ts";
 import { MqttToPrometheusTask } from "./tasks/mqtt-to-prometheus-task.ts";
@@ -29,6 +34,7 @@ class HomeAutomationApp {
   private metrics: PrometheusMetrics;
   private httpServer: HttpServer;
   private chargingCycle: AutomaticChargingCycle;
+  private forecasts: SolarForecasts;
 
   constructor() {
     this.metrics = new PrometheusMetrics();
@@ -42,8 +48,19 @@ class HomeAutomationApp {
       publisher: this.mqttClient,
       enabled: POWER_CONTROL_ENABLED,
     });
-    this.httpServer = new HttpServer(this.metrics, () =>
-      this.chargingCycle.getBatteryDischargeStatus(),
+    this.forecasts = new SolarForecasts({
+      forecastSolarApiKey: FORECAST_SOLAR_API_KEY,
+      victronApiKey: VICTRON_API_KEY,
+      victronInstallationId: VICTRON_INSTALLATION_ID,
+      fetch,
+      clock: systemClock,
+      metrics: this.metrics,
+      logError,
+    });
+    this.httpServer = new HttpServer(
+      this.metrics,
+      () => this.chargingCycle.getBatteryDischargeStatus(),
+      (at) => this.forecasts.display(at),
     );
   }
 
@@ -120,9 +137,12 @@ class HomeAutomationApp {
       return this.chargingCycle.tick();
     });
 
-    const loadForecastTask = new LoadForecastTask(this.metrics);
     scheduler.cron("Load forecast solar", "0 * * * *", () => {
-      return loadForecastTask.execute();
+      return this.forecasts.refresh();
+    });
+
+    void this.forecasts.refresh().catch((error) => {
+      logError(`Error refreshing solar forecasts: ${error}`);
     });
 
     const loadOmieTask = new LoadOmieTask(this.metrics);
@@ -130,7 +150,12 @@ class HomeAutomationApp {
       return loadOmieTask.execute();
     });
 
-    const setSocLimitTask = new SetSocLimitTask(this.mqttClient);
+    const setSocLimitTask = new SetSocLimitTask(
+      this.mqttClient,
+      systemClock,
+      () => controlTelemetry.value(CONTROL_PATHS.batterySOC),
+      (date, at) => this.forecasts.forMinimumSoc(date, at),
+    );
     scheduler.cron("Setup Min SOC", "* * * * *", () => setSocLimitTask.tick());
   }
 

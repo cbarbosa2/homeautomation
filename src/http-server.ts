@@ -1,3 +1,5 @@
+import type { ForecastDisplay } from "./solar-forecasts/solar-forecasts.ts";
+import type { Temporal } from "./temporal.ts";
 import { batteryCellTelemetry } from "./battery-cell-telemetry.ts";
 import { readFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
@@ -30,6 +32,9 @@ export class HttpServer {
   constructor(
     metrics: PrometheusMetrics,
     private readonly readDischargeStatus: () => BatteryDischargeStatus = unknownDischargeStatus,
+    private readonly readForecastDisplay?: (
+      at: Temporal.Instant,
+    ) => ForecastDisplay,
   ) {
     this.metrics = metrics;
     this.buildTimestamp = this.readBuildTimestamp();
@@ -211,29 +216,28 @@ export class HttpServer {
   }
 
   private handleGetSolarForecasts(): Response {
-    const today = lisbonTime(systemClock()).toPlainDate();
-    const { forecastSolar, victron } = globals.solarForecastDisplay;
-    const valid = (value: number | undefined) =>
-      value !== undefined && Number.isFinite(value) && value >= 0
-        ? value
-        : null;
-    const days = Array.from({ length: 4 }, (_, index) => {
-      const date = today.add({ days: index }).toString();
-      return {
-        date,
-        forecastSolarWh: valid(forecastSolar?.values.get(date)),
-        victronWh: valid(victron?.values.get(date)),
-      };
-    });
+    const at = systemClock();
+    const today = lisbonTime(at).toPlainDate();
+    const display = this.readForecastDisplay?.(at) ?? {
+      updatedAt: { forecastSolar: null, victron: null },
+      days: Array.from({ length: 4 }, (_, index) => ({
+        date: today.add({ days: index }),
+        forecastSolarWh: null,
+        victronWh: null,
+      })),
+    };
 
     return Response.json(
       {
         timeZone: "Europe/Lisbon",
         updatedAt: {
-          forecastSolar: forecastSolar?.fetchedAt.toString() ?? null,
-          victron: victron?.fetchedAt.toString() ?? null,
+          forecastSolar: display.updatedAt.forecastSolar?.toString() ?? null,
+          victron: display.updatedAt.victron?.toString() ?? null,
         },
-        days,
+        days: display.days.map((day) => ({
+          ...day,
+          date: day.date.toString(),
+        })),
       },
       { headers: { "Cache-Control": "no-store" } },
     );

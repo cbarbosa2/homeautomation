@@ -1,3 +1,4 @@
+import { SolarForecasts } from "./solar-forecasts/solar-forecasts.ts";
 import { test } from "node:test";
 import { deepStrictEqual, equal, match, rejects } from "node:assert/strict";
 import { connect } from "node:net";
@@ -310,10 +311,39 @@ test("electricity prices API returns Lisbon days and nullable hourly tariff pric
 test("solar forecasts API aligns four Lisbon dates and keeps missing, zero and invalid values distinct", async (context) => {
   let now = Temporal.Instant.from("2026-07-02T22:59:00Z");
   context.mock.method(Temporal.Now, "instant", () => now);
-  const previous = globals.solarForecastDisplay;
-  globals.solarForecastDisplay = { forecastSolar: null, victron: null };
+  let populated = false;
+  const forecasts = new SolarForecasts({
+    forecastSolarApiKey: "",
+    victronApiKey: "",
+    victronInstallationId: "1",
+    clock: () => now,
+    fetch: async (input) =>
+      Response.json(
+        String(input).includes("api.forecast.solar")
+          ? {
+              result: populated ? { "2026-07-02": 0, "2026-07-04": 12345 } : {},
+            }
+          : {
+              records: {
+                vrm_pv_charger_yield_fc: populated
+                  ? [
+                      [
+                        Temporal.Instant.from("2026-07-02T23:00:00Z")
+                          .epochMilliseconds,
+                        5000 / 1.5,
+                      ],
+                    ]
+                  : [],
+              },
+            },
+      ),
+    metrics: { setGauge: () => {} },
+    logError: () => {},
+  });
   const metrics = new PrometheusMetrics();
-  const server = new HttpServer(metrics);
+  const server = new HttpServer(metrics, undefined, (at) =>
+    forecasts.display(at),
+  );
   const port = await server.start(0);
   const read = async () => {
     const response = await fetch(
@@ -335,24 +365,16 @@ test("solar forecasts API aligns four Lisbon dates and keeps missing, zero and i
       updatedAt: { forecastSolar: null, victron: null },
       days: [2, 3, 4, 5].map((day) => emptyDay(`2026-07-0${day}`)),
     });
-    globals.solarForecastDisplay = {
-      forecastSolar: {
-        fetchedAt: now,
-        values: new Map([
-          ["2026-07-04", 12345],
-          ["2026-07-02", 0],
-          ["2026-07-03", Number.NaN],
-          ["2026-07-05", -1],
-        ]),
-      },
-      victron: {
-        fetchedAt: now,
-        values: new Map([
-          ["2026-07-03", 5000],
-          ["2026-07-04", Number.POSITIVE_INFINITY],
-        ]),
-      },
-    };
+    equal(
+      (
+        await fetch(`http://127.0.0.1:${port}/api/solar-forecasts`, {
+          method: "POST",
+        })
+      ).status,
+      404,
+    );
+    populated = true;
+    await forecasts.refresh();
     deepStrictEqual((await read()).days, [
       { date: "2026-07-02", forecastSolarWh: 0, victronWh: null },
       { date: "2026-07-03", forecastSolarWh: null, victronWh: 5000 },
@@ -372,7 +394,6 @@ test("solar forecasts API aligns four Lisbon dates and keeps missing, zero and i
       );
     }
   } finally {
-    globals.solarForecastDisplay = previous;
     await server.stop();
     metrics.getRegister().clear();
   }

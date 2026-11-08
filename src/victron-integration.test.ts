@@ -14,7 +14,8 @@ import { globals, WallboxChargeMode, WallboxLocation } from "./globals.ts";
 import { MqttAwakeTask } from "./tasks/mqtt-awake-task.ts";
 import { MqttToPrometheusTask } from "./tasks/mqtt-to-prometheus-task.ts";
 import { SetSocLimitTask } from "./tasks/set-soc-limit-task.ts";
-import { LoadForecastTask } from "./tasks/load-forecast-task.ts";
+import { SolarForecasts } from "./solar-forecasts/solar-forecasts.ts";
+import { Temporal } from "./temporal.ts";
 import {
   CommandType,
   runCommands,
@@ -95,43 +96,29 @@ test("configured portal ID routes telemetry, subscriptions, refreshes and comman
 });
 
 test("forecast request uses the configured installation ID", async () => {
-  const originalFetch = globalThis.fetch;
-  const previousDisplay = { ...globals.solarForecastDisplay };
-  const previousForecast = globals.solarForecastByDate;
-  const previousSolar = globals.solarForecastNextDays;
-  const previousVictron = globals.victronNextDays;
   const requested: URL[] = [];
-  const completed = Promise.withResolvers<void>();
-  globalThis.fetch = (input) => {
-    requested.push(new URL(input instanceof Request ? input.url : input));
-    return Promise.resolve(
-      Response.json(
+  const forecasts = new SolarForecasts({
+    forecastSolarApiKey: "",
+    victronApiKey: "",
+    victronInstallationId: VICTRON_INSTALLATION_ID,
+    clock: () => Temporal.Instant.from("2026-01-01T00:00:00Z"),
+    fetch: async (input) => {
+      requested.push(new URL(input instanceof Request ? input.url : input));
+      return Response.json(
         requested.length === 1
           ? { result: {} }
-          : { records: { vrm_pv_charger_yield_fc: [[0, 1000]] } },
-      ),
-    );
-  };
-  try {
-    new LoadForecastTask({
-      setGauge: (_, __, labels) => {
-        const { source } = labels ?? {};
-        if (source === "victron") completed.resolve();
-      },
-    });
-    await completed.promise;
-    assertEquals(requested.length, 2);
-    assert(requested[1]);
-    assertEquals(requested[1].origin, "https://vrmapi.victronenergy.com");
-    assertEquals(
-      requested[1].pathname,
-      `/v2/installations/${VICTRON_INSTALLATION_ID}/stats`,
-    );
-  } finally {
-    globalThis.fetch = originalFetch;
-    globals.solarForecastDisplay = previousDisplay;
-    globals.solarForecastByDate = previousForecast;
-    globals.solarForecastNextDays = previousSolar;
-    globals.victronNextDays = previousVictron;
-  }
+          : { records: { vrm_pv_charger_yield_fc: [] } },
+      );
+    },
+    metrics: { setGauge: () => {} },
+    logError: () => {},
+  });
+  await forecasts.refresh();
+  assertEquals(requested.length, 2);
+  assert(requested[1]);
+  assertEquals(requested[1].origin, "https://vrmapi.victronenergy.com");
+  assertEquals(
+    requested[1].pathname,
+    `/v2/installations/${VICTRON_INSTALLATION_ID}/stats`,
+  );
 });

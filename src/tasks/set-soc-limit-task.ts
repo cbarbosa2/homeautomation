@@ -1,6 +1,4 @@
 import { VICTRON_PORTAL_ID } from "../constants.ts";
-import { globals } from "../globals.ts";
-import type { SolarForecasts } from "../solar-forecasts/solar-forecasts.ts";
 import { CONTROL_PATHS, controlTelemetry } from "../control-telemetry.ts";
 import {
   type Clock,
@@ -37,11 +35,6 @@ export function calculateEveningSOC(
   );
 }
 
-interface EveningInputs {
-  soc: number | undefined;
-  forecast: SolarForecasts;
-}
-
 export class SetSocLimitTask {
   private readonly topic =
     `W/${VICTRON_PORTAL_ID}/settings/0/Settings/CGwacs/BatteryLife/MinimumSocLimit`;
@@ -53,13 +46,16 @@ export class SetSocLimitTask {
         retryAt: Temporal.Instant;
       }
     | undefined;
+
   constructor(
     private mqttClient: Pick<MqttClient, "publishJson">,
     private clock: Clock = systemClock,
-    private inputs: () => EveningInputs = () => ({
-      soc: controlTelemetry.value(CONTROL_PATHS.batterySOC),
-      forecast: globals.solarForecastByDate,
-    }),
+    private readSoc: () => number | undefined = () =>
+      controlTelemetry.value(CONTROL_PATHS.batterySOC),
+    private readForecast: (
+      date: Temporal.PlainDate,
+      at: Temporal.Instant,
+    ) => number | undefined = () => undefined,
   ) {
     // The constructor does not run missed actions, even within a scheduled minute.
     this.lastMinute = clock().round({
@@ -67,32 +63,35 @@ export class SetSocLimitTask {
       roundingMode: "floor",
     });
   }
+
   public executeInMorning(): Promise<void> {
     return this.mqttClient.publishJson(this.topic, { value: 5 });
   }
+
   public async executeInEvening(
-    targetDate = lisbonTime(this.clock()).toPlainDate().add({ days: 1 }),
+    targetDate?: Temporal.PlainDate,
   ): Promise<boolean> {
     const now = this.clock();
-    const { soc, forecast } = this.inputs();
-    const estimate = forecast.get(targetDate);
+    const soc = this.readSoc();
+    const wattHours = this.readForecast(
+      targetDate ?? lisbonTime(now).toPlainDate().add({ days: 1 }),
+      now,
+    );
     if (
       !finite(soc) ||
       soc < 0 ||
       soc > 100 ||
-      !estimate ||
-      !finite(estimate.wattHours) ||
-      estimate.wattHours < 0 ||
-      !(estimate.fetchedAt instanceof Temporal.Instant) ||
-      Temporal.Instant.compare(now, estimate.fetchedAt) < 0 ||
-      Temporal.Instant.compare(now, estimate.fetchedAt.add({ hours: 6 })) > 0
+      !finite(wattHours) ||
+      wattHours < 0
     )
       return false;
+
     await this.mqttClient.publishJson(this.topic, {
-      value: calculateEveningSOC(soc, estimate.wattHours / 1000, now),
+      value: calculateEveningSOC(soc, wattHours / 1000, now),
     });
     return true;
   }
+
   /** Called each UTC minute; all decisions are made using Lisbon civil time. */
   public async tick(): Promise<void> {
     const instant = this.clock();

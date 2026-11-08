@@ -261,8 +261,27 @@ nullable `forecastSolar` and `victron` ISO timestamps, and four `days`, each wit
 `null` when missing, negative or nonfinite. The endpoint reads cached snapshots,
 performs no external requests, and sends `Cache-Control: no-store`. The dashboard
 refreshes every minute after the previous request completes. Failed dashboard
-requests clear the chart and retry automatically. Forecast loading, metrics and
-battery target calculations retain their existing behavior.
+requests clear the chart and retry automatically. The application owns one dated forecast module shared by this endpoint and the
+Minimum SOC task. It explicitly starts a nonblocking refresh after MQTT and HTTP
+startup and retains the hourly schedule. Startup, manual and scheduled triggers
+coalesce while a refresh is running; each caller awaits that same refresh.
+Forecast.Solar and then Victron are fetched sequentially. A provider failure logs
+an error, retains that source's snapshot and does not prevent the other provider
+attempt; handled provider failures still count as a completed task. Empty successful
+results replace that source's snapshot. Individual impossible ISO forecast dates
+are skipped; malformed top-level responses retain the previous snapshot.
+
+The overnight target uses only Forecast.Solar for the exact required date, fetched
+no more than six hours ago and not in the future. Display retention does not apply
+that freshness cutoff. Existing target calculations are unchanged.
+
+Forecast metrics deliberately retain their existing meaning: `ess_solar_forecast`
+with source `solarForecast` uses day indices 0–3 relative to Lisbon at fetch time,
+with zero for missing dates. Source `victron` uses provider-order indices and the
+legacy numeric 1.5 adjustment, even for values rejected by the dated display.
+Previously emitted longer-index series are not removed by shorter responses.
+Metric write failures do not roll back already accepted dated snapshots. Changing
+these positional metric semantics is separate from dated forecast ownership.
 
 ## Charger status display
 
