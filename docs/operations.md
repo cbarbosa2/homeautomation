@@ -50,7 +50,7 @@ The health endpoint returns `OK`; it does not verify MQTT connectivity or extern
 The Home Energy dashboard displays current home battery SOC and minimum SOC,
 wallbox mode controls, BMW SOC, and a compact list of scheduled jobs. Job cron
 expressions are shown in UTC. `GET /api/battery` returns
-`{ "soc": 72, "minSoc": 30, "discharge": { "state": "confirmed", "reason": "The controller has observed the battery discharging." } }`.
+`{ "soc": 72, "minSoc": 30, "discharge": { "state": "available", "reason": "SOC is above minimum SOC + 4 percentage points; discharge is assumed available. Charging remains subject to mode and power limits." } }`.
 SOC values come from validated control telemetry, with each value
 independently `null` when missing, invalid, disconnected, or more than 60 seconds
 old. The response is not cached. The dashboard polls battery readings every ten
@@ -94,13 +94,13 @@ contains only observations collected since startup. Display readings are request
 every 30 seconds and the dashboard refreshes every ten seconds. These historical
 values do not affect charging telemetry validity or live Prometheus voltage gauges.
 
-The discharge indicator reports the existing controller assessment: Confirmed,
-Checking, Blocked, or Unknown, with an explanation. SOC above minimum alone does
-not confirm discharge. Failed discovery blocks further attempts until SOC rises
-one percentage point from the failure baseline or minimum SOC changes. Invalid
-control telemetry or a controller evaluation older than 60 seconds produces
-Unknown. This display does not initiate discharge checks or change charging.
-
+The Battery support indicator reports Available, Blocked or Unknown, with an
+explanation. Available means SOC is strictly above minimum SOC + 4 percentage
+points; it is an assumption of discharge availability, not observed discharge
+or a promise that a wallbox can charge. Reserve margins, charger eligibility,
+priority and power limits still apply. At or below the margin, the indicator is
+Blocked. Invalid control telemetry or a controller evaluation older than 60
+seconds produces Unknown. The display does not initiate control actions.
 
 ## Automation telemetry and timing
 
@@ -130,17 +130,21 @@ Solar availability is bounded by total AC/DC PV and the energy balance
 `automatic wallbox power + signed battery power - grid import`, so grid-funded
 battery charging is not reused as solar surplus.
 
-Battery-supported modes discover available discharge with a bounded 10 A startup,
-then whole-amp increases after fresh device confirmation. They target whole-house
-import below 100 W; Sun targets zero. An observed discharge ceiling limits further
-increases after import reaches the target. If import exceeds 200 W continuously
-for more than 15 seconds without observed discharge, both EVs stop probing until
-minimum SOC changes or SOC rises at least one point above its failure value.
-Mode changes and stale recovery retain this block; process restart clears it.
-See [automation rules](automation-rules.md#battery-support-discovery) for exact
-conditions. Real inverter response times, measured-power tolerance (half an amp)
-and the retained 15-tick increase smoothing need observation after deployment;
-validation uses simulated devices and never sends hardware commands.
+Battery-supported modes assume discharge is available strictly above minimum
+SOC + 4 percentage points. They start one EV at 10 A and increase by whole amps
+after fresh device settings, charging status and positive measured power confirm
+the preceding command. Power need not match nominal 240 V watts. They target whole-house import below 100 W;
+Sun targets zero. The 15-second inverter response window begins at the first
+nonzero built startup allocation, excluding smoothing and reservation waits;
+repeated commands do not renew it. Fresh import feedback reduces charging when
+the response allowance expires. No observed discharge is required.
+
+There are no learned ceilings, failure baselines or cooldowns. Normal allocation
+can restart after a stop without SOC recovery. If the battery cannot physically
+supply enough power, bounded starts and current adjustments may recur. See
+[automation rules](automation-rules.md#battery-support-regulation). Real inverter
+response times and retained 15-tick increase smoothing need observation after deployment; automated validation uses
+simulated devices and never sends hardware commands.
 
 SOC actions run at Lisbon 22:01 and 08:00, including DST. The evening job requires
 fresh battery SOC and tomorrow's date-specific Forecast.Solar result (Wh, fetched

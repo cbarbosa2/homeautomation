@@ -152,3 +152,22 @@ test("missing readings pause every limited policy and preserve unrestricted fall
     }
   }
 });
+
+test("four-point discharge margin applies to Battery, Reserve and the full-SOC exception", () => {
+  for (const mode of [M.Battery, M.Reserve, M.Sun, M.Night]) {
+    const s = state(mode, mode === M.Reserve ? "07:59" : "12:00");
+    s.batteryMinSOC = 92;
+    for (const soc of [95.99, 96, 96.01]) {
+      s.batterySOC = soc;
+      equal(
+        chargeModePolicy(s, L.Inside).supply,
+        soc > 96 ? "battery" : "solar",
+      );
+    }
+  }
+  const s = state(M.Battery);
+  for (const soc of [20, 23.99, 24, 24.01]) {
+    s.batterySOC = soc;
+    equal(chargeModePolicy(s, L.Inside).supply, soc > 24 ? "battery" : "solar");
+  }
+});

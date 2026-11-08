@@ -34,6 +34,15 @@ export function validTelemetry(state: InputState): boolean {
   );
 }
 
+/** SOC is the sole discharge-availability assumption. */
+export function batteryDischargeAvailable(state: InputState): boolean {
+  return (
+    finite(state.batterySOC) &&
+    finite(state.batteryMinSOC) &&
+    state.batterySOC > state.batteryMinSOC + 4
+  );
+}
+
 /** Resolve preference and eligibility independently of available watts. */
 export function chargeModePolicy(state: InputState, location: L): ModePolicy {
   const mode = state.wallboxChargeMode.get(location) ?? Mode.Sun;
@@ -66,18 +75,20 @@ export function chargeModePolicy(state: InputState, location: L): ModePolicy {
     (state.batteryPower as number) > 0
   )
     return result("stopped", "charging-below-minimum");
-  if (soc > 95 && mode !== Mode.Battery)
+  const dischargeAvailable = batteryDischargeAvailable(state);
+  if (soc > 95 && mode !== Mode.Battery && dischargeAvailable)
     return result("battery", "full-battery");
   if (mode === Mode.Battery)
     return result(
-      soc > min ? "battery" : "solar",
-      soc > min ? "battery" : "discharge-floor",
+      dischargeAvailable ? "battery" : "solar",
+      dischargeAvailable ? "battery" : "discharge-floor",
     );
   let remaining = state.remainingNight ?? state.timeOfDay.until("08:00");
   if (remaining.sign < 0) remaining = remaining.add({ hours: 24 });
   if (
     mode === Mode.Reserve &&
     night &&
+    dischargeAvailable &&
     soc > min + 2 * Math.ceil(remaining.total("hours"))
   )
     return result("battery", "reserve-available");

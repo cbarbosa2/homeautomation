@@ -453,6 +453,7 @@ function batteryInstallation(
   capacity = 4000,
   both = false,
   responsePerSecond = Infinity,
+  wallboxVoltage = 240,
 ) {
   const h = installation();
   h.modes.set(L.Inside, Mode.Battery);
@@ -470,7 +471,7 @@ function batteryInstallation(
     for (const l of [L.Inside, L.Outside]) {
       const active = h.values.get(wallboxPath(l, "StartStop")) === 1;
       const power = active
-        ? (h.values.get(wallboxPath(l, "SetCurrent")) ?? 0) * 240
+        ? (h.values.get(wallboxPath(l, "SetCurrent")) ?? 0) * wallboxVoltage
         : 0;
       h.values.set(wallboxPath(l, "Status"), active ? S.Charging : S.Connected);
       h.values.set(wallboxPath(l, "Ac/Power"), power);
@@ -517,15 +518,27 @@ function batteryInstallation(
   };
 }
 
-test("battery starts from idle, ramps in whole amps and converges below 100 W import", async () => {
+/** Fresh one-second samples must bring every import excursion back within the
+ * bounded response window. No learned ceiling suppresses later adjustments. */
+function assertBoundedImport(samples: { grid: number }[], target = 99) {
+  let aboveTarget = 0;
+  for (const sample of samples) {
+    aboveTarget = sample.grid > target ? aboveTarget + 1 : 0;
+    assert(aboveTarget <= 16, JSON.stringify(samples));
+  }
+  assert(samples.some((s) => s.grid <= target));
+}
+
+test("battery starts from idle, ramps in whole amps and bounds import excursions", async () => {
   const h = batteryInstallation(3500);
   assert(has(await h.tick(), inside("SetCurrent"), 10));
   await h.run(240);
   const tail = h.samples.slice(-30);
   assert(
-    tail.every((s) => s.inside >= 7 * 240 && s.grid < 100),
+    tail.every((s) => s.inside >= 7 * 240 && s.grid <= 99 + 240),
     JSON.stringify(tail),
   );
+  assertBoundedImport(h.samples);
   assert(tail.some((s) => s.inside >= 14 * 240));
   // No single fresh response permits an increase larger than one amp.
   for (let i = 1; i < h.samples.length; i++) {
@@ -538,82 +551,11 @@ test("battery starts from idle, ramps in whole amps and converges below 100 W im
   }
   h.household(1200);
   await h.run(20);
-  assert(h.samples.slice(-10).every((s) => s.grid < 100 && s.inside <= 2400));
+  assertBoundedImport(h.samples.slice(-20));
+  assert(h.samples.slice(-10).some((s) => s.grid < 100 && s.inside <= 2400));
 });
 
-test("failed discharge discovery blocks both EVs until the recorded SOC baseline rises by one point", async () => {
-  const h = batteryInstallation(0, true);
-  assert(has(await h.tick(), inside("SetCurrent"), 10));
-  await h.run(16); // first high reading at second 1: exactly 15 seconds is allowed
-  assertEquals(h.values.get(inside("StartStop")), 1);
-  await h.step();
-  assertEquals(h.values.get(inside("StartStop")), 0);
-  const failedAt = h.writes.length;
-  h.prefer(L.Outside);
-  h.modes.set(L.Inside, Mode.Max);
-  h.modes.set(L.Inside, Mode.Battery);
-  await h.run(90);
-  assert(
-    !h.writes
-      .slice(failedAt)
-      .some((w) => w.path.endsWith("StartStop") && w.value === 1),
-  );
-  h.values.set(P.batterySOC, 50.99);
-  await h.run(20);
-  assert(
-    !h.writes
-      .slice(failedAt)
-      .some((w) => w.path.endsWith("StartStop") && w.value === 1),
-  );
-  // Stale recovery and elapsed time must preserve the failure baseline.
-  h.advance(Temporal.Duration.from({ seconds: 61 }));
-  await h.tick();
-  await h.run(20);
-  assert(
-    !h.writes
-      .slice(failedAt)
-      .some((w) => w.path.endsWith("StartStop") && w.value === 1),
-  );
-  h.values.set(P.batterySOC, 51);
-  await h.run(20);
-  assert(
-    h.writes
-      .slice(failedAt)
-      .some((w) => w.path === outside("StartStop") && w.value === 1),
-  );
-  // The SOC increase allowed an attempt, not proof of discharge.
-  await h.run(40);
-  const secondFailure = h.writes.length;
-  await h.run(40);
-  assert(
-    !h.writes
-      .slice(secondFailure)
-      .some((w) => w.path.endsWith("StartStop") && w.value === 1),
-  );
-});
-
-test("minimum-SOC change releases failed discovery but never allows a probe at the floor", async () => {
-  const h = batteryInstallation(0);
-  await h.tick();
-  await h.run(20);
-  const failure = h.writes.length;
-  h.values.set(P.batteryMinSOC, 50);
-  await h.run(20);
-  assert(
-    !h.writes
-      .slice(failure)
-      .some((w) => w.path === inside("StartStop") && w.value === 1),
-  );
-  h.values.set(P.batteryMinSOC, 49);
-  await h.run(20);
-  assert(
-    h.writes
-      .slice(failure)
-      .some((w) => w.path === inside("StartStop") && w.value === 1),
-  );
-});
-
-test("two battery EVs share discovery and the 100 W allowance", async () => {
+test("two battery EVs share power regulation and the 100 W allowance", async () => {
   const h = batteryInstallation(6400, true);
   h.values.set(inside("SetCurrent"), 7);
   h.values.set(inside("StartStop"), 1);
@@ -621,15 +563,14 @@ test("two battery EVs share discovery and the 100 W allowance", async () => {
   await h.tick();
   await h.run(250);
   assert(
-    h.samples
-      .slice(-20)
-      .every((s) => s.inside + s.outside < 6500 && s.grid < 100),
+    h.samples.slice(-20).every((s) => s.inside + s.outside <= 6400 + 99 + 240),
     JSON.stringify(h.samples.slice(-20)),
   );
+  assertBoundedImport(h.samples);
   assert(h.samples.every((s) => s.grid <= 28 * 240));
 });
 
-test("unchanged telemetry cannot grow a probe or fabricate a failure interval", async () => {
+test("unchanged telemetry cannot increase demand or advance response feedback", async () => {
   const h = batteryInstallation(0);
   await h.tick();
   await h.step();
@@ -648,46 +589,96 @@ test("unchanged telemetry cannot grow a probe or fabricate a failure interval", 
       .slice(first)
       .some((w) => w.path === inside("StartStop") && w.value === 0),
   );
-  // Fresh evidence spanning the failed interval now ends it.
+  // Fresh grid feedback after the response window now reduces charging.
   await h.step();
   assertEquals(h.values.get(inside("StartStop")), 0);
 });
 
-test("any fresh discharge establishes availability but grants no unused capacity", async () => {
-  const h = batteryInstallation(1);
+test("7 A charging at actual supply voltage is continuing, not a blocked startup", async () => {
+  const h = batteryInstallation(1800, false, Infinity, 230);
   await h.tick();
-  await h.run(17);
-  assertEquals(h.values.get(inside("StartStop")), 0);
-  const stopped = h.writes.length;
+  await h.run(60);
+  const tail = h.samples.slice(-40);
+  assert(tail.some((s) => s.inside === 1610));
+  assert(tail.every((s) => s.inside >= 1610 && s.inside < 10 * 230));
+  assertBoundedImport(h.samples);
+  assert(!has(h.writes, inside("StartStop"), 0));
+  assertEquals(h.dischargeStatus().state, "available");
+});
+
+test("confirmed charging below nominal voltage can ramp without waiting for impossible nominal watts", async () => {
+  const h = batteryInstallation(5000, false, Infinity, 230);
+  await h.tick();
+  await h.run(180);
+  assert((h.values.get(inside("SetCurrent")) ?? 0) >= 18);
+  assert(
+    h.samples.slice(-20).every((s) => s.inside >= 18 * 230 && s.grid < 100),
+  );
+});
+
+test("failed restart publication retains its reservation and cannot start the other EV", async () => {
+  const h = batteryInstallation(1, true);
+  await h.tick();
   await h.run(40);
+  const stopped = h.writes.length;
+  h.onPublish(async ({ path, value }) => {
+    if (path === inside("StartStop") && value === 1)
+      throw new Error("restart transport unavailable");
+    h.values.set(path, Number(value));
+  });
+  h.advance(Temporal.Duration.from({ minutes: 5 }));
+  let rejected = false;
+  for (let i = 0; i < 30 && !rejected; i++) {
+    try {
+      await h.step();
+    } catch (error) {
+      match(String(error), /restart transport unavailable/);
+      rejected = true;
+    }
+  }
+  assert(rejected);
+  h.onPublish(async () => {});
+  await h.run(40);
+  assert(!has(h.writes.slice(stopped), outside("StartStop"), 1));
   assert(
     !h.writes
       .slice(stopped)
-      .some((w) => w.path === inside("StartStop") && w.value === 1),
+      .some((w) => w.path === inside("SetCurrent") && Number(w.value) > 10),
   );
-  // Household demand and PV are unchanged: the observed 1 W is not a rating.
 });
 
-test("200 W is not a failed-discharge interval and a fresh interruption resets the interval", async () => {
-  const h = batteryInstallation(0);
+test("startup response time excludes smoothing and repeated starts do not renew it", async () => {
+  const h = installation();
+  h.modes.set(L.Inside, Mode.Battery);
+  h.modes.set(L.Outside, Mode.Manual);
+  h.values.set(P.gridPower, 500);
+  h.refresh();
   await h.tick();
-  await h.step();
-  await h.step(10);
-  h.telemetry.record(P.gridPower, 200);
+  await h.settle();
+  h.values.set(P.gridPower, 0);
+  for (let i = 0; i < 14; i++) {
+    h.advance();
+    h.refresh();
+    assert(!has(await h.tick(), inside("StartStop"), 1));
+  }
   h.advance();
-  h.telemetry.record(P.batteryPower, 0);
-  h.telemetry.record(P.gridPower, 200);
-  await h.tick();
-  // Return to high import; the preceding ten seconds cannot count.
-  await h.step();
-  await h.step(10);
-  assertEquals(h.values.get(inside("StartStop")), 1);
-  await h.step(6);
-  assertEquals(h.values.get(inside("StartStop")), 0);
+  h.refresh();
+  assert(has(await h.tick(), inside("StartStop"), 1));
+  h.values.set(P.gridPower, 2500);
+  h.values.set(P.batteryPower, -1);
+  // Device has not yet acknowledged the start: each tick repeats it.
+  for (let i = 0; i < 15; i++) {
+    h.advance();
+    h.refresh();
+    assert(!has(await h.tick(), inside("StartStop"), 0));
+  }
+  h.advance();
+  h.refresh();
+  assert(has(await h.tick(), inside("StartStop"), 0));
 });
 
-test("battery probes require SOC strictly above minimum, including after stale recovery", async () => {
-  for (const soc of [19, 20]) {
+test("battery support requires SOC strictly above minimum + 4, including after stale recovery", async () => {
+  for (const soc of [19, 20, 23.99, 24]) {
     const h = batteryInstallation(5000);
     h.values.set(P.batterySOC, soc);
     h.refresh();
@@ -702,7 +693,7 @@ test("battery probes require SOC strictly above minimum, including after stale r
     assert(
       !h.writes.some((w) => w.path === inside("StartStop") && w.value === 1),
     );
-    h.values.set(P.batterySOC, 20.01);
+    h.values.set(P.batterySOC, 24.01);
     await h.run(20);
     assert(
       h.writes.some((w) => w.path === inside("StartStop") && w.value === 1),
@@ -723,17 +714,21 @@ test("full-SOC exception remains battery-limited and BMW freshness takes precede
   h.setInsideVehicleSoc(80, 91);
   await h.run(200);
   assert(
-    h.samples.slice(-20).every((s) => s.grid < 100 && s.inside >= 7 * 240),
+    h.samples
+      .slice(-20)
+      .every((s) => s.grid <= 99 + 240 && s.inside >= 7 * 240),
   );
+  assertBoundedImport(h.samples);
   h.values.set(P.batterySOC, 95);
   await h.step();
   assertEquals(h.values.get(inside("StartStop")), 0);
 });
 
-test("failed probing still permits Battery's zero-import solar fallback", async () => {
+test("Battery below the SOC margin permits zero-import solar fallback", async () => {
   const h = batteryInstallation(0);
   await h.tick();
   await h.run(20);
+  h.values.set(P.batterySOC, 24);
   h.solar(3000);
   await h.run(30);
   assert(h.samples.slice(-10).every((s) => s.inside >= 2400 && s.grid <= 0));
@@ -742,7 +737,7 @@ test("failed probing still permits Battery's zero-import solar fallback", async 
   assertEquals(h.values.get(inside("StartStop")), 0);
 });
 
-test("a failed battery probe publish does not permit another EV or a larger probe", async () => {
+test("a failed battery start publish does not permit another EV or a larger start", async () => {
   const h = installation();
   h.modes.set(L.Inside, Mode.Battery);
   h.modes.set(L.Outside, Mode.Battery);
@@ -773,12 +768,13 @@ test("solar and battery modes share power while the solar EV keeps a zero-import
   assert(
     h.samples
       .slice(-20)
-      .every((s) => s.grid <= 0 && s.inside >= 2400 && s.outside === 6000),
+      .every((s) => s.grid <= 240 && s.inside >= 2400 && s.outside >= 5760),
     JSON.stringify(h.samples.slice(-20)),
   );
+  assertBoundedImport(h.samples, 0);
   h.household(1200);
   await h.run(40);
-  assert(h.samples.slice(-20).every((s) => s.grid <= 0));
+  assertBoundedImport(h.samples.slice(-40), 0);
 });
 
 test("household and Manual import above the limited target pause an automatic EV", async () => {
@@ -805,32 +801,19 @@ test("gradual inverter response completes a bounded startup before ramping furth
   assertEquals(h.values.get(inside("StartStop")), 1);
   assert(h.samples.slice(0, 7).every((s) => s.inside === 2400));
   await h.run(240);
-  assert(h.samples.slice(-20).every((s) => s.inside >= 3360 && s.grid < 100));
-});
-
-test("loss of previously working discharge stops charging and blocks repeated restart attempts", async () => {
-  const h = batteryInstallation(3500);
-  await h.tick();
-  await h.run(200);
-  h.capacity(0);
-  await h.run(80);
-  assertEquals(h.values.get(inside("StartStop")), 0);
-  const stopped = h.writes.length;
-  await h.run(60);
   assert(
-    !h.writes
-      .slice(stopped)
-      .some((w) => w.path === inside("StartStop") && w.value === 1),
+    h.samples.slice(-20).every((s) => s.inside >= 3360 && s.grid <= 99 + 240),
   );
+  assertBoundedImport(h.samples);
 });
 
-test("dashboard discharge status follows discovery, telemetry recovery and mode resets", async () => {
+test("dashboard battery support status follows SOC availability and telemetry recovery", async () => {
   const h = batteryInstallation();
   assertEquals(h.dischargeStatus().state, "unknown");
   await h.tick();
-  assertEquals(h.dischargeStatus().state, "checking");
+  assertEquals(h.dischargeStatus().state, "available");
   await h.step();
-  assertEquals(h.dischargeStatus().state, "confirmed");
+  assertEquals(h.dischargeStatus().state, "available");
 
   h.telemetry.invalidate();
   assertEquals(h.dischargeStatus().state, "unknown");
@@ -840,49 +823,24 @@ test("dashboard discharge status follows discovery, telemetry recovery and mode 
   await h.step();
   // Stopping for stale telemetry retains reservations and restart smoothing.
   await h.run(20);
-  assertEquals(h.dischargeStatus().state, "confirmed");
+  assertEquals(h.dischargeStatus().state, "available");
 
   h.modes.set(L.Inside, Mode.Manual);
   await h.step();
-  assertEquals(h.dischargeStatus().state, "unknown");
-  match(h.dischargeStatus().reason, /No eligible wallbox/);
+  assertEquals(h.dischargeStatus().state, "available");
+  match(h.dischargeStatus().reason, /assumed available/);
   h.restart();
   assertEquals(h.dischargeStatus().state, "unknown");
-});
-
-test("dashboard discharge status retains failed discovery until retry conditions change", async () => {
-  const h = batteryInstallation(0);
-  await h.tick();
-  assertEquals(h.dischargeStatus().state, "checking");
-  await h.run(40);
-  assertEquals(h.dischargeStatus().state, "blocked");
-  match(h.dischargeStatus().reason, /attempt failed/);
-  h.values.set(P.batterySOC, 50.99);
-  await h.step();
-  assertEquals(h.dischargeStatus().state, "blocked");
-  h.values.set(P.batterySOC, 51);
-  await h.step();
-  assertEquals(h.dischargeStatus().state, "checking");
-  // Retry publication waits for the preceding stop and increase smoothing.
-  await h.run(40);
-  assertEquals(h.dischargeStatus().state, "blocked");
-  h.values.set(P.batteryMinSOC, 51);
-  await h.step();
-  assertEquals(h.dischargeStatus().state, "blocked");
-  match(h.dischargeStatus().reason, /at or below/);
-  h.values.set(P.batteryMinSOC, 50);
-  await h.step();
-  assertEquals(h.dischargeStatus().state, "checking");
 });
 
 test("dashboard discharge status expires even while device telemetry is refreshed", async () => {
   const h = batteryInstallation();
   await h.tick();
   await h.step();
-  assertEquals(h.dischargeStatus().state, "confirmed");
+  assertEquals(h.dischargeStatus().state, "available");
   h.advance(Temporal.Duration.from({ seconds: 60 }));
   h.refresh();
-  assertEquals(h.dischargeStatus().state, "confirmed");
+  assertEquals(h.dischargeStatus().state, "available");
   h.advance(Temporal.Duration.from({ nanoseconds: 1 }));
   h.refresh();
   assertEquals(h.dischargeStatus().state, "unknown");
@@ -962,4 +920,48 @@ test("registered ingestion feeds fallback, recovery and original observation tim
   writes.length = 0;
   await cycle.tick();
   assert(has(writes, inside("StartStop"), 0));
+});
+
+test("zero discharge stops on grid feedback and recovers without SOC changes or cooldown", async () => {
+  const h = batteryInstallation(0, true);
+  await h.tick();
+  assertEquals(h.dischargeStatus().state, "available");
+  await h.run(16);
+  assertEquals(h.values.get(inside("StartStop")), 0);
+  const stopped = h.writes.length;
+  h.prefer(L.Outside);
+  h.capacity(4000);
+  await h.run(60);
+  assert(has(h.writes.slice(stopped), outside("StartStop"), 1));
+  assertEquals(h.values.get(P.batterySOC), 50);
+  assertEquals(h.values.get(P.batteryMinSOC), 20);
+  assertEquals(h.dischargeStatus().state, "available");
+});
+
+test("continuing battery charging stops at the four-point margin and minimum changes take effect", async () => {
+  const h = batteryInstallation(5000);
+  await h.tick();
+  await h.run(40);
+  h.values.set(P.batterySOC, 24);
+  await h.step();
+  assertEquals(h.values.get(inside("StartStop")), 0);
+  assertEquals(h.dischargeStatus().state, "blocked");
+  match(h.dischargeStatus().reason, /minimum SOC \+ 4/);
+  h.values.set(P.batteryMinSOC, 19);
+  await h.run(40);
+  assertEquals(h.values.get(inside("StartStop")), 1);
+  assertEquals(h.dischargeStatus().state, "available");
+});
+
+test("insufficient capacity allows normal restarts without a learned ceiling", async () => {
+  const h = batteryInstallation(0);
+  await h.tick();
+  await h.run(100);
+  const starts = h.writes.filter(
+    (w) => w.path === inside("StartStop") && w.value === 1,
+  );
+  assert(starts.length > 1);
+  assertBoundedImport(h.samples);
+  assert(h.samples.every((s) => s.inside <= 2400));
+  assertEquals(h.dischargeStatus().state, "available");
 });

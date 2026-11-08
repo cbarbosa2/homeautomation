@@ -4,7 +4,11 @@ import { CONTROL_PATHS as P, wallboxPath } from "../device-topics.ts";
 import type { WallboxLocation as L } from "../globals.ts";
 import { MAX_AMPS_PER_LOCATION } from "./power-constants.ts";
 import { SYSTEM_VOLTAGE } from "../utils/index.ts";
-import { validTelemetry } from "./charge-mode-policy.ts";
+import {
+  batteryDischargeAvailable,
+  validTelemetry,
+} from "./charge-mode-policy.ts";
+import { isCharging } from "./wallbox-policy.ts";
 import {
   effectivePolicies,
   powerResources,
@@ -18,30 +22,28 @@ const RESPONSE_WINDOW = Temporal.Duration.from({ seconds: 15 });
 type State = InputState & SystemState;
 
 export interface BatteryDischargeStatus {
-  state: "confirmed" | "checking" | "blocked" | "unknown";
+  state: "available" | "blocked" | "unknown";
   reason: string;
 }
 
 export function unknownDischargeStatus(): BatteryDischargeStatus {
-  return { state: "unknown", reason: "Discharge has not been checked yet." };
+  return {
+    state: "unknown",
+    reason: "Battery support has not been evaluated yet.",
+  };
 }
 
-/** Shared discharge discovery. SOC permits an attempt, never proves capacity. */
+/** SOC grants discharge availability; fresh grid feedback regulates EV demand. */
 export class BatterySupportController {
-  private failure: { soc: number; minimum: number } | undefined;
-  private highImportSince: Temporal.Instant | undefined;
   private lastObservation: Temporal.Instant | undefined;
   private signature = "";
-  private confirmed = false;
-  private attempt: { location: L; since: Temporal.Instant } | undefined;
+  private startup:
+    | { location: L; since: Temporal.Instant | undefined }
+    | undefined;
   private response: { since: Temporal.Instant; increment: number } | undefined;
   private batteryLocations: L[] = [];
   private commands = new Map<L, { watts: number; since: Temporal.Instant }>();
   private allowance = 0;
-  private dischargeCeiling:
-    | { watts: number; soc: number; minimum: number }
-    | undefined;
-
   private evaluatedAt: Temporal.Instant | undefined;
   private dischargeStatus = unknownDischargeStatus();
 
@@ -70,38 +72,18 @@ export class BatterySupportController {
         state: "unknown",
         reason: "Control telemetry is unavailable or stale.",
       };
-    if ((state.batterySOC as number) <= (state.batteryMinSOC as number))
-      return {
-        state: "blocked",
-        reason: "Battery SOC is at or below the minimum.",
-      };
-    if (this.failure)
+    if (!batteryDischargeAvailable(state))
       return {
         state: "blocked",
         reason:
-          "Discharge attempt failed. Retry after SOC rises one percentage point from the failed attempt or minimum SOC changes.",
-      };
-    if (
-      ![...effectivePolicies(state).values()].some(
-        (p) => p.supply === "battery",
-      )
-    )
-      return {
-        state: "unknown",
-        reason: "No eligible wallbox currently requests battery support.",
-      };
-    if (this.confirmed)
-      return {
-        state: "confirmed",
-        reason: "The controller has observed the battery discharging.",
-      };
-    if (this.attempt)
-      return {
-        state: "checking",
-        reason: "Waiting for the battery to respond to a discharge attempt.",
+          "Battery support requires SOC strictly above minimum SOC + 4 percentage points.",
       };
 
-    return { state: "unknown", reason: "Waiting for a discharge check." };
+    return {
+      state: "available",
+      reason:
+        "SOC is above minimum SOC + 4 percentage points; discharge is assumed available. Charging remains subject to mode and power limits.",
+    };
   }
 
   allowanceFor(state: State, builder: CommandBuilder): number {
@@ -121,32 +103,14 @@ export class BatterySupportController {
       [...state.wallboxChargeMode, ...policies].map(([l, p]) => [l, p]),
     );
     if (!validTelemetry(state) || signature !== this.signature) {
-      this.confirmed = false;
-      this.attempt = undefined;
+      this.startup = undefined;
       this.response = undefined;
       this.lastObservation = undefined;
-      this.highImportSince = undefined;
       this.allowance = 0;
-      this.dischargeCeiling = undefined;
       this.signature = signature;
     }
     if (!validTelemetry(state)) return 0;
-    const soc = state.batterySOC as number;
-    const minimum = state.batteryMinSOC as number;
-    if (
-      this.dischargeCeiling &&
-      (minimum !== this.dischargeCeiling.minimum ||
-        soc >= this.dischargeCeiling.soc + 1)
-    )
-      this.dischargeCeiling = undefined;
-    if (
-      this.failure &&
-      (minimum !== this.failure.minimum || soc >= this.failure.soc + 1)
-    ) {
-      this.failure = undefined;
-      this.confirmed = false;
-    }
-    if (this.failure || soc <= minimum || !eligible.length) return 0;
+    if (!batteryDischargeAvailable(state) || !eligible.length) return 0;
 
     const observations = [P.gridPower, P.batteryPower].map((p) =>
       state.observedAt?.get(p),
@@ -186,26 +150,6 @@ export class BatterySupportController {
         (this.commands.get(l)?.watts ?? 0) > 0 ||
         (state.wallboxPower.get(l) ?? 0) > 0,
     );
-    const discharging = (state.batteryPower as number) < 0;
-    if (discharging) {
-      this.confirmed = true;
-      this.highImportSince = undefined;
-    } else if (demand && (state.gridPower as number) > 200) {
-      this.highImportSince ??= observed;
-      if (
-        Temporal.Instant.compare(
-          observed,
-          this.highImportSince.add(RESPONSE_WINDOW),
-        ) > 0
-      ) {
-        this.failure = { soc, minimum };
-        this.confirmed = false;
-        this.attempt = undefined;
-        this.allowance = 0;
-        return 0;
-      }
-    } else this.highImportSince = undefined;
-
     const commandConfirmed = (l: L): boolean => {
       const command = this.commands.get(l);
       if (!command || command.watts <= 0) return false;
@@ -218,30 +162,30 @@ export class BatterySupportController {
         }) &&
         state.wallboxStartStop?.get(l) === 1 &&
         state.wallboxSetCurrent?.get(l) === command.watts / SYSTEM_VOLTAGE &&
-        (state.wallboxPower.get(l) ?? 0) >= command.watts - SYSTEM_VOLTAGE / 2
+        isCharging(state.wallboxVictronStatus.get(l)) &&
+        (state.wallboxPower.get(l) ?? 0) > 0
       );
     };
     if (
-      this.attempt &&
-      this.confirmed &&
-      commandConfirmed(this.attempt.location) &&
+      this.startup &&
+      commandConfirmed(this.startup.location) &&
       (state.gridPower as number) <= target
     )
-      this.attempt = undefined;
+      this.startup = undefined;
 
     // A solar allocation or outstanding reservation may have prevented the
-    // intended startup. Re-evaluate it against the now-confirmed total load.
-    if (this.attempt && this.commands.get(this.attempt.location)?.watts === 0)
-      this.attempt = undefined;
+    // startup. Re-evaluate it against the now-confirmed total load.
+    if (this.startup && this.commands.get(this.startup.location)?.watts === 0)
+      this.startup = undefined;
 
     // A startup may briefly import while the inverter responds. No repeated
     // telemetry or failed publication authorizes another step during this window.
     if (
-      this.attempt &&
-      ((!this.confirmed && this.highImportSince !== undefined) ||
+      this.startup &&
+      (this.startup.since === undefined ||
         Temporal.Instant.compare(
           observed,
-          this.attempt.since.add(RESPONSE_WINDOW),
+          this.startup.since.add(RESPONSE_WINDOW),
         ) <= 0)
     )
       return this.allowance;
@@ -264,16 +208,10 @@ export class BatterySupportController {
       resources.measured + target - (state.gridPower as number),
     );
     if ((state.gridPower as number) > target && demand) {
-      if (discharging)
-        this.dischargeCeiling = {
-          watts: -(state.batteryPower as number),
-          soc,
-          minimum,
-        };
       this.allowance = Math.min(this.allowance, balanced);
       return this.allowance;
     }
-    if (this.attempt) return this.allowance;
+    if (this.startup) return this.allowance;
     // Household and Manual import cannot be corrected by starting an EV.
     if ((state.gridPower as number) - resources.measured > target) {
       this.allowance = 0;
@@ -282,8 +220,12 @@ export class BatterySupportController {
     const pending = [...this.commands].some(
       ([l, c]) => c.watts > 0 && !commandConfirmed(l),
     );
-    if (pending || committed > resources.measured + SYSTEM_VOLTAGE / 2)
-      return this.allowance;
+    // Keep unconfirmed reduction peaks reserved. Confirmed current settings can
+    // draw less than nominal 240 V watts without blocking subsequent increases.
+    const pendingReduction = [...commitments].some(
+      ([l, c]) => c.watts > Math.max(state.wallboxPower.get(l) ?? 0, c.target),
+    );
+    if (pending || pendingReduction) return this.allowance;
     const candidate = eligible.find(
       (l) =>
         (state.wallboxPower.get(l) ?? 0) <
@@ -291,41 +233,17 @@ export class BatterySupportController {
     );
     if (candidate === undefined) return this.allowance;
     const location =
-      (state.wallboxPower.get(candidate) ?? 0) < 7 * SYSTEM_VOLTAGE
+      !isCharging(state.wallboxVictronStatus.get(candidate)) ||
+      (state.wallboxPower.get(candidate) ?? 0) <= 0
         ? candidate
         : undefined;
     const increment =
       location !== undefined ? 10 * SYSTEM_VOLTAGE : SYSTEM_VOLTAGE;
-    if (!this.confirmed && location === undefined) {
-      // An existing load after restart still needs a bounded discovery attempt.
-      this.attempt = { location: eligible[0] as L, since: this.clock() };
-      this.allowance = resources.measured;
-      return this.allowance;
-    }
-    // After reaching the inverter's observed limit, retain that ceiling while
-    // adapting it to household/PV changes. This avoids a permanent sawtooth of
-    // import excursions. A higher measured discharge or SOC recovery reopens it.
-    if (
-      this.dischargeCeiling &&
-      -(state.batteryPower as number) > this.dischargeCeiling.watts
-    )
-      this.dischargeCeiling.watts = -(state.batteryPower as number);
-    const baseline =
-      (state.gridPower as number) -
-      resources.measured -
-      (state.batteryPower as number);
-    const ceiling = this.dischargeCeiling
-      ? this.dischargeCeiling.watts + target - baseline
-      : Infinity;
-    const next = Math.min(
-      resources.installation,
-      resources.measured + increment,
-      ceiling,
-    );
+    // Add one amp to the reserved current, not voltage-dependent measured watts.
+    const next = Math.min(resources.installation, committed + increment);
     if (next - committed < increment) return this.allowance;
     if (location !== undefined) {
-      this.confirmed = false;
-      this.attempt = { location, since: this.clock() };
+      this.startup = { location, since: undefined };
     }
     this.allowance = next;
     return this.allowance;
@@ -333,6 +251,13 @@ export class BatterySupportController {
 
   recordCommands(builder: CommandBuilder): void {
     for (const [l, commitment] of builder.commitments()) {
+      if (
+        this.startup?.location === l &&
+        this.startup.since === undefined &&
+        commitment.target > 0
+      )
+        this.startup.since = this.clock();
+
       if (this.commands.get(l)?.watts !== commitment.target) {
         const previous = this.commands.get(l)?.watts ?? 0;
         if (

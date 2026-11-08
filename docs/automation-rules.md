@@ -14,8 +14,8 @@ Remaining hours use actual elapsed time until the next Lisbon 08:00, including a
 | --- | --- | --- |
 | 1 | Manual | Send no automatic wallbox current or start/stop commands, including grid protection. The user is responsible for its current and grid impact. |
 | 2 | Sun | Use solar surplus while battery SOC is above minimum SOC + 1 percentage point; target zero whole-house grid import. |
-| 3 | Reserve | Sun by day. At night, use battery support while SOC is above minimum SOC + 2 percentage points per rounded-up remaining hour until 08:00; otherwise use Sun. |
-| 4 | Battery | Use battery support strictly above minimum SOC. At the discharge floor, genuine solar surplus remains usable without Sun's minimum-SOC eligibility guard. |
+| 3 | Reserve | Sun by day. At night, use battery support while SOC is above minimum SOC + 2 percentage points per rounded-up remaining hour until 08:00; otherwise use Sun. Battery support also requires SOC strictly above minimum SOC + 4 percentage points. |
+| 4 | Battery | Use battery support strictly above minimum SOC + 4 percentage points. At or below that threshold, genuine solar surplus remains usable without Sun's minimum-SOC eligibility guard. |
 | 5 | Night | Maximum possible charging at night; Sun by day. |
 | 6 | Max | Maximum possible charging at any time using grid, battery and solar. |
 
@@ -27,7 +27,7 @@ charging below minimum SOC; grid-funded battery charging is not EV headroom.
 Strictly **above 95% SOC**, Sun, Reserve and daytime Night use battery-supported
 operation, overriding Reserve's overnight reserve margin. At exactly 95% or below,
 the ordinary rules apply. This exception still requires fresh telemetry and
-battery support; it does not authorize unrestricted grid charging.
+SOC strictly above minimum SOC + 4 percentage points; it does not authorize unrestricted grid charging.
 
 The inside wallbox charges the BMW i3. In Sun, Reserve, Battery and Night, a BMW
 SOC reading of at least 80% and no more than 90 minutes old stops it, including
@@ -37,31 +37,31 @@ charging. Max and Manual are exempt. BMW telemetry may lag, so 80% is approximat
 For example, at 23:00 Reserve's ordinary battery-support condition requires SOC
 above minimum SOC + 18 percentage points.
 
-### Battery support discovery
+### Battery support regulation
 
-SOC eligibility permits a controlled attempt; it does not prove the battery can
-discharge. One eligible wallbox at a time starts at **10 A**, in priority order,
-subject to installation headroom and outstanding device commands. Continuing
-loads increase in whole-amp steps only after fresh settings and measured power
-confirm the preceding command, retaining increase smoothing. Any fresh measured
-discharge strictly greater than 0 W establishes availability, without implying
-unused capacity. Startup and increases allow a bounded 15-second inverter
-response window. Import above the target beyond that response causes reductions; charging
-stops below the 7 A continuation threshold. The controller retains an observed
-discharge ceiling after reaching the import limit and adjusts it for household
-and PV changes, avoiding repeated excursions at the same load. A measured higher
-discharge, minimum-SOC change or SOC recovery of one point reopens that ceiling.
+Assume discharge is available strictly when SOC is above minimum SOC + **4
+percentage points**. This applies to Battery, nighttime Reserve and the
+above-95% exception. Reserve also retains its remaining-night margin. Exactly
+minimum SOC + 4 does not permit battery support. There is no extra hysteresis.
 
-If import stays strictly **above 200 W for more than 15 continuous seconds** with
-no observed discharge, end the attempt and block battery probes for **both** EVs.
-Evaluate this using fresh telemetry; repeated control ticks do not establish
-elapsed failure evidence. Record SOC and minimum SOC at failure. Retry only after
-minimum SOC changes or fresh SOC rises at least **1 percentage point** above that
-failure baseline. Time, unchanged new readings, mode changes, stale recovery,
-more solar and lower household load do not release this block. Releasing it
-permits a new probe, requiring SOC strictly above minimum and all normal safety
-and eligibility conditions; it does not confirm discharge. Genuine solar remains
-usable while probes are blocked. Restart discards discovery and retry state.
+One eligible wallbox at a time starts at **10 A**, in priority order, subject to
+installation headroom and outstanding device commands. Continuing loads increase
+in whole-amp steps only after fresh settings and measured power confirm the
+preceding command, retaining increase smoothing. No observed battery discharge
+is required to start or continue.
+
+Startup and increases allow a bounded 15-second inverter response window,
+starting when command building first produces the nonzero allocation rather
+than while smoothing or reservations delay it. Repeated commands do not extend
+that window. Fresh grid import above the target beyond that response causes
+reductions; charging stops below the 7 A continuation threshold. Sun retains its
+zero-import target when sharing power with a battery-supported EV.
+
+There are no discharge probes, learned ceilings, failure baselines or retry
+cooldowns. Normal allocation may restart charging while SOC remains eligible,
+subject to fresh telemetry, command confirmation and smoothing. Insufficient
+physical capacity can therefore cause recurring bounded starts or current
+adjustments. Genuine solar surplus remains usable according to each mode's rules.
 
 Household and Manual loads remain outside automatic intervention. If these loads
 or an unrestricted EV require import above a constrained EV's whole-house target,

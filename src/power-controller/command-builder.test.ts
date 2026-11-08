@@ -38,7 +38,7 @@ function createTargets(
   };
 }
 
-test("confirmed stop releases sequential reductions and permits battery discovery", () => {
+test("confirmed stop releases sequential reductions and permits battery startup", () => {
   let now = Temporal.Instant.from("2026-11-08T13:45:55Z");
   const outside = WallboxLocation.Outside;
   const builder = new CommandBuilder(() => now);
@@ -98,7 +98,7 @@ test("confirmed stop releases sequential reductions and permits battery discover
 
   const support = new BatterySupportController(() => now);
   assertEquals(support.allowanceFor(state, builder), 2400);
-  assertEquals(support.getDischargeStatus(true).state, "checking");
+  assertEquals(support.getDischargeStatus(true).state, "available");
 });
 
 test("CommandBuilder should create wallbox current commands", () => {

@@ -134,7 +134,7 @@ test("battery API exposes fresh SOC independently and clears invalid, expired an
     );
     deepStrictEqual(discharge, {
       state: "unknown",
-      reason: "Discharge has not been checked yet.",
+      reason: "Battery support has not been evaluated yet.",
     });
     return readings;
   };
@@ -245,8 +245,7 @@ test("battery API reads live controller discharge status on every request", asyn
   try {
     for (const state of [
       "unknown",
-      "checking",
-      "confirmed",
+      "available",
       "blocked",
       "unknown",
     ] as const) {
