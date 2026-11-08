@@ -7,7 +7,7 @@ node scripts/check-node.mjs
 npm run analyze
 npm run build
 
-# Verify runtime and the one-time systemd migration before stopping the service.
+# Verify runtime and the installed systemd unit before stopping the service.
 ssh carlos@bee.local 'bash -se' <<'EOF_REMOTE'
 set -euo pipefail
 /usr/bin/node -e 'if (process.versions.node.split(".")[0] !== "26" || Number(process.versions.node.split(".")[1]) < 13) process.exit(1)'

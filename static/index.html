@@ -216,13 +216,13 @@
         <div class="section-header"><div><h2 id="charging-title">Charging</h2></div></div>
         <form id="inside-form" class="charger-row">
           <span class="charger-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h10v18H7zM10 6h4M10 17l3-5h-3l3-5" /></svg></span>
-          <div><h3 class="charger-name"><label for="inside-mode">Inside</label><span id="inside-priority" class="priority-badge" title="First in line for available power when eligible" hidden>Priority</span></h3><p class="vehicle"><span>BMW i3</span><span id="bmw-soc">Loading SOC…</span></p><p id="bmw-observed" class="subtitle"></p></div>
+          <div><h3 class="charger-name"><label for="inside-mode">Inside</label><span id="inside-priority" class="priority-badge" title="First in line for available power when eligible" hidden>Priority</span></h3><p class="vehicle"><span>BMW i3</span><span id="bmw-soc">Loading SOC…</span></p><p id="bmw-observed" class="subtitle"></p><p id="inside-status" class="subtitle" role="status">Loading status…</p></div>
           <div class="mode-controls"><select id="inside-mode" name="mode" disabled><option value="1">Manual</option><option value="2">Sun</option><option value="3">Reserve</option><option value="4">Battery</option><option value="5">Night</option><option value="6">Max</option></select><button class="button button-primary" type="submit" aria-label="Set inside mode and priority" disabled>Set</button></div>
           <p id="inside-feedback" class="feedback" role="status"></p>
         </form>
         <form id="outside-form" class="charger-row">
           <span class="charger-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h10v18H7zM10 6h4M10 17l3-5h-3l3-5" /></svg></span>
-          <div><h3 class="charger-name"><label for="outside-mode">Outside</label><span id="outside-priority" class="priority-badge" title="First in line for available power when eligible" hidden>Priority</span></h3><p class="subtitle">Wallbox</p></div>
+          <div><h3 class="charger-name"><label for="outside-mode">Outside</label><span id="outside-priority" class="priority-badge" title="First in line for available power when eligible" hidden>Priority</span></h3><p id="outside-status" class="subtitle" role="status">Loading status…</p></div>
           <div class="mode-controls"><select id="outside-mode" name="mode" disabled><option value="1">Manual</option><option value="2">Sun</option><option value="3">Reserve</option><option value="4">Battery</option><option value="5">Night</option><option value="6">Max</option></select><button class="button button-primary" type="submit" aria-label="Set outside mode and priority" disabled>Set</button></div>
           <p id="outside-feedback" class="feedback" role="status"></p>
         </form>
@@ -352,6 +352,32 @@
           renderBattery(null, true);
         } finally {
           setTimeout(loadBattery, 10000);
+        }
+      }
+
+      function renderWallboxStatus(value) {
+        const labels = {
+          0: "Disconnected", 1: "Connected", 2: "Charging", 3: "Charged",
+          4: "Waiting for sun", 5: "Waiting for RFID", 6: "Waiting for start",
+          7: "Low SOC", 20: "Charging limit", 21: "Starting charging",
+          22: "Switching to 3 phases", 23: "Switching to 1 phase", 24: "Stopping charging",
+        };
+        for (const location of locations) {
+          const status = value?.[location]?.status;
+          const label = Number.isInteger(status)
+            ? status >= 8 && status <= 14 ? `Fault (code ${status})` : labels[status]
+            : null;
+          byId(`${location.toLowerCase()}-status`).textContent = label ?? "Status unavailable";
+        }
+      }
+
+      async function loadWallboxStatus() {
+        try {
+          renderWallboxStatus(await requestJson("/api/wallbox-status"));
+        } catch (_) {
+          renderWallboxStatus(null);
+        } finally {
+          setTimeout(loadWallboxStatus, 10000);
         }
       }
 
@@ -705,6 +731,7 @@
       loadPrices();
       loadBattery();
       loadChargeModes();
+      loadWallboxStatus();
       loadBmwSoc();
       loadTasks();
     </script>

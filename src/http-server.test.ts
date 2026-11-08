@@ -5,13 +5,17 @@ import { once } from "node:events";
 import { HttpServer } from "./http-server.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { scheduler } from "./task-scheduler.ts";
-import { CONTROL_PATHS, controlTelemetry } from "./control-telemetry.ts";
+import {
+  CONTROL_PATHS,
+  controlTelemetry,
+  wallboxPath,
+} from "./control-telemetry.ts";
 import {
   unknownDischargeStatus,
   type BatteryDischargeStatus,
 } from "./power-controller/battery-support-controller.ts";
 import { Temporal } from "./temporal.ts";
-import { globals } from "./globals.ts";
+import { globals, WallboxLocation } from "./globals.ts";
 
 // Exercise the real TCP adapter without starting MQTT or scheduled automation.
 test("Node HTTP adapter preserves dashboard, APIs, metrics and request bodies", async () => {
@@ -369,6 +373,65 @@ test("solar forecasts API aligns four Lisbon dates and keeps missing, zero and i
     }
   } finally {
     globals.solarForecastDisplay = previous;
+    await server.stop();
+    metrics.getRegister().clear();
+  }
+});
+
+test("wallbox status API returns independent fresh statuses without power", async (context) => {
+  let now = Temporal.Instant.from("2026-11-08T12:00:00Z");
+  context.mock.method(Temporal.Now, "instant", () => now);
+  const metrics = new PrometheusMetrics();
+  const server = new HttpServer(metrics);
+  const port = await server.start(0);
+  const url = `http://127.0.0.1:${port}/api/wallbox-status`;
+  const inside = wallboxPath(WallboxLocation.Inside, "Status");
+  const outside = wallboxPath(WallboxLocation.Outside, "Status");
+  const read = async (
+    insideStatus: number | null,
+    outsideStatus: number | null,
+  ) => {
+    const response = await fetch(url);
+    equal(response.status, 200);
+    equal(response.headers.get("cache-control"), "no-store");
+    deepStrictEqual(await response.json(), {
+      Inside: { status: insideStatus },
+      Outside: { status: outsideStatus },
+    });
+  };
+  controlTelemetry.invalidate();
+
+  try {
+    await read(null, null);
+    controlTelemetry.record(inside, { value: 0 });
+    await read(0, null);
+    controlTelemetry.record(outside, { value: 2 });
+    await read(0, 2);
+
+    for (const status of [
+      1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24,
+    ]) {
+      controlTelemetry.record(inside, { value: status });
+      await read(status, 2);
+    }
+    for (const invalid of [-1, 15, 25, 2.5, NaN, Infinity, "2", null]) {
+      controlTelemetry.record(inside, { value: invalid });
+      await read(null, 2);
+    }
+    controlTelemetry.record(inside, { value: 0 });
+    now = now.add({ seconds: 60 });
+    await read(0, 2);
+    now = now.add({ nanoseconds: 1 });
+    await read(null, null);
+    controlTelemetry.record(outside, { value: 4 });
+    await read(null, 4);
+    controlTelemetry.invalidate();
+    await read(null, null);
+    for (const method of ["POST", "PUT", "DELETE"]) {
+      equal((await fetch(url, { method })).status, 404);
+    }
+  } finally {
+    controlTelemetry.invalidate();
     await server.stop();
     metrics.getRegister().clear();
   }

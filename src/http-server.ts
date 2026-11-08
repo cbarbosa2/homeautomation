@@ -10,7 +10,11 @@ import { globals, WallboxChargeMode, WallboxLocation } from "./globals.ts";
 import type { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
 import { getVehicleSoc } from "./bmw-cardata/bmw-cardata.ts";
-import { CONTROL_PATHS, controlTelemetry } from "./control-telemetry.ts";
+import {
+  CONTROL_PATHS,
+  controlTelemetry,
+  wallboxPath,
+} from "./control-telemetry.ts";
 import { lisbonTime, systemClock } from "./lisbon-clock.ts";
 
 import {
@@ -101,6 +105,21 @@ export class HttpServer {
 
       if (url.pathname === "/api/trigger" && request.method === "POST") {
         return await this.handleTriggerTask(request);
+      }
+
+      if (url.pathname === "/api/wallbox-status" && request.method === "GET") {
+        const status = (location: WallboxLocation) => ({
+          status:
+            controlTelemetry.value(wallboxPath(location, "Status")) ?? null,
+        });
+
+        return Response.json(
+          {
+            Inside: status(WallboxLocation.Inside),
+            Outside: status(WallboxLocation.Outside),
+          },
+          { headers: { "Cache-Control": "no-store" } },
+        );
       }
 
       // Wallbox charge mode API endpoints

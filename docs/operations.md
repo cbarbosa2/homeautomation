@@ -263,3 +263,15 @@ performs no external requests, and sends `Cache-Control: no-store`. The dashboar
 refreshes every minute after the previous request completes. Failed dashboard
 requests clear the chart and retry automatically. Forecast loading, metrics and
 battery target calculations retain their existing behavior.
+
+## Charger status display
+
+The Inside and Outside dashboard rows show live device-reported charger status.
+`GET /api/wallbox-status` returns `{ "Inside": { "status": 0 }, "Outside": { "status": 2 } }`,
+where each status is a Victron numeric code or independently `null` when missing,
+invalid, disconnected from MQTT, or more than 60 seconds old. Code 0 means the
+vehicle is disconnected, not unavailable telemetry. Codes 8–14 display as
+`Fault (code N)`. The endpoint sends `Cache-Control: no-store` and makes no device
+requests. The dashboard loads immediately and refreshes ten seconds after each
+request completes. Failed refreshes clear both labels to `Status unavailable`
+and retry automatically. This display does not affect charging controls.

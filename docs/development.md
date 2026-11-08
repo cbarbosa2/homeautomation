@@ -43,7 +43,7 @@ Development mode uses the production compiler configuration, which excludes test
 
 Production output is `dist/src/bootstrap.js`; the BMW setup command is `dist/scripts/bmw-cardata-setup.js`. Run both from the repository root. Static assets, `.env`, build timestamps, and token files remain relative to that directory. Production and test builds emit ESM JavaScript targeting ES2024 with source maps. Node provides native Temporal; the shared compiler configuration includes `ESNext.Temporal` declarations while retaining ES2024 output.
 
-The test command supplies synthetic Victron identifiers and does not load your private `.env`. It runs compiled `*.test.js` files with Node's process isolation; tests in each file run sequentially. For a single compiled test, set `VICTRON_PORTAL_ID=test-portal VICTRON_INSTALLATION_ID=123456` and run `node --test .test-dist/src/path/to/file.test.js` after `npm test` has compiled it. Network-facing migration tests use local sockets or stubbed APIs, and token/setup tests use temporary working directories.
+The test command supplies synthetic Victron identifiers and does not load your private `.env`. It runs compiled `*.test.js` files with Node's process isolation; tests in each file run sequentially. For a single compiled test, set `VICTRON_PORTAL_ID=test-portal VICTRON_INSTALLATION_ID=123456` and run `node --test .test-dist/src/path/to/file.test.js` after `npm test` has compiled it. Network-facing integration tests use local sockets or stubbed APIs, and token/setup tests use temporary working directories.
 
 Compiler strictness checks code before execution; it does not validate incoming payloads at runtime.
 
