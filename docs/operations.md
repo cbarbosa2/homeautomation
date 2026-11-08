@@ -136,7 +136,8 @@ after fresh device settings, charging status and positive measured power confirm
 the preceding command. Power need not match nominal 240 V watts. They target whole-house import below 100 W;
 Sun targets zero. The 30-second inverter response window begins at the first
 nonzero built startup allocation, excluding smoothing and reservation waits;
-repeated commands do not renew it. Fresh import feedback reduces charging when
+repeated commands do not renew it. Low import during the car's initial ramp does
+not end the startup window early. Fresh import feedback reduces charging when
 the response allowance expires. No observed discharge is required.
 
 There are no learned ceilings or failure baselines. After a power-related stop,

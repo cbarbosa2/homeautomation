@@ -1027,7 +1027,7 @@ for (const reset of ["mode", "restart"]) {
 test("a current increase gets a 30-second inverter response window", async () => {
   const h = batteryInstallation(2400);
   await h.tick();
-  for (let i = 0; i < 40 && h.values.get(inside("SetCurrent")) !== 11; i++)
+  for (let i = 0; i < 60 && h.values.get(inside("SetCurrent")) !== 11; i++)
     await h.step();
   assertEquals(h.values.get(inside("SetCurrent")), 11);
   await h.run(30);
@@ -1095,4 +1095,34 @@ test("failed stop publication retains the original retry deadline", async () => 
   await h.run(14);
   assert(!has(h.writes.slice(stopped), inside("StartStop"), 1));
   assert(has(await h.step(), inside("StartStop"), 1));
+});
+
+test("a small initial EV load does not end the startup response window before the car ramps up", async () => {
+  const h = installation();
+  h.modes.set(L.Inside, Mode.Battery);
+  h.modes.set(L.Outside, Mode.Manual);
+  h.onPublish(async ({ path, value }) => {
+    h.values.set(path, Number(value));
+  });
+  assert(has(await h.tick(), inside("StartStop"), 1));
+  h.advance();
+  h.values.set(inside("Status"), S.Charging);
+  h.values.set(inside("Ac/Power"), 240);
+  h.values.set(P.gridPower, 0);
+  h.values.set(P.batteryPower, -240);
+  h.refresh();
+  await h.tick();
+  // The vehicle ramps up before the inverter follows the full charging load.
+  h.values.set(inside("Ac/Power"), 2400);
+  h.values.set(P.gridPower, 2400);
+  h.values.set(P.batteryPower, 0);
+  for (let second = 2; second <= 30; second++) {
+    h.advance();
+    h.refresh();
+    assert(!has(await h.tick(), inside("StartStop"), 0));
+    assertEquals(h.values.get(inside("SetCurrent")), 10);
+  }
+  h.advance();
+  h.refresh();
+  assert(has(await h.tick(), inside("StartStop"), 0));
 });

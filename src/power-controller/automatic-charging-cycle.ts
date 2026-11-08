@@ -91,7 +91,7 @@ export class AutomaticChargingCycle {
         state,
         targets,
       );
-      this.support.recordCommands(this.builder);
+      this.support.recordCommands(this.builder, targets);
       await runCommands(commands, publisher, enabled, (location) =>
         modes().get(location) === state.wallboxChargeMode.get(location)
           ? modes().get(location)

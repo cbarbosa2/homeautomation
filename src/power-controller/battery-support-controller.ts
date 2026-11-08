@@ -1,7 +1,7 @@
 import type { Clock } from "../lisbon-clock.ts";
 import { Temporal } from "../temporal.ts";
 import { CONTROL_PATHS as P, wallboxPath } from "../device-topics.ts";
-import type { WallboxChargeMode, WallboxLocation as L } from "../globals.ts";
+import { type WallboxChargeMode, WallboxLocation as L } from "../globals.ts";
 import { MAX_AMPS_PER_LOCATION } from "./power-constants.ts";
 import { SYSTEM_VOLTAGE } from "../utils/index.ts";
 import {
@@ -15,6 +15,7 @@ import {
   powerResources,
   priorityOrder,
   type InputState,
+  type CalculatedTargetResults,
 } from "./dynamic-power-calculator.ts";
 import type { SystemState, CommandBuilder } from "./command-builder.ts";
 
@@ -203,13 +204,6 @@ export class BatterySupportController {
         (state.wallboxPower.get(l) ?? 0) > 0
       );
     };
-    if (
-      this.startup &&
-      commandConfirmed(this.startup.location) &&
-      (state.gridPower as number) <= target
-    )
-      this.startup = undefined;
-
     // A solar allocation or outstanding reservation may have prevented the
     // startup. Re-evaluate it against the now-confirmed total load.
     if (this.startup && this.commands.get(this.startup.location)?.watts === 0)
@@ -226,6 +220,16 @@ export class BatterySupportController {
         ) <= 0)
     )
       return this.allowance;
+
+    // A small initial car load is not evidence that the inverter has responded
+    // to the full requested load. Always retain the entire startup window.
+    if (
+      this.startup &&
+      commandConfirmed(this.startup.location) &&
+      (state.gridPower as number) <= target
+    )
+      this.startup = undefined;
+
     if (this.response) {
       const responding =
         Temporal.Instant.compare(
@@ -286,10 +290,20 @@ export class BatterySupportController {
     return this.allowance;
   }
 
-  recordCommands(builder: CommandBuilder): void {
+  recordCommands(
+    builder: CommandBuilder,
+    targets: CalculatedTargetResults,
+  ): void {
     for (const [l, commitment] of builder.commitments()) {
-      // Record stop intent once, even if publication fails or is disabled.
-      if (commitment.target === 0 && this.powerStopCandidates.has(l)) {
+      const target =
+        l === L.Inside ? targets.insideWallboxAmps : targets.outsideWallboxAmps;
+      // Reservation and smoothing waits must not turn a positive allocation
+      // into a failed attempt. Record genuine stop intent once, even if sending fails.
+      if (
+        target === 0 &&
+        commitment.target === 0 &&
+        this.powerStopCandidates.has(l)
+      ) {
         this.retryAfter.set(l, this.clock().add(RETRY_DELAY));
         this.powerStopCandidates.delete(l);
       }

@@ -53,14 +53,18 @@ is required to start or continue.
 Startup and increases allow a bounded 30-second inverter response window,
 starting when command building first produces the nonzero allocation rather
 than while smoothing or reservations delay it. Repeated commands do not extend
-that window. Fresh grid import above the target beyond that response causes
+that window. Startup retains the full 30 seconds even if the car initially draws
+little power and grid import is already below target, allowing the car and
+inverter to ramp together. Fresh grid import above the target beyond that response causes
 reductions; charging stops below the 7 A continuation threshold. Sun retains its
 zero-import target when sharing power with a battery-supported EV.
 
 After power regulation or insufficient available power stops an active or pending
 battery-supported allocation, that wallbox waits **15 minutes** before another
 battery-supported start. The delay starts with the first zero allocation built
-for that stop; repeated stop commands do not extend it. Each failed retry starts
+for that stop; repeated stop commands do not extend it. Temporary command-builder
+waits for smoothing or outstanding reservations do not create a delay when the
+power allocator still requests charging. Each failed retry starts
 a new delay. The other wallbox may still charge according to priority. Genuine
 solar surplus remains usable during the delay.
 
