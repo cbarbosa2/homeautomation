@@ -219,7 +219,7 @@
           <div class="mode-controls"><select id="outside-mode" name="mode" disabled><option value="1">Manual</option><option value="2">Sun</option><option value="3">Reserve</option><option value="4">Battery</option><option value="5">Night</option><option value="6">Max</option></select><button class="button button-primary" type="submit" aria-label="Set outside mode and priority" disabled>Set</button></div>
           <p id="outside-feedback" class="feedback" role="status"></p>
         </form>
-        <div class="section-note"><p>Set applies the mode and claims priority when eligible.</p><p id="priority-status" class="feedback" role="status">Loading priority…</p><p id="modes-status" class="feedback" role="status">Loading charge modes…</p><button id="retry-modes" class="button" type="button" hidden>Retry loading modes</button></div>
+        <div class="section-note"><p id="priority-status" class="feedback" role="status">Loading priority…</p><p id="modes-status" class="feedback" role="status">Loading charge modes…</p><button id="retry-modes" class="button" type="button" hidden>Retry loading modes</button></div>
       </section>
 
       <section class="panel" aria-labelledby="prices-title">
@@ -372,8 +372,8 @@
         const missing = sources.filter((source) => !value.days.some((day) => available(day[source.field])));
         feedback(byId("solar-status"), values.length === 0 ? "Solar forecasts not available yet." :
           missing.length ? `${missing.map((source) => source.name).join(" and ")} forecast unavailable.` : "");
-        byId("solar-detail").hidden = values.length === 0;
-        byId("solar-detail").textContent = "Hover, focus or tap a bar for its forecast. Gaps indicate unavailable values.";
+        byId("solar-detail").hidden = true;
+        byId("solar-detail").textContent = "";
         if (values.length === 0) return;
 
         const plot = document.createElement("div");
@@ -411,7 +411,7 @@
               bar.className = "solar-bar";
               bar.style.height = `${wh / 1000 / upper * 100}%`;
               slot.append(bar);
-              const show = () => { byId("solar-detail").textContent = description; };
+              const show = () => { byId("solar-detail").textContent = description; byId("solar-detail").hidden = false; };
               for (const event of ["mouseenter", "focus", "click"]) slot.addEventListener(event, show);
             }
             group.append(slot);
