@@ -1,11 +1,5 @@
 import { VICTRON_PORTAL_ID } from "../constants.ts";
-import { CONTROL_PATHS, controlTelemetry } from "../control-telemetry.ts";
-import {
-  type Clock,
-  lisbonTime,
-  systemClock,
-  timeUntilMorning,
-} from "../lisbon-clock.ts";
+import { type Clock, lisbonTime, timeUntilMorning } from "../lisbon-clock.ts";
 import type { MqttClient } from "../mqtt-client.ts";
 import { Temporal } from "../temporal.ts";
 import { finite } from "../utils/index.ts";
@@ -49,9 +43,8 @@ export class SetSocLimitTask {
 
   constructor(
     private mqttClient: Pick<MqttClient, "publishJson">,
-    private clock: Clock = systemClock,
-    private readSoc: () => number | undefined = () =>
-      controlTelemetry.value(CONTROL_PATHS.batterySOC),
+    private clock: Clock,
+    private readSoc: () => number | undefined,
     private readForecast: (
       date: Temporal.PlainDate,
       at: Temporal.Instant,

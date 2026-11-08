@@ -198,3 +198,105 @@ test("forecast startup remains nonblocking and manual/scheduled overlaps share i
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+for (const fail of [false, true]) {
+  test(`subscriptions gate scheduling and ${fail ? "failure reaches startup handling" : "acknowledgement enables startup"}`, {
+    timeout: 10000,
+  }, async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), "homeautomation-subscriptions-"),
+    );
+    const bootstrap = new URL("./bootstrap.js", import.meta.url).href;
+    const mqtt = new URL("./mqtt-client.js", import.meta.url).href;
+    const schedulerModule = new URL("./task-scheduler.js", import.meta.url)
+      .href;
+    const adapter = `export class MqttClient {
+      async connect() {}
+      async disconnect() {}
+      async subscribeWithHandler(topic, handler) {
+        if (topic === 'N/test-portal/evcharger/40/SetCurrent') handler(topic, {value:6});
+        globalThis.subscriptions++;
+        if (globalThis.subscriptions === 1) queueMicrotask(globalThis.verifySubscriptions);
+        await globalThis.subscriptionGate.promise;
+      }
+      async publish(topic) { if (!topic.startsWith('R/test-portal/')) throw new Error('Unexpected write'); }
+    }`;
+    const code = `
+      import { registerHooks } from 'node:module';
+      import { equal, ok } from 'node:assert/strict';
+      registerHooks({load(url, context, next) {
+        if (url === ${JSON.stringify(mqtt)}) return {format:'module',source:${JSON.stringify(adapter)},shortCircuit:true};
+        return next(url, context);
+      }});
+      const { scheduler } = await import(${JSON.stringify(schedulerModule)});
+      const { globals, WallboxLocation, WallboxChargeMode } = await import(${JSON.stringify(new URL("./globals.js", import.meta.url).href)});
+      globalThis.subscriptions = 0;
+      globalThis.subscriptionGate = Promise.withResolvers();
+      globalThis.verifySubscriptions = () => {
+        ok(globalThis.subscriptions > 20);
+        equal(scheduler.getAllTaskInfo().length, 0);
+        equal(globals.wallboxChargeMode.get(WallboxLocation.Inside), WallboxChargeMode.Manual);
+        console.log('SUBSCRIPTIONS_PENDING_NO_TASKS');
+        ${fail ? "globalThis.subscriptionGate.reject(new Error('subscription denied'));" : "globalThis.subscriptionGate.resolve();"}
+      };
+      globalThis.fetch = async input => {
+        const url = new URL(input);
+        if (url.hostname === 'api.jsonbin.io') return Response.json({inside:2,outside:2});
+        if (url.hostname === 'api.forecast.solar') return Response.json({result:{}});
+        if (url.hostname === 'vrmapi.victronenergy.com') return Response.json({records:{vrm_pv_charger_yield_fc:[]}});
+        if (url.hostname === 'www.omie.es') return new Response('');
+        throw new Error('Unexpected fetch');
+      };
+      await import(${JSON.stringify(bootstrap)});
+      ok(scheduler.getAllTaskInfo().some(task => task.name === 'Dynamic power'));
+      console.log('SUBSCRIPTIONS_READY_TASKS_STARTED');
+      process.kill(process.pid, 'SIGTERM');
+    `;
+    const { PATH } = process.env;
+    const child = spawn(process.execPath, ["--input-type=module", "-e", code], {
+      cwd: directory,
+      env: {
+        PATH,
+        VICTRON_PORTAL_ID: "test-portal",
+        VICTRON_INSTALLATION_ID: "123456",
+        HTTP_PORT: "0",
+        POWER_CONTROL_ENABLED: "false",
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const exited = once(child, "exit");
+    let output = "";
+    let errors = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      output += chunk.toString();
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      errors += chunk.toString();
+    });
+    const timeout = setTimeout(() => child.kill("SIGKILL"), 7000);
+    try {
+      const [code, signal] = await exited;
+      equal(code, fail ? 1 : 0, output + errors);
+      equal(signal, null);
+      match(output, /SUBSCRIPTIONS_PENDING_NO_TASKS/);
+      if (fail) {
+        match(
+          errors,
+          /Failed to start Home Automation System: Error: subscription denied/,
+        );
+        equal(output.includes("Scheduling"), false);
+        equal(output.includes("started successfully"), false);
+        equal(errors.includes("Unhandled promise rejection"), false);
+      } else {
+        match(output, /SUBSCRIPTIONS_READY_TASKS_STARTED/);
+        equal(errors, "");
+      }
+    } finally {
+      clearTimeout(timeout);
+      if (child.exitCode === null && child.signalCode === null)
+        child.kill("SIGKILL");
+      await exited;
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+}

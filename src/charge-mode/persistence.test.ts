@@ -1,3 +1,5 @@
+import { recordingTelemetry } from "../device-telemetry-fixture.test.ts";
+import { unknownDischargeStatus } from "../power-controller/battery-support-controller.ts";
 import { test } from "node:test";
 import {
   deepStrictEqual as assertEquals,
@@ -11,13 +13,20 @@ import {
   restorePersistedChargeSettings,
 } from "./charge-mode-switcher.ts";
 
+const controlTelemetry = await recordingTelemetry();
+
 test("API reports persistence failure and later saved modes restore after reset", async () => {
   const originalFetch = globalThis.fetch;
   const originalModes = new Map(globals.wallboxChargeMode);
   const originalPreference = globals.preferredWallboxLocation;
   globals.preferredWallboxLocation = WallboxLocation.Outside;
   const metrics = new PrometheusMetrics();
-  const server = new HttpServer(metrics);
+  const server = new HttpServer(
+    metrics,
+    unknownDischargeStatus,
+    undefined,
+    controlTelemetry,
+  );
   const request = () =>
     new Request("http://localhost/api/wallbox-charge-mode", {
       method: "POST",
@@ -123,7 +132,12 @@ test("mode commands save ordered snapshots and same-mode commands claim preferen
         preferredWallboxLocation,
       })),
     );
-    const server = new HttpServer(metrics);
+    const server = new HttpServer(
+      metrics,
+      unknownDischargeStatus,
+      undefined,
+      controlTelemetry,
+    );
     for (const location of ["Inside", "Outside", "Outside"]) {
       // biome-ignore lint/complexity/useLiteralKeys: TypeScript permits private test access only with bracket notation.
       const result = await server["handleSetWallboxChargeMode"](
@@ -162,7 +176,12 @@ test("restoration preserves saved preference and defaults legacy or invalid pref
   const originalModes = globals.wallboxChargeMode;
   const originalPreference = globals.preferredWallboxLocation;
   const metrics = new PrometheusMetrics();
-  const server = new HttpServer(metrics);
+  const server = new HttpServer(
+    metrics,
+    unknownDischargeStatus,
+    undefined,
+    controlTelemetry,
+  );
   try {
     for (const preference of [
       WallboxLocation.Outside,
@@ -221,7 +240,12 @@ test("all six raw numbers round-trip through API and storage without migration",
   const originalModes = globals.wallboxChargeMode;
   const originalPreference = globals.preferredWallboxLocation;
   const metrics = new PrometheusMetrics();
-  const server = new HttpServer(metrics);
+  const server = new HttpServer(
+    metrics,
+    unknownDischargeStatus,
+    undefined,
+    controlTelemetry,
+  );
   let saved = {
     inside: 1,
     outside: 6,

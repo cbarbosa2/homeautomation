@@ -1,6 +1,6 @@
 import type { ForecastDisplay } from "./solar-forecasts/solar-forecasts.ts";
 import type { Temporal } from "./temporal.ts";
-import { batteryCellTelemetry } from "./battery-cell-telemetry.ts";
+import type { DeviceTelemetry } from "./device-telemetry.ts";
 import { readFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -12,17 +12,10 @@ import { globals, WallboxChargeMode, WallboxLocation } from "./globals.ts";
 import type { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { setChargeMode } from "./charge-mode/charge-mode-switcher.ts";
 import { getVehicleSoc } from "./bmw-cardata/bmw-cardata.ts";
-import {
-  CONTROL_PATHS,
-  controlTelemetry,
-  wallboxPath,
-} from "./control-telemetry.ts";
+import { CONTROL_PATHS, wallboxPath } from "./device-topics.ts";
 import { lisbonTime, systemClock } from "./lisbon-clock.ts";
 
-import {
-  type BatteryDischargeStatus,
-  unknownDischargeStatus,
-} from "./power-controller/battery-support-controller.ts";
+import type { BatteryDischargeStatus } from "./power-controller/battery-support-controller.ts";
 
 export class HttpServer {
   private server: Server | null = null;
@@ -31,10 +24,11 @@ export class HttpServer {
 
   constructor(
     metrics: PrometheusMetrics,
-    private readonly readDischargeStatus: () => BatteryDischargeStatus = unknownDischargeStatus,
-    private readonly readForecastDisplay?: (
-      at: Temporal.Instant,
-    ) => ForecastDisplay,
+    private readonly readDischargeStatus: () => BatteryDischargeStatus,
+    private readonly readForecastDisplay:
+      | ((at: Temporal.Instant) => ForecastDisplay)
+      | undefined,
+    private readonly telemetry: Pick<DeviceTelemetry, "value" | "cellHistory">,
   ) {
     this.metrics = metrics;
     this.buildTimestamp = this.readBuildTimestamp();
@@ -75,10 +69,10 @@ export class HttpServer {
       if (url.pathname === "/api/battery" && request.method === "GET") {
         return Response.json(
           {
-            soc: controlTelemetry.value(CONTROL_PATHS.batterySOC) ?? null,
-            minSoc: controlTelemetry.value(CONTROL_PATHS.batteryMinSOC) ?? null,
+            soc: this.telemetry.value(CONTROL_PATHS.batterySOC) ?? null,
+            minSoc: this.telemetry.value(CONTROL_PATHS.batteryMinSOC) ?? null,
             discharge: this.readDischargeStatus(),
-            ...batteryCellTelemetry.snapshot(),
+            ...this.telemetry.cellHistory(),
           },
           { headers: { "Cache-Control": "no-store" } },
         );
@@ -114,8 +108,7 @@ export class HttpServer {
 
       if (url.pathname === "/api/wallbox-status" && request.method === "GET") {
         const status = (location: WallboxLocation) => ({
-          status:
-            controlTelemetry.value(wallboxPath(location, "Status")) ?? null,
+          status: this.telemetry.value(wallboxPath(location, "Status")) ?? null,
         });
 
         return Response.json(

@@ -1,31 +1,28 @@
-import { VICTRON_PORTAL_ID } from "./constants.ts";
 import { type Clock, systemClock } from "./lisbon-clock.ts";
 import { Temporal } from "./temporal.ts";
-import { globals, WallboxLocation as L } from "./globals.ts";
-import { finite } from "./utils/index.ts";
+import { WallboxLocation as L, type WallboxStatus } from "./globals.ts";
+import {
+  CONTROL_PATHS,
+  CONTROL_TOPICS,
+  wallboxPath,
+  validControlValue,
+} from "./device-topics.ts";
 
-export const CONTROL_PATHS = {
-  gridPower: "system/0/Ac/Grid/L1/Power",
-  batterySOC: "battery/512/Soc",
-  batteryPower: "battery/512/Dc/0/Power",
-  batteryMinSOC: "settings/0/Settings/CGwacs/BatteryLife/MinimumSocLimit",
-  batteryMaxChargePower: "settings/0/Settings/CGwacs/MaxChargePower",
-  pvInverterPower: "system/0/Ac/PvOnGrid/L1/Power",
-  pvChargerPower: "system/0/Dc/Pv/Power",
-};
-
-export function wallboxPath(location: L, field: string): string {
-  return `evcharger/${location === L.Inside ? 40 : 41}/${field}`;
+export interface ControlSnapshot {
+  gridPower: number | undefined;
+  batterySOC: number | undefined;
+  batteryPower: number | undefined;
+  batteryMinSOC: number | undefined;
+  batteryMaxChargePower: number | undefined;
+  pvInverterPower: number;
+  pvChargerPower: number | undefined;
+  wallboxPower: Map<L, number>;
+  wallboxVictronStatus: Map<L, WallboxStatus>;
+  wallboxSetCurrent: Map<L, number>;
+  wallboxStartStop: Map<L, number>;
+  telemetryValid: boolean;
+  observedAt: Map<string, Temporal.Instant>;
 }
-
-export const REFRESH_PATHS = [
-  ...Object.values(CONTROL_PATHS),
-  ...[L.Inside, L.Outside].flatMap((l) =>
-    ["Ac/Power", "Status", "SetCurrent", "StartStop"].map((f) =>
-      wallboxPath(l, f),
-    ),
-  ),
-];
 
 /** Validity belongs to each reading; a keepalive is not a measurement. */
 export class ControlTelemetry {
@@ -33,34 +30,15 @@ export class ControlTelemetry {
 
   constructor(private now: Clock = systemClock) {}
 
-  record(topic: string, payload: unknown): void {
-    const path = topic.replace(`N/${VICTRON_PORTAL_ID}/`, "");
-    if (!REFRESH_PATHS.includes(path)) return;
-    const rawValue =
-      payload !== null && typeof payload === "object" && "value" in payload
-        ? payload.value
-        : undefined;
-    if (
-      !finite(rawValue) ||
-      ((path.endsWith("Soc") || path.endsWith("SocLimit")) &&
-        (rawValue < 0 || rawValue > 100)) ||
-      (path.endsWith("Status") &&
-        ![
-          0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24,
-        ].includes(rawValue)) ||
-      (path.endsWith("StartStop") && ![0, 1].includes(rawValue)) ||
-      (path.includes("evcharger/") &&
-        (path.endsWith("Ac/Power") || path.endsWith("SetCurrent")) &&
-        rawValue < 0) ||
-      ([CONTROL_PATHS.pvInverterPower, CONTROL_PATHS.pvChargerPower].includes(
-        path,
-      ) &&
-        rawValue < 0)
-    ) {
+  record(path: string, value: unknown): void {
+    const topic = CONTROL_TOPICS.find((topic) => topic.path === path);
+    if (!topic?.control) return;
+
+    if (!validControlValue(topic.control, value)) {
       this.readings.delete(path);
       return;
     }
-    const value: number = rawValue;
+
     this.readings.set(path, { value, at: this.now() });
   }
 
@@ -78,7 +56,7 @@ export class ControlTelemetry {
       : undefined;
   }
 
-  snapshot() {
+  snapshot(): ControlSnapshot {
     const pvInverterPower = this.value(CONTROL_PATHS.pvInverterPower);
     const map = (field: string) =>
       new Map(
@@ -87,12 +65,10 @@ export class ControlTelemetry {
           return value === undefined ? [] : [[l, value] as const];
         }),
       );
+
     return {
-      ...globals,
-      telemetryValid: REFRESH_PATHS.every(
-        (path) =>
-          path === CONTROL_PATHS.pvInverterPower ||
-          this.value(path) !== undefined,
+      telemetryValid: CONTROL_TOPICS.every(
+        (topic) => topic.optional || this.value(topic.path) !== undefined,
       ),
       gridPower: this.value(CONTROL_PATHS.gridPower),
       batterySOC: this.value(CONTROL_PATHS.batterySOC),
@@ -113,5 +89,3 @@ export class ControlTelemetry {
     };
   }
 }
-
-export const controlTelemetry = new ControlTelemetry();

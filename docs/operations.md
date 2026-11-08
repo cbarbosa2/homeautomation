@@ -106,9 +106,13 @@ Unknown. This display does not initiate discharge checks or change charging.
 
 Control readings are refreshed every 30 seconds using explicit empty MQTT reads
 on `R/<VICTRON_PORTAL_ID>/<path>`. The exact list is in
-[control-telemetry.ts](../src/control-telemetry.ts): grid power, battery power/SOC,
+[device-topics.ts](../src/device-topics.ts): grid power, battery power/SOC,
 minimum SOC and maximum charge power, both PV sources, and each wallbox's power,
-status, SetCurrent and StartStop. Keepalive does not renew these timestamps.
+status, SetCurrent and StartStop. The same topic definitions drive notification subscriptions and refreshes through
+[device-telemetry.ts](../src/device-telemetry.ts). Startup installs physical event
+consumers and awaits subscription acknowledgements before scheduling refresh or
+control; subscription failures reach normal startup failure handling. Keepalive
+and explicit read publication do not renew measurement timestamps.
 Missing, malformed, nonfinite, or more than 60-second-old readings are unavailable.
 Missing PV inverter power counts as zero at any hour, since the inverter may not
 report when sunlight is insufficient. A broker disconnect invalidates all control

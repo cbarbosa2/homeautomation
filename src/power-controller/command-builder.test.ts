@@ -5,7 +5,7 @@ import {
 } from "node:assert/strict";
 import { Temporal } from "../temporal.ts";
 import { WallboxLocation, WallboxStatus } from "../globals.ts";
-import { CONTROL_PATHS } from "../control-telemetry.ts";
+import { CONTROL_PATHS } from "../device-topics.ts";
 import type { CalculatedTargetResults } from "./dynamic-power-calculator.ts";
 import { CommandBuilder, type SystemState } from "./command-builder.ts";
 import { CommandType, type PowerCommand } from "./power-controller.ts";

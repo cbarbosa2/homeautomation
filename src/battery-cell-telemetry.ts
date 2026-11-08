@@ -1,13 +1,7 @@
-import { VICTRON_PORTAL_ID } from "./constants.ts";
+import { BATTERY_CELL_PATHS } from "./device-topics.ts";
 import { type Clock, systemClock } from "./lisbon-clock.ts";
 import { Temporal } from "./temporal.ts";
-
-export const BATTERY_CELL_PATHS = {
-  minCellVoltage: "battery/512/System/MinCellVoltage",
-  maxCellVoltage: "battery/512/System/MaxCellVoltage",
-  minVoltagePackName: "battery/512/System/MinVoltageCellId",
-  maxVoltagePackName: "battery/512/System/MaxVoltageCellId",
-};
+import { finite } from "./utils/index.ts";
 
 type VoltageSample = {
   voltage: number;
@@ -22,16 +16,10 @@ export class BatteryCellTelemetry {
 
   constructor(private now: Clock = systemClock) {}
 
-  record(topic: string, payload: unknown): void {
-    const path = topic.replace(`N/${VICTRON_PORTAL_ID}/`, "");
+  record(path: string, value: unknown): void {
     if (!Object.values(BATTERY_CELL_PATHS).includes(path)) return;
     const now = this.now();
     this.prune(now);
-    const value =
-      payload !== null && typeof payload === "object" && "value" in payload
-        ? payload.value
-        : undefined;
-
     if (path.endsWith("CellId")) {
       if (typeof value === "string" && value.trim().length > 0) {
         this.packs.set(path, { value, at: now });
@@ -41,8 +29,7 @@ export class BatteryCellTelemetry {
       return;
     }
 
-    if (typeof value !== "number" || !Number.isFinite(value) || value < 0)
-      return;
+    if (!finite(value) || value < 0) return;
 
     const isMinimum = path === BATTERY_CELL_PATHS.minCellVoltage;
     const pack = this.packs.get(
@@ -113,5 +100,3 @@ export class BatteryCellTelemetry {
     };
   }
 }
-
-export const batteryCellTelemetry = new BatteryCellTelemetry();

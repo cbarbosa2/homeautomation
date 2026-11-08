@@ -6,12 +6,12 @@ import {
   match,
 } from "node:assert/strict";
 import { Temporal } from "../temporal.ts";
+import { ControlTelemetry } from "../control-telemetry.ts";
 import {
   CONTROL_PATHS as P,
-  ControlTelemetry,
   REFRESH_PATHS,
   wallboxPath,
-} from "../control-telemetry.ts";
+} from "../device-topics.ts";
 import {
   WallboxChargeMode as Mode,
   WallboxLocation as L,
@@ -46,7 +46,7 @@ function installation(enabled = true, startupCharging = false) {
     values.set(wallboxPath(l, "SetCurrent"), 10);
   }
   const refresh = () => {
-    for (const [path, value] of values) telemetry.record(path, { value });
+    for (const [path, value] of values) telemetry.record(path, value);
   };
   refresh();
   const modes = new Map([
@@ -170,7 +170,7 @@ test("cycle reserves capacity until both settings and measured power confirm red
   // A setting echo alone cannot release capacity.
   h.advance();
   for (const field of ["SetCurrent", "StartStop"]) {
-    h.telemetry.record(inside(field), { value: 0 });
+    h.telemetry.record(inside(field), 0);
   }
   assert(!has(await h.tick(), outside("StartStop"), 1));
   h.advance();
@@ -251,7 +251,7 @@ test("cycle allocates to the other charger while the preferred charger is inelig
 test("cycle uses one conservative budget and recovers after fresh readings", async () => {
   const h = installation();
   // Only grid is stale; charger status remains valid so On remains eligible.
-  h.telemetry.record(P.gridPower, { value: null });
+  h.telemetry.record(P.gridPower, null);
   let writes = await h.tick();
   assert(has(writes, inside("SetCurrent"), 12));
   assert(!has(writes, outside("StartStop"), 1));
@@ -280,13 +280,13 @@ test("cycle treats missing PV inverter power as zero", async () => {
 
   const day = installation();
   day.values.delete(P.pvInverterPower);
-  day.telemetry.record(P.pvInverterPower, { value: null });
+  day.telemetry.record(P.pvInverterPower, null);
   day.modes.set(L.Outside, Mode.Sun);
   assert(has(await day.tick(), inside("SetCurrent"), 20));
 
   const missingGrid = installation();
   missingGrid.modes.set(L.Outside, Mode.Sun);
-  missingGrid.telemetry.record(P.gridPower, { value: null });
+  missingGrid.telemetry.record(P.gridPower, null);
   assert(has(await missingGrid.tick(), inside("SetCurrent"), 12));
 });
 
@@ -294,7 +294,7 @@ test("conservative allocation still enforces solar eligibility and funds battery
   const h = installation();
   h.modes.set(L.Inside, Mode.Sun);
   h.modes.set(L.Outside, Mode.Sun);
-  h.telemetry.record(P.gridPower, { value: null });
+  h.telemetry.record(P.gridPower, null);
   const writes = await h.tick();
   assert(!has(writes, inside("StartStop"), 1));
   assert(has(writes, P.batteryMaxChargePower, 2880));
@@ -673,10 +673,10 @@ test("200 W is not a failed-discharge interval and a fresh interruption resets t
   await h.tick();
   await h.step();
   await h.step(10);
-  h.telemetry.record(P.gridPower, { value: 200 });
+  h.telemetry.record(P.gridPower, 200);
   h.advance();
-  h.telemetry.record(P.batteryPower, { value: 0 });
-  h.telemetry.record(P.gridPower, { value: 200 });
+  h.telemetry.record(P.batteryPower, 0);
+  h.telemetry.record(P.gridPower, 200);
   await h.tick();
   // Return to high import; the preceding ten seconds cannot count.
   await h.step();
@@ -887,4 +887,79 @@ test("dashboard discharge status expires even while device telemetry is refreshe
   h.refresh();
   assertEquals(h.dischargeStatus().state, "unknown");
   match(h.dischargeStatus().reason, /status is stale/);
+});
+
+test("registered ingestion feeds fallback, recovery and original observation times into the charging cycle", async () => {
+  let now = Temporal.Instant.from("2026-11-08T12:00Z");
+  const { recordingTelemetry } = await import(
+    "../device-telemetry-fixture.test.ts"
+  );
+  const { telemetry, record } = await recordingTelemetry(() => now);
+  const values = new Map<string, number>(
+    REFRESH_PATHS.map((path) => [path, 0]),
+  );
+  values.delete(P.pvInverterPower);
+  values.set(P.batterySOC, 50);
+  values.set(P.batteryMinSOC, 20);
+  values.set(inside("Status"), S.Connected);
+  values.set(outside("Status"), S.Connected);
+  const refresh = () => {
+    for (const [path, value] of values) record(path, { value });
+  };
+  refresh();
+  const modes = new Map([
+    [L.Inside, Mode.Max],
+    [L.Outside, Mode.Sun],
+  ]);
+  const writes: Write[] = [];
+  const cycle = new AutomaticChargingCycle({
+    telemetry: () => telemetry.snapshot(),
+    modes: () => modes,
+    preference: () => L.Inside,
+    clock: () => now,
+    enabled: true,
+    publisher: {
+      publishJson: async (topic, data) => {
+        const path = topic.split("/").slice(2).join("/");
+        const { value } = data;
+        writes.push({ path, value });
+        values.set(path, Number(value));
+      },
+    },
+  });
+  record(P.gridPower, { value: null });
+  await cycle.tick();
+  assert(has(writes, inside("SetCurrent"), 12));
+  writes.length = 0;
+  for (let tick = 0; tick < 20; tick++) {
+    now = now.add({ seconds: 1 });
+    refresh();
+    await cycle.tick();
+  }
+  assert(has(writes, inside("SetCurrent"), 20));
+  assertEquals(telemetry.snapshot().pvInverterPower, 0);
+  const observedAt = telemetry.snapshot().observedAt;
+  now = now.add({ seconds: 1 });
+  await cycle.tick();
+  assertEquals(telemetry.snapshot().observedAt, observedAt);
+  telemetry.invalidate();
+  writes.length = 0;
+  await cycle.tick();
+  assert(has(writes, inside("StartStop"), 0));
+  assertEquals(telemetry.snapshot().telemetryValid, false);
+  // Fresh measured/settings feedback releases the previous allocation.
+  values.set(inside("Ac/Power"), 0);
+  writes.length = 0;
+  for (let tick = 0; tick < 20; tick++) {
+    now = now.add({ seconds: 1 });
+    refresh();
+    await cycle.tick();
+  }
+  assertEquals(telemetry.snapshot().telemetryValid, true);
+  assert(has(writes, inside("SetCurrent"), 20));
+  now = now.add({ seconds: 61 });
+  assertEquals(telemetry.snapshot().telemetryValid, false);
+  writes.length = 0;
+  await cycle.tick();
+  assert(has(writes, inside("StartStop"), 0));
 });

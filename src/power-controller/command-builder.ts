@@ -6,7 +6,7 @@ import {
   WallboxLocation as L,
   WallboxStatus,
 } from "../globals.ts";
-import { CONTROL_PATHS, wallboxPath } from "../control-telemetry.ts";
+import { CONTROL_PATHS, wallboxPath } from "../device-topics.ts";
 import { SYSTEM_VOLTAGE } from "../utils/index.ts";
 import {
   type CalculatedTargetResults,

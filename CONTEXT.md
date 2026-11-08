@@ -5,6 +5,10 @@ charging preferences, and available grid capacity.
 
 ## Language
 
+**Device telemetry**:
+Readings received from the home battery, energy system and wallboxes, interpreted
+separately as fresh control evidence, display history and monitoring values.
+
 **SOC**:
 The home battery's state of charge, expressed as a percentage. SOC margins are
 percentage points.

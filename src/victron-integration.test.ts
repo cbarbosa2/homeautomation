@@ -1,18 +1,17 @@
-import { BATTERY_CELL_PATHS } from "./battery-cell-telemetry.ts";
+import {
+  BATTERY_CELL_PATHS,
+  CONTROL_PATHS,
+  REFRESH_PATHS,
+} from "./device-topics.ts";
 import { test } from "node:test";
 import {
   deepStrictEqual as assertEquals,
   ok as assert,
 } from "node:assert/strict";
 import { VICTRON_INSTALLATION_ID, VICTRON_PORTAL_ID } from "./constants.ts";
-import {
-  CONTROL_PATHS,
-  ControlTelemetry,
-  REFRESH_PATHS,
-} from "./control-telemetry.ts";
+import { recordingTelemetry } from "./device-telemetry-fixture.test.ts";
+import { systemClock } from "./lisbon-clock.ts";
 import { globals, WallboxChargeMode, WallboxLocation } from "./globals.ts";
-import { MqttAwakeTask } from "./tasks/mqtt-awake-task.ts";
-import { MqttToPrometheusTask } from "./tasks/mqtt-to-prometheus-task.ts";
 import { SetSocLimitTask } from "./tasks/set-soc-limit-task.ts";
 import { SolarForecasts } from "./solar-forecasts/solar-forecasts.ts";
 import { Temporal } from "./temporal.ts";
@@ -22,35 +21,15 @@ import {
 } from "./power-controller/power-controller.ts";
 
 test("configured portal ID routes telemetry, subscriptions, refreshes and commands", async () => {
-  const subscriptions: string[] = [];
-  new MqttToPrometheusTask(
-    {
-      subscribeWithHandler: (topic) => {
-        subscriptions.push(topic);
-        return Promise.resolve();
-      },
-    },
-    { setGauge: () => {} },
-  ).subscribeTopics();
-  const victronTopics = subscriptions.filter((topic) => topic.startsWith("N/"));
-  assert(victronTopics.length > 0);
-  assert(
-    victronTopics.every((topic) => topic.startsWith(`N/${VICTRON_PORTAL_ID}/`)),
-  );
-
-  const telemetry = new ControlTelemetry();
-  telemetry.record(`N/${VICTRON_PORTAL_ID}/${CONTROL_PATHS.gridPower}`, {
-    value: 100,
-  });
+  const { telemetry, record } = await recordingTelemetry();
+  record(CONTROL_PATHS.gridPower, { value: 100 });
   assertEquals(telemetry.value(CONTROL_PATHS.gridPower), 100);
-
   const reads: string[] = [];
-  await new MqttAwakeTask({
-    publish: (topic) => {
+  await telemetry.refresh({
+    publish: async (topic) => {
       reads.push(topic);
-      return Promise.resolve();
     },
-  }).execute();
+  });
   assertEquals(
     reads,
     ["keepalive", ...REFRESH_PATHS, ...Object.values(BATTERY_CELL_PATHS)].map(
@@ -80,7 +59,11 @@ test("configured portal ID routes telemetry, subscriptions, refreshes and comman
       mqtt,
       true,
     );
-    await new SetSocLimitTask(mqtt).executeInMorning();
+    await new SetSocLimitTask(
+      mqtt,
+      systemClock,
+      () => undefined,
+    ).executeInMorning();
     assertEquals(writes.length, 6);
     assert(
       writes.every((topic) => topic.startsWith(`W/${VICTRON_PORTAL_ID}/`)),

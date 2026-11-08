@@ -4,7 +4,8 @@ import { MqttClient } from "./mqtt-client.ts";
 import { logError, logInfo } from "./logger.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { HttpServer } from "./http-server.ts";
-import { CONTROL_PATHS, controlTelemetry } from "./control-telemetry.ts";
+import { CONTROL_PATHS } from "./device-topics.ts";
+import { DeviceTelemetry } from "./device-telemetry.ts";
 import { systemClock } from "./lisbon-clock.ts";
 import {
   POWER_CONTROL_ENABLED,
@@ -12,13 +13,11 @@ import {
   VICTRON_API_KEY,
   VICTRON_INSTALLATION_ID,
 } from "./constants.ts";
-import { MqttAwakeTask } from "./tasks/mqtt-awake-task.ts";
 import { SolarForecasts } from "./solar-forecasts/solar-forecasts.ts";
 import { LoadOmieTask } from "./tasks/load-omie-task.ts";
 import { scheduler } from "./task-scheduler.ts";
-import { MqttToPrometheusTask } from "./tasks/mqtt-to-prometheus-task.ts";
 import { SetSocLimitTask } from "./tasks/set-soc-limit-task.ts";
-import { globals } from "./globals.ts";
+import { globals, events, WallboxLocation } from "./globals.ts";
 import { flushPersistentStorage } from "./persistent-storage.ts";
 import { AutomaticChargingCycle } from "./power-controller/automatic-charging-cycle.ts";
 import { DYNAMIC_POWER_INTERVAL } from "./power-controller/power-constants.ts";
@@ -35,12 +34,27 @@ class HomeAutomationApp {
   private httpServer: HttpServer;
   private chargingCycle: AutomaticChargingCycle;
   private forecasts: SolarForecasts;
+  private telemetry: DeviceTelemetry;
 
   constructor() {
     this.metrics = new PrometheusMetrics();
-    this.mqttClient = new MqttClient(this.metrics);
+    this.telemetry = new DeviceTelemetry({
+      clock: systemClock,
+      metrics: this.metrics,
+      currentUpdated: (location, value) => {
+        const event =
+          location === WallboxLocation.Inside
+            ? events.wallboxCurrentInsideUpdated
+            : events.wallboxCurrentOutsideUpdated;
+        void event.emit(value);
+      },
+      wallSwitchUpdated: (payload) => events.wallSwitchUpdated.emit(payload),
+    });
+    this.mqttClient = new MqttClient(this.metrics, () =>
+      this.telemetry.invalidate(),
+    );
     this.chargingCycle = new AutomaticChargingCycle({
-      telemetry: () => controlTelemetry.snapshot(),
+      telemetry: () => this.telemetry.snapshot(),
       modes: () => globals.wallboxChargeMode,
       preference: () => globals.preferredWallboxLocation,
       insideVehicleSoc: getVehicleSoc,
@@ -61,6 +75,7 @@ class HomeAutomationApp {
       this.metrics,
       () => this.chargingCycle.getBatteryDischargeStatus(),
       (at) => this.forecasts.display(at),
+      this.telemetry,
     );
   }
 
@@ -78,9 +93,9 @@ class HomeAutomationApp {
       await this.mqttClient.connect();
       await this.httpServer.start();
 
-      this.setupScheduledTasks();
-
       setupWallSwitchHandler(this.mqttClient, this.metrics);
+      await this.telemetry.subscribe(this.mqttClient);
+      this.setupScheduledTasks();
 
       await logInfo("✅ Home Automation System started successfully");
       this.setupGracefulShutdown();
@@ -122,15 +137,9 @@ class HomeAutomationApp {
       });
       void scheduler.triggerTask("Load BMW i3 SOC");
     }
-    const readMqttTask = new MqttToPrometheusTask(
-      this.mqttClient,
-      this.metrics,
-    );
-    readMqttTask.subscribeTopics();
 
-    const mqttAwakeTask = new MqttAwakeTask(this.mqttClient);
     scheduler.interval("Awake MQTT", AWAKE_MQTT_INTERVAL, () => {
-      return mqttAwakeTask.execute();
+      return this.telemetry.refresh(this.mqttClient);
     });
 
     scheduler.interval("Dynamic power", DYNAMIC_POWER_INTERVAL, () => {
@@ -153,7 +162,7 @@ class HomeAutomationApp {
     const setSocLimitTask = new SetSocLimitTask(
       this.mqttClient,
       systemClock,
-      () => controlTelemetry.value(CONTROL_PATHS.batterySOC),
+      () => this.telemetry.value(CONTROL_PATHS.batterySOC),
       (date, at) => this.forecasts.forMinimumSoc(date, at),
     );
     scheduler.cron("Setup Min SOC", "* * * * *", () => setSocLimitTask.tick());

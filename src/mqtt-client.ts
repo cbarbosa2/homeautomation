@@ -1,5 +1,3 @@
-import { batteryCellTelemetry } from "./battery-cell-telemetry.ts";
-import { controlTelemetry } from "./control-telemetry.ts";
 import mqtt from "mqtt";
 import type { MqttClient as MqttClientType } from "mqtt";
 import {
@@ -20,7 +18,10 @@ export class MqttClient {
   >();
   private metrics: PrometheusMetrics;
 
-  constructor(metrics: PrometheusMetrics) {
+  constructor(
+    metrics: PrometheusMetrics,
+    private readonly unavailable: () => void,
+  ) {
     this.metrics = metrics;
   }
 
@@ -51,13 +52,11 @@ export class MqttClient {
 
         this.client.on("close", () => {
           this.isConnected = false;
-          controlTelemetry.invalidate();
-          batteryCellTelemetry.invalidate();
+          this.unavailable();
         });
 
         this.client.on("offline", () => {
-          controlTelemetry.invalidate();
-          batteryCellTelemetry.invalidate();
+          this.unavailable();
           logWarn("⚠️ MQTT client offline");
           this.isConnected = false;
           this.metrics.recordMqttConnection(false);

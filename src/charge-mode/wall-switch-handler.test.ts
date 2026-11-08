@@ -1,3 +1,7 @@
+import { DeviceTelemetry } from "../device-telemetry.ts";
+import { systemClock } from "../lisbon-clock.ts";
+import { VICTRON_PORTAL_ID } from "../constants.ts";
+import { wallboxPath } from "../device-topics.ts";
 import { test } from "node:test";
 import { deepStrictEqual as assertEquals } from "node:assert/strict";
 import {
@@ -15,7 +19,7 @@ test("repeated physical selections and Manual triggers persist preference", asyn
   const originalModes = globals.wallboxChargeMode;
   const originalPreference = globals.preferredWallboxLocation;
   const metrics = new PrometheusMetrics();
-  const mqtt = new MqttClient(metrics);
+  const mqtt = new MqttClient(metrics, () => {});
   const commands: { topic: string; value: unknown }[] = [];
   mqtt.publishJson = async (topic, payload) => {
     const { value } = payload;
@@ -31,6 +35,34 @@ test("repeated physical selections and Manual triggers persist preference", asyn
     [L.Outside, Mode.Max],
   ]);
   setupWallSwitchHandler(mqtt, metrics, true);
+  let pendingEvent = Promise.resolve();
+  const handlers = new Map<string, (topic: string, payload: unknown) => void>();
+  const telemetry = new DeviceTelemetry({
+    clock: systemClock,
+    metrics,
+    currentUpdated: (location, value) => {
+      pendingEvent = (
+        location === L.Inside
+          ? events.wallboxCurrentInsideUpdated
+          : events.wallboxCurrentOutsideUpdated
+      ).emit(value);
+    },
+    wallSwitchUpdated: (payload) => {
+      pendingEvent = events.wallSwitchUpdated.emit(payload);
+    },
+  });
+  await telemetry.subscribe({
+    subscribeWithHandler: async (topic, handler) => {
+      handlers.set(topic, handler);
+    },
+  });
+  const currentGesture = async (location: L) => {
+    const topic = `N/${VICTRON_PORTAL_ID}/${wallboxPath(location, "SetCurrent")}`;
+    const handler = handlers.get(topic);
+    if (!handler) throw new Error("Missing current subscription");
+    handler(topic, { value: 6 });
+    await pendingEvent;
+  };
   try {
     for (const [id, location] of [
       [2, L.Outside],
@@ -44,10 +76,10 @@ test("repeated physical selections and Manual triggers persist preference", asyn
       assertEquals(globals.preferredWallboxLocation, location);
       assertEquals(writes.at(-1)?.preferredWallboxLocation, location);
     }
-    await events.wallboxCurrentInsideUpdated.emit(6);
+    await currentGesture(L.Inside);
     assertEquals(globals.wallboxChargeMode.get(L.Inside), Mode.Manual);
     assertEquals(globals.preferredWallboxLocation, L.Inside);
-    await events.wallboxCurrentOutsideUpdated.emit(6);
+    await currentGesture(L.Outside);
     assertEquals(globals.wallboxChargeMode.get(L.Outside), Mode.Manual);
     assertEquals(globals.preferredWallboxLocation, L.Outside);
     assertEquals(

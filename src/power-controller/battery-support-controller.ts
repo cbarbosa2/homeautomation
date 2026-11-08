@@ -1,6 +1,6 @@
 import type { Clock } from "../lisbon-clock.ts";
 import { Temporal } from "../temporal.ts";
-import { CONTROL_PATHS as P, wallboxPath } from "../control-telemetry.ts";
+import { CONTROL_PATHS as P, wallboxPath } from "../device-topics.ts";
 import type { WallboxLocation as L } from "../globals.ts";
 import { MAX_AMPS_PER_LOCATION } from "./power-constants.ts";
 import { SYSTEM_VOLTAGE } from "../utils/index.ts";

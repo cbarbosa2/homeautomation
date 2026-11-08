@@ -6,11 +6,8 @@ import { once } from "node:events";
 import { HttpServer } from "./http-server.ts";
 import { PrometheusMetrics } from "./prometheus/prometheus.ts";
 import { scheduler } from "./task-scheduler.ts";
-import {
-  CONTROL_PATHS,
-  controlTelemetry,
-  wallboxPath,
-} from "./control-telemetry.ts";
+import { recordingTelemetry } from "./device-telemetry-fixture.test.ts";
+import { CONTROL_PATHS, wallboxPath } from "./device-topics.ts";
 import {
   unknownDischargeStatus,
   type BatteryDischargeStatus,
@@ -18,10 +15,17 @@ import {
 import { Temporal } from "./temporal.ts";
 import { globals, WallboxLocation } from "./globals.ts";
 
+const controlTelemetry = await recordingTelemetry();
+
 // Exercise the real TCP adapter without starting MQTT or scheduled automation.
 test("Node HTTP adapter preserves dashboard, APIs, metrics and request bodies", async () => {
   const metrics = new PrometheusMetrics();
-  const server = new HttpServer(metrics);
+  const server = new HttpServer(
+    metrics,
+    unknownDischargeStatus,
+    undefined,
+    controlTelemetry,
+  );
   const originalRequest = globalThis.Request;
   const originalResponse = globalThis.Response;
   const port = await server.start(0);
@@ -88,7 +92,12 @@ test("battery API exposes fresh SOC independently and clears invalid, expired an
   let now = Temporal.Instant.from("2026-11-07T12:00:00Z");
   context.mock.method(Temporal.Now, "instant", () => now);
   const metrics = new PrometheusMetrics();
-  const server = new HttpServer(metrics);
+  const server = new HttpServer(
+    metrics,
+    unknownDischargeStatus,
+    undefined,
+    controlTelemetry,
+  );
   const port = await server.start(0);
   const url = `http://127.0.0.1:${port}/api/battery`;
   const read = async () => {
@@ -170,8 +179,18 @@ test("battery API exposes fresh SOC independently and clears invalid, expired an
 
 test("HTTP bind failures reject startup", async () => {
   const metrics = new PrometheusMetrics();
-  const first = new HttpServer(metrics);
-  const second = new HttpServer(metrics);
+  const first = new HttpServer(
+    metrics,
+    unknownDischargeStatus,
+    undefined,
+    controlTelemetry,
+  );
+  const second = new HttpServer(
+    metrics,
+    unknownDischargeStatus,
+    undefined,
+    controlTelemetry,
+  );
   const port = await first.start(0);
   try {
     await rejects(() => second.start(port), { code: "EADDRINUSE" });
@@ -184,7 +203,12 @@ test("HTTP bind failures reject startup", async () => {
 
 test("HTTP shutdown closes a stalled connection at its deadline", async (context) => {
   const metrics = new PrometheusMetrics();
-  const server = new HttpServer(metrics);
+  const server = new HttpServer(
+    metrics,
+    unknownDischargeStatus,
+    undefined,
+    controlTelemetry,
+  );
   const port = await server.start(0);
   const socket = connect(port, "127.0.0.1");
   socket.on("error", () => {});
@@ -211,7 +235,12 @@ test("HTTP shutdown closes a stalled connection at its deadline", async (context
 test("battery API reads live controller discharge status on every request", async () => {
   let discharge: BatteryDischargeStatus = unknownDischargeStatus();
   const metrics = new PrometheusMetrics();
-  const server = new HttpServer(metrics, () => discharge);
+  const server = new HttpServer(
+    metrics,
+    () => discharge,
+    undefined,
+    controlTelemetry,
+  );
   const port = await server.start(0);
   try {
     for (const state of [
@@ -238,7 +267,12 @@ test("electricity prices API returns Lisbon days and nullable hourly tariff pric
   context.mock.method(Temporal.Now, "instant", () => now);
   const originalEntries = globals.omieEntries;
   const metrics = new PrometheusMetrics();
-  const server = new HttpServer(metrics);
+  const server = new HttpServer(
+    metrics,
+    unknownDischargeStatus,
+    undefined,
+    controlTelemetry,
+  );
   const port = await server.start(0);
   const url = `http://127.0.0.1:${port}/api/electricity-prices`;
   const read = async () => {
@@ -341,8 +375,11 @@ test("solar forecasts API aligns four Lisbon dates and keeps missing, zero and i
     logError: () => {},
   });
   const metrics = new PrometheusMetrics();
-  const server = new HttpServer(metrics, undefined, (at) =>
-    forecasts.display(at),
+  const server = new HttpServer(
+    metrics,
+    unknownDischargeStatus,
+    (at) => forecasts.display(at),
+    controlTelemetry,
   );
   const port = await server.start(0);
   const read = async () => {
@@ -403,7 +440,12 @@ test("wallbox status API returns independent fresh statuses without power", asyn
   let now = Temporal.Instant.from("2026-11-08T12:00:00Z");
   context.mock.method(Temporal.Now, "instant", () => now);
   const metrics = new PrometheusMetrics();
-  const server = new HttpServer(metrics);
+  const server = new HttpServer(
+    metrics,
+    unknownDischargeStatus,
+    undefined,
+    controlTelemetry,
+  );
   const port = await server.start(0);
   const url = `http://127.0.0.1:${port}/api/wallbox-status`;
   const inside = wallboxPath(WallboxLocation.Inside, "Status");

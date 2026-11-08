@@ -244,6 +244,7 @@ test("SOC schedule ignores repeated minutes and a backward clock", async () => {
       },
     },
     () => now,
+    () => undefined,
   );
   now = now.add({ seconds: 1 });
   await task.tick();

@@ -43,37 +43,15 @@ export enum WallboxLocation {
 
 export interface GlobalState {
   omieEntries: OmieEntry[];
-  gridPower: number | undefined;
-  batteryMinSOC: number | undefined;
-  batterySOC: number | undefined;
-  batteryPower: number | undefined;
-  batteryMaxChargePower: number | undefined;
-  pvInverterPower: number | undefined;
-  pvChargerPower: number | undefined;
-  wallboxPower: Map<WallboxLocation, number>; // power in watts
-  wallboxCurrent: Map<WallboxLocation, number>; // current in amps
-  wallboxVictronStatus: Map<WallboxLocation, WallboxStatus>;
-  wallboxSetCurrent: Map<WallboxLocation, number>; // target current in amps
   wallboxChargeMode: Map<WallboxLocation, WallboxChargeMode>;
   preferredWallboxLocation: WallboxLocation;
 }
 
 /**
- * Most values are read from MQTT, but not all.
+ * Application settings and electricity prices.
  */
 export const globals: GlobalState = {
   omieEntries: [],
-  gridPower: undefined,
-  batteryMinSOC: undefined,
-  batterySOC: undefined,
-  batteryPower: undefined,
-  batteryMaxChargePower: undefined,
-  pvInverterPower: undefined,
-  pvChargerPower: undefined,
-  wallboxPower: new Map(),
-  wallboxCurrent: new Map(),
-  wallboxVictronStatus: new Map(),
-  wallboxSetCurrent: new Map(),
   preferredWallboxLocation: WallboxLocation.Inside,
   wallboxChargeMode: new Map([
     [WallboxLocation.Inside, WallboxChargeMode.Sun],
