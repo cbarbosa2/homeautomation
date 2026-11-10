@@ -46,6 +46,32 @@ export class HttpServer {
     const handler = async (request: Request): Promise<Response> => {
       const url = new URL(request.url);
 
+      if (
+        (request.method === "GET" || request.method === "HEAD") &&
+        [
+          "/favicon.png",
+          "/apple-touch-icon.png",
+          "/icon-192.png",
+          "/icon-512.png",
+          "/site.webmanifest",
+        ].includes(url.pathname)
+      ) {
+        try {
+          const asset = await readFile(`./static${url.pathname}`);
+          return new Response(request.method === "HEAD" ? null : asset, {
+            headers: {
+              "Content-Type": url.pathname.endsWith(".webmanifest")
+                ? "application/manifest+json"
+                : "image/png",
+              "Cache-Control": "public, max-age=3600",
+            },
+          });
+        } catch (error) {
+          logError(`Failed to read dashboard asset: ${String(error)}`);
+          return new Response("Asset not found", { status: 404 });
+        }
+      }
+
       // Metrics endpoint
       if (url.pathname === "/metrics") {
         return await this.handleMetrics();
