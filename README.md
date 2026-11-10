@@ -124,12 +124,6 @@ This validates locally, checks the remote runtime and unit, stops the service, c
 
 Both scripts run checks, linting, formatting verification, and a production build locally before deployment. A remote install/build failure leaves the service stopped for operator recovery. Neither transfers your local `.env` or BMW CarData token file. To enable BMW SOC on the server, follow [BMW CarData setup](docs/operations.md#bmw-cardata-setup) on `bee.local` after the code is deployed. Update `/home/carlos/homeautomation/.env` separately before deploying changes that require new configuration. After deployment, check the service status and journal; a script's completion message alone does not establish application health.
 
-For noninteractive deployment, configure sudo on the server with `sudo visudo`. Confirm the systemctl path using `command -v systemctl`; for `/usr/bin/systemctl`, a rule limited to the commands used by these scripts is:
-
-```sudoers
-carlos ALL=(root) NOPASSWD: /usr/bin/systemctl stop homeautomation, /usr/bin/systemctl start homeautomation, /usr/bin/systemctl status homeautomation --no-pager
-```
-
 ## Monitoring
 
 With the default `HTTP_PORT=1881`:
