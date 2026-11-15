@@ -104,6 +104,9 @@
       .empty-state { padding: 14px 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
       .empty-state .button { margin-top: 12px; }
       .price-charts { padding: 0 20px 14px; }
+      .price-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-bottom: 12px; font-size: 11px; color: var(--muted); }
+      .price-key::before { content: ""; display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 2px; background: var(--green); }
+      .price-key[data-period="night"]::before { background: #536db5; }
       .price-day-heading { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 6px 36px; font-size: 11px; color: var(--muted); }
       .price-day-label { display: flex; flex-wrap: wrap; gap: 2px 8px; }
       .price-day-heading strong { color: var(--text); font-weight: 600; }
@@ -117,6 +120,8 @@
       .price-slot { position: relative; border: 0; padding: 0; background: transparent; color: var(--green); min-width: 0; }
       .price-bar { position: absolute; left: 0; right: 0; border-radius: 2px; background: currentColor; min-height: 2px; }
       .price-slot:hover, .price-slot:focus-visible { color: #174c36; }
+      .price-slot[data-period="night"] { color: #536db5; }
+      .price-slot[data-period="night"]:hover, .price-slot[data-period="night"]:focus-visible { color: #354b86; }
       .price-slot:focus-visible { outline-offset: 1px; z-index: 1; }
       .price-hours { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); margin: 4px 0 0 36px; color: var(--muted); font-size: 10px; }
       .price-detail { min-height: 18px; margin-top: 8px; color: var(--muted); font-size: 11px; }
@@ -225,6 +230,7 @@
       <section class="panel" aria-labelledby="prices-title">
         <div class="section-header"><h2 id="prices-title">Electricity prices</h2><span class="label">c/kWh</span></div>
         <div class="price-charts">
+          <div class="price-legend"><span class="price-key">Day 08:00–22:00</span><span class="price-key" data-period="night">Night 22:00–08:00</span></div>
           <p id="prices-status" class="feedback" role="status">Loading prices…</p>
           <div id="price-days"></div>
           <p id="price-detail" class="price-detail" role="status" hidden></p>
@@ -534,7 +540,9 @@
             const available = isPrice(price);
             const slot = document.createElement(available ? "button" : "span");
             slot.className = "price-slot";
-            const description = `${name}, ${day.date}, ${String(hour).padStart(2, "0")}:00–${String(hour + 1).padStart(2, "0")}:00 · ${available ? `${price} c/kWh` : "Unavailable"}`;
+            const isNight = hour >= 22 || hour < 8;
+            slot.dataset.period = isNight ? "night" : "day";
+            const description = `${name}, ${day.date}, ${String(hour).padStart(2, "0")}:00–${String(hour + 1).padStart(2, "0")}:00 · ${isNight ? "Night" : "Day"} · ${available ? `${price} c/kWh` : "Unavailable"}`;
             slot.setAttribute("aria-label", description);
             slot.title = description;
             if (available) {

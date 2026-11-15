@@ -73,7 +73,7 @@ test("inside BMW charge limit applies only to automatic capped modes", () => {
     const state = createDefaultState();
     state.pvInverterPower = 8000;
     state.batteryPower = 8000;
-    state.insideVehicleSOC = 80;
+    state.insideVehicleSOC = 90;
     state.wallboxChargeMode.set(WallboxLocation.Inside, mode);
     state.wallboxChargeMode.set(
       WallboxLocation.Outside,
@@ -81,11 +81,13 @@ test("inside BMW charge limit applies only to automatic capped modes", () => {
     );
     assertEquals(calculatePowerTargets(state).insideWallboxAmps, 0);
 
-    state.insideVehicleSOC = 79;
-    assertEquals(calculatePowerTargets(state).insideWallboxAmps, 20);
+    for (const soc of [80, 89.99]) {
+      state.insideVehicleSOC = soc;
+      assertEquals(calculatePowerTargets(state).insideWallboxAmps, 20);
+    }
     state.insideVehicleSOC = undefined;
     assertEquals(calculatePowerTargets(state).insideWallboxAmps, 20);
-    state.insideVehicleSOC = 80;
+    state.insideVehicleSOC = 90;
     state.wallboxChargeMode.set(WallboxLocation.Inside, WallboxChargeMode.Max);
     assertEquals(calculatePowerTargets(state).insideWallboxAmps, 20);
   }

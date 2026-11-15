@@ -33,9 +33,9 @@ SOC strictly above minimum SOC + 4 percentage points. Reserve uses its 6000 W
 discharge target; Sun and daytime Night retain their below-100 W grid target.
 
 The inside wallbox charges the BMW i3. In Sun, Reserve, Battery and Night, a BMW
-SOC reading of at least 80% and no more than 90 minutes old stops it, including
+SOC reading of at least 90% and no more than 90 minutes old stops it, including
 during the above-95% exception. Missing or older BMW readings do not interrupt
-charging. Max and Manual are exempt. BMW telemetry may lag, so 80% is approximate.
+charging. Max and Manual are exempt. BMW telemetry may lag, so 90% is approximate.
 
 For example, at 23:00 Reserve's ordinary battery-support condition requires SOC
 above minimum SOC + 18 percentage points.

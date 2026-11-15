@@ -135,18 +135,18 @@ function installation(enabled = true, startupCharging = false) {
   };
 }
 
-test("cycle stops the inside BMW at 80% and ignores unavailable readings", async () => {
+test("cycle stops the inside BMW at 90% and ignores unavailable readings", async () => {
   const h = installation();
   h.modes.set(L.Inside, Mode.Night);
   h.modes.set(L.Outside, Mode.Sun);
   h.setTime("2026-09-27T21:00:00Z");
   h.refresh();
   assert(has(await h.tick(), inside("StartStop"), 1));
-  h.setInsideVehicleSoc(80);
+  h.setInsideVehicleSoc(90);
   assert(has(await h.tick(), inside("StartStop"), 0));
   h.setInsideVehicleSoc(undefined);
   assert(has(await h.settle(), inside("StartStop"), 1));
-  h.setInsideVehicleSoc(80, 91);
+  h.setInsideVehicleSoc(90, 91);
   assert(!has(await h.tick(), inside("StartStop"), 0));
 });
 
@@ -715,10 +715,10 @@ test("full-SOC exception remains battery-limited and BMW freshness takes precede
   h.refresh();
   assert(!has(await h.tick(), inside("StartStop"), 1));
   h.values.set(P.batterySOC, 95.01);
-  h.setInsideVehicleSoc(80);
+  h.setInsideVehicleSoc(90);
   h.refresh();
   assert(!has(await h.tick(), inside("StartStop"), 1));
-  h.setInsideVehicleSoc(80, 91);
+  h.setInsideVehicleSoc(90, 91);
   await h.run(200);
   assert(
     h.samples
@@ -1070,7 +1070,7 @@ for (const cause of ["telemetry", "vehicle", "disconnect"]) {
       h.telemetry.invalidate();
       await h.tick();
     } else if (cause === "vehicle") {
-      h.setInsideVehicleSoc(80);
+      h.setInsideVehicleSoc(90);
       await h.step();
     } else {
       h.values.set(inside("Status"), S.Disconnected);

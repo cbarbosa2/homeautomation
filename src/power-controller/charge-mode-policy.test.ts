@@ -74,7 +74,7 @@ test("full battery is strictly above 95 and cannot bypass Manual, BMW, device or
         soc > 95 ? "battery" : "solar",
       );
     }
-    s.insideVehicleSOC = 80;
+    s.insideVehicleSOC = 90;
     equal(chargeModePolicy(s, L.Inside).reason, "bmw-limit");
     s.insideVehicleSOC = undefined;
     s.telemetryValid = false;

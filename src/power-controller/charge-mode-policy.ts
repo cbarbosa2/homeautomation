@@ -57,7 +57,7 @@ export function chargeModePolicy(state: InputState, location: L): ModePolicy {
     location === L.Inside &&
     mode !== Mode.Max &&
     finite(state.insideVehicleSOC) &&
-    state.insideVehicleSOC >= 80
+    state.insideVehicleSOC >= 90
   )
     return result("stopped", "bmw-limit");
 
