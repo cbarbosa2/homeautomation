@@ -6,6 +6,19 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+// Keep lifecycle tests offline while serving valid date-specific market files.
+const omieFetchStub = `
+  if (url.hostname === 'www.omie.es') {
+    const match = url.searchParams.get('filename')?.match(/marginalpdbc_(\\d{4})(\\d{2})(\\d{2})\\./);
+    if (!match) return new Response('');
+    const { Temporal } = await import(${JSON.stringify(new URL("./temporal.js", import.meta.url).href)});
+    const day = Temporal.PlainDate.from({year:Number(match[1]),month:Number(match[2]),day:Number(match[3])});
+    const count = day.toZonedDateTime('Europe/Madrid').hoursInDay * 4;
+    const rows = Array.from({length:count}, (_, i) => [day.year,day.month,day.day,i+1,100,999,''].join(';'));
+    return new Response(['MARGINALPDBC;',...rows,'*'].join('\\n'));
+  }
+`;
+
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   test(`application drains persistence and exits cleanly on ${signal}`, {
     timeout: 10000,
@@ -32,7 +45,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
       }});
       globalThis.fetch = async (input, init) => {
         const url = new URL(input);
-        if (url.hostname === 'www.omie.es') return new Response('');
+        ${omieFetchStub}
         if (url.hostname === 'api.forecast.solar') return Response.json({ result: {} });
         if (url.hostname === 'vrmapi.victronenergy.com') return Response.json({ records: { vrm_pv_charger_yield_fc: [] } });
         if (!String(input).startsWith('https://api.jsonbin.io/v3/b/')) throw new Error('Unexpected network request');
@@ -141,7 +154,7 @@ test("forecast startup remains nonblocking and manual/scheduled overlaps share i
         victron++;
         return Response.json({records:{vrm_pv_charger_yield_fc:[]}});
       }
-      if (url.hostname === 'www.omie.es') return new Response('');
+      ${omieFetchStub}
       if (url.hostname === 'api.jsonbin.io') return Response.json({inside:2,outside:2});
       throw new Error('Unexpected fetch');
     };
@@ -244,7 +257,7 @@ for (const fail of [false, true]) {
         if (url.hostname === 'api.jsonbin.io') return Response.json({inside:2,outside:2});
         if (url.hostname === 'api.forecast.solar') return Response.json({result:{}});
         if (url.hostname === 'vrmapi.victronenergy.com') return Response.json({records:{vrm_pv_charger_yield_fc:[]}});
-        if (url.hostname === 'www.omie.es') return new Response('');
+        ${omieFetchStub}
         throw new Error('Unexpected fetch');
       };
       await import(${JSON.stringify(bootstrap)});

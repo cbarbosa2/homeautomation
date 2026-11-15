@@ -108,3 +108,29 @@ test("intervals run immediately, skip busy runs, support manual triggers and sto
     context.mock.timers.reset();
   }
 });
+
+test("intervals can force a manual refresh separately from a gated scheduled tick", async (context) => {
+  context.mock.timers.enable({ apis: ["setInterval"] });
+  const scheduler = new TaskScheduler();
+  let scheduled = 0;
+  let manual = 0;
+  try {
+    scheduler.interval(
+      "prices",
+      Temporal.Duration.from({ minutes: 5 }),
+      () => {
+        scheduled++;
+      },
+      () => {
+        manual++;
+      },
+    );
+    equal(scheduled, 1);
+    equal(await scheduler.triggerTask("prices"), true);
+    equal(manual, 1);
+    equal(scheduled, 1);
+  } finally {
+    scheduler.terminateAll();
+    context.mock.timers.reset();
+  }
+});

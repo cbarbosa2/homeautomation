@@ -1,110 +1,227 @@
 import { test } from "node:test";
+import { deepStrictEqual as equal, throws, ok } from "node:assert/strict";
 import {
-  ok as assert,
-  deepStrictEqual as assertEquals,
-} from "node:assert/strict";
-import { parseOmieResponse } from "./omie-proxy.ts";
+  parseOmieDay,
+  parseRenDay,
+  hourlyPrices,
+  fetchPriceQuarters,
+  type PriceFetch,
+} from "./omie-proxy.ts";
 import { Temporal } from "../temporal.ts";
 
-// Test data that simulates OMIE CSV format
-const sampleOmieData = `OMIE - Mercado de electricidad;Fecha Emisión :14/11/2025 - 13:10;;15/11/2025;Precios y volúmenes del mercado diario;;;;
+function file(
+  date: string,
+  count = 96,
+  pt: (index: number) => number = () => 100,
+) {
+  const [year, month, day] = date.split("-");
+  return [
+    "MARGINALPDBC;",
+    ...Array.from(
+      { length: count },
+      (_, index) => `${year};${month};${day};${index + 1};${pt(index)};999;`,
+    ),
+    "*",
+  ].join("\n");
+}
 
-Fecha;Periodo;Precio marginal en el sistema español (EUR/MWh);Precio marginal en el sistema portugués (EUR/MWh);Potencia total de compra sistema español (MW);Potencia total de venta sistema español (MW);Potencia total de compra sistema portugués (MW);Potencia total de venta sistema portugués (MW);Potencia total de compra del mercado Ibérico (MW);Potencia total de venta del mercado Ibérico (MW);Potencia total con bilaterales del mercado Ibérico (MW);
-15/11/2025;1;31,5;31,5;19027,4;18635,4;5871,2;5267,6;24898,6;23903;32041,3;
-15/11/2025;2;22,2;22,2;19169,4;18705,1;5815;5135,8;24984,4;23840,9;32084;
-15/11/2025;3;21,14;21,14;19176,8;18792,7;5690,7;5147,1;24867,5;23939,8;31888,1;
-15/11/2025;4;17,11;17,11;19663,3;18877,4;5753,6;5110,4;25416,9;23987,8;32365,6;
-15/11/2025;5;23,04;23,04;21027,1;21638,8;5371,5;5147,9;26398,6;26786,7;30466,2;
-15/11/2025;6;19,1;19,1;21601,9;21532;5297,3;5138,6;26899,2;26670,6;30967,6;
-15/11/2025;7;19,51;19,51;21002,3;21443,4;5198,8;5136,5;26201,1;26579,9;30263,2;
-15/11/2025;8;17,37;17,37;21267,8;21369,7;5134,2;5092;26402;26461,7;30439,5;
-15/11/2025;41;33;33;22732,7;25116,9;5453;5281,7;28185,7;30398,6;33088,9;
-15/11/2025;42;21,8;21,8;23643,1;25465;5613;5155,7;29256,1;30620,7;34230;
-15/11/2025;43;23,98;23,98;23557,6;25784,9;5659,9;5112,6;29217,5;30897,5;34242,4;
-15/11/2025;44;18,49;18,49;24375,7;26040,6;5701,8;5132,5;30077,5;31173,1;35142,5;`;
+const date = Temporal.PlainDate.from("2026-11-16");
 
-test("parseOmieResponse should parse OMIE data correctly", () => {
-  const startOfToday = new Temporal.PlainDateTime(2025, 11, 14, 0, 0, 0);
+function ren(count = 92) {
+  return {
+    xAxis: {
+      categories: Array.from(
+        { length: count },
+        (_, i) =>
+          `${String(Math.floor(i / 4)).padStart(2, "0")}:${String((i % 4) * 15).padStart(2, "0")}`,
+      ),
+      max: "2026-11-16T22:45:00",
+    },
+    series: [
+      { name: "ES", data: Array(count).fill(999) },
+      { name: "PT", data: Array(count).fill(100) },
+    ],
+  };
+}
 
-  const result = parseOmieResponse(sampleOmieData, startOfToday);
+test("OMIE selects Portuguese prices, validates entire day and retains zero/negative prices", () => {
+  const quarters = parseOmieDay(
+    file(date.toString(), 96, (i) => (i === 0 ? -10 : 0)),
+    date,
+  );
+  equal(quarters.length, 96);
+  equal(quarters[0]?.price, -10);
+  equal(quarters[1]?.price, 0);
+  equal(quarters[0]?.instant.toString(), "2026-11-15T23:00:00Z");
+  for (const invalid of [
+    "<html>Service unavailable</html>",
+    file(date.toString(), 95),
+    file("2026-11-15"),
+    file(date.toString()).replace(";2;100;", ";1;100;"),
+    file(date.toString()).replace(";100;", ";NaN;"),
+    file(date.toString()).replace(";100;", ";;"),
+    file(date.toString()).replace("*", ""),
+  ])
+    throws(() => parseOmieDay(invalid, date));
+});
 
-  // Should have 3 entries
-  assertEquals(result.length, 3);
-
-  // Check first entry (period 1 = hour 0, offset -1 = hour 23 of previous day)
-  // But since we're filtering >= startOfToday, this should be the first valid entry
-  const firstEntry = result[0];
-  assert(firstEntry);
-  assertEquals(firstEntry.date.year, 2025);
-  assertEquals(firstEntry.date.month, 11);
-  assertEquals(firstEntry.date.day, 14); // Previous day due to -1 hour offset
-  assertEquals(firstEntry.date.hour, 23); // Period 1 becomes hour 0, then -1 = 23
-
-  // The average OMIE price is 22.9875 EUR/MWh; the night price rounds
-  // to 8 cents/kWh after applying the formula.
-  assertEquals(firstEntry.price, 8);
-
-  // Check last entry
-  const lastEntry = result[result.length - 1];
-  assert(lastEntry);
-  assertEquals(lastEntry.date.hour, 9);
-  assertEquals(lastEntry.price, 15);
-
-  // Verify entries are sorted by date
-  for (let i = 1; i < result.length; i++) {
-    const previous = result[i - 1];
-    const current = result[i];
-    assert(previous);
-    assert(current);
-    const comparison = Temporal.PlainDateTime.compare(
-      previous.date,
-      current.date,
+test("Madrid periods follow elapsed time on both DST days; Lisbon repeated hour averages eight quarters", () => {
+  for (const [day, count, missingHour] of [
+    ["2026-03-29", 92, 1],
+    ["2026-10-25", 100, undefined],
+  ] as const) {
+    const d = Temporal.PlainDate.from(day);
+    const quarters = parseOmieDay(
+      file(day, count, (i) => (i < 12 ? 0 : 200)),
+      d,
     );
-    assertEquals(comparison <= 0, true, "Entries should be sorted by date");
+    equal(quarters.length, count);
+    const entries = hourlyPrices(quarters, d);
+    if (missingHour !== undefined)
+      ok(!entries.some((entry) => entry.date.hour === missingHour));
+    else {
+      const hour = entries.find((entry) => entry.date.hour === 1);
+      // Madrid periods 9–16 cover both Lisbon occurrences of 01:00.
+      equal(hour?.price, 17);
+      equal(entries.find((entry) => entry.date.hour === 2)?.price, 30);
+    }
+    equal(entries.at(-1)?.date.hour, 22);
+    equal(entries.length, count === 92 ? 22 : 23);
+    throws(() => parseOmieDay(file(day, 96), d));
   }
 });
 
-test("parseOmieResponse applies tariffs at Portugal hour boundaries", () => {
-  // OMIE periods are quarter-hours in Spain time, one hour ahead.
-  const response = [
-    "15/11/2025;5;100;100", // 00:00 Portugal
-    "15/11/2025;33;100;100", // 07:00 Portugal
-    "15/11/2025;37;100;100", // 08:00 Portugal
-    "15/11/2025;89;100;100", // 21:00 Portugal
-    "15/11/2025;93;100;100", // 22:00 Portugal
-    "16/11/2025;1;100;100", // 23:00 Portugal
-  ].join("\n");
-
-  const result = parseOmieResponse(
-    response,
-    new Temporal.PlainDateTime(2025, 11, 15),
-  );
-
-  // At 0.1 EUR/kWh OMIE, night is 17.2992 cents and day is 24.4754 cents.
-  assertEquals(
-    result.map((entry) => [entry.date.hour, entry.price]),
-    [
-      [0, 17],
-      [7, 17],
-      [8, 24],
-      [21, 24],
-      [22, 17],
-      [23, 17],
-    ],
+test("hourly tariff boundaries and unpublished Lisbon final hour", () => {
+  const quarters = parseOmieDay(file(date.toString()), date);
+  const entries = hourlyPrices(quarters, date);
+  for (const [hour, expected] of [
+    [0, 17],
+    [7, 17],
+    [8, 24],
+    [21, 24],
+    [22, 17],
+  ]) {
+    equal(entries.find((entry) => entry.date.hour === hour)?.price, expected);
+  }
+  ok(!entries.some((entry) => entry.date.hour === 23));
+  // A partial hour must never be priced using only its available quarters.
+  equal(
+    hourlyPrices(
+      quarters.filter((_, i) => i !== 4),
+      date,
+    ).some((entry) => entry.date.hour === 0),
+    false,
   );
 });
 
-test("parseOmieResponse should filter entries before startOfToday", () => {
-  const response = `15/11/2025;1;31,5;31,5;19027,4;18635,4;5871,2;5267,6;24898,6;23903;32041,3;
-16/11/2025;5;25,0;25,0;19027,4;18635,4;5871,2;5267,6;24898,6;23903;32041,3;`;
+test("REN accepts verified Lisbon prefixes, rejects wrong dates, incomplete hours and invalid PT prices", () => {
+  const parsed = parseRenDay(ren(), date);
+  equal(parsed.length, 92);
+  equal(parsed[0]?.instant.toString(), "2026-11-16T00:00:00Z");
+  equal(parsed.at(-1)?.instant.toString(), "2026-11-16T22:45:00Z");
+  equal(parsed[0]?.price, 100);
+  for (const input of [
+    null,
+    {},
+    ren(91),
+    { ...ren(), xAxis: { ...ren().xAxis, max: "2026-11-15T22:45:00" } },
+    { ...ren(), series: [{ name: "PT", data: Array(92).fill(null) }] },
+    { ...ren(), series: [{ name: "ES", data: Array(92).fill(100) }] },
+    {
+      ...ren(),
+      xAxis: { ...ren().xAxis, categories: Array(92).fill("00:00") },
+    },
+  ])
+    throws(() => parseRenDay(input, date));
+});
 
-  // Set startOfToday to 16/11/2025, so 15/11/2025 entries should be filtered out
-  const startOfToday = new Temporal.PlainDateTime(2025, 11, 16, 0, 0, 0);
+test("source fetching selects latest discovered version and avoids REN when direct days validate", async () => {
+  const urls: string[] = [];
+  const fetcher: PriceFetch = async (url, init) => {
+    urls.push(url);
+    ok(init?.signal);
+    if (url.includes("file-access-list"))
+      return new Response("marginalpdbc_20261116.1 marginalpdbc_20261116.2");
+    const d = url.includes("20261116") ? "2026-11-16" : "2026-11-17";
+    return new Response(file(d));
+  };
+  const quarters = await fetchPriceQuarters(date, fetcher);
+  equal(quarters.length, 192);
+  equal(urls.length, 3);
+  ok(urls.some((url) => url.includes("marginalpdbc_20261116.2")));
+  ok(urls.every((url) => !url.includes("ren.pt")));
+});
 
-  const result = parseOmieResponse(response, startOfToday);
+test("listing failure still tries direct files; malformed primary invokes REN, direct PT values win", async () => {
+  const fetcher: PriceFetch = async (url) => {
+    if (url.includes("file-access-list")) throw new Error("timeout");
+    if (url.includes("20261116.1"))
+      return new Response(file("2026-11-16", 96, () => 50));
+    if (url.includes("20261117.1"))
+      return new Response("<html>Not published</html>");
+    if (url.includes("date=2026-11-16")) return Response.json(ren());
+    return new Response("Unavailable", { status: 503 });
+  };
+  const result = await fetchPriceQuarters(date, fetcher);
+  equal(result.length, 96);
+  equal(
+    result.find(
+      (quarter) => quarter.instant.toString() === "2026-11-16T00:00:00Z",
+    )?.price,
+    50,
+  );
+});
 
-  // Should only have 1 entry (the 16/11/2025 one)
-  assertEquals(result.length, 1);
-  assert(result[0]);
-  assertEquals(result[0].date.day, 16);
+test("both failed sources yield no replacement prices", async () => {
+  const result = await fetchPriceQuarters(
+    date,
+    async () => new Response("not found", { status: 404 }),
+  );
+  equal(result, []);
+});
+
+test("REN recovers missing market files using Lisbon dates without inventing the final hour", async () => {
+  const result = await fetchPriceQuarters(date, async (url) => {
+    if (url.includes("omie.es"))
+      return new Response("not published", { status: 404 });
+    const data = ren();
+    data.xAxis.max = url.includes("2026-11-17")
+      ? "2026-11-17T22:45:00"
+      : "2026-11-16T22:45:00";
+    return Response.json(data);
+  });
+  equal(result.length, 184);
+  equal(hourlyPrices(result, date).length, 46);
+  equal(hourlyPrices(result, date)[0]?.date.toString(), "2026-11-16T00:00:00");
+});
+
+test("REN DST labels must follow the actual Lisbon timeline", () => {
+  for (const [day, count] of [
+    ["2026-03-29", 92],
+    ["2026-10-25", 100],
+  ] as const) {
+    const categories: string[] = [];
+    for (let hour = 0; hour < 24; hour++) {
+      const repeats = hour === 1 ? (count === 92 ? 0 : 2) : 1;
+      for (let repeat = 0; repeat < repeats; repeat++) {
+        for (const minute of ["00", "15", "30", "45"])
+          categories.push(`${String(hour).padStart(2, "0")}:${minute}`);
+      }
+    }
+    const result = parseRenDay(
+      {
+        xAxis: { categories, max: `${day}T23:45:00` },
+        series: [
+          {
+            name: "PT",
+            data: Array.from({ length: count }, (_, i) => (i === 0 ? -10 : 0)),
+          },
+        ],
+      },
+      Temporal.PlainDate.from(day),
+    );
+    equal(result.length, count);
+    equal(result[0]?.price, -10);
+    equal(result[1]?.price, 0);
+  }
 });

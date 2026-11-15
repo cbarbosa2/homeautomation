@@ -155,9 +155,14 @@ class HomeAutomationApp {
     });
 
     const loadOmieTask = new LoadOmieTask(this.metrics);
-    scheduler.cron("Load omie", "0 * * * *", () => {
-      return loadOmieTask.execute();
-    });
+    scheduler.interval(
+      "Load omie",
+      Temporal.Duration.from({ minutes: 5 }),
+      () => {
+        return loadOmieTask.execute(false);
+      },
+      () => loadOmieTask.execute(),
+    );
 
     const setSocLimitTask = new SetSocLimitTask(
       this.mqttClient,

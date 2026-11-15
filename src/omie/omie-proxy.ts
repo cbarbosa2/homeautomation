@@ -1,129 +1,245 @@
 import type { OmieEntry } from "../globals.ts";
-import { logError } from "../logger.ts";
+import { logInfo, logWarn } from "../logger.ts";
 import { Temporal } from "../temporal.ts";
 
-// Keep native decimal/hexadecimal detection for integer inputs.
-const AUTO_DETECT_RADIX = 0;
-
-const OMIE_API_URL = `https://www.omie.es/sites/default/files/dados/NUEVA_SECCION/INT_PBC_EV_H_ACUM.TXT`;
-const TAR_NIGHT = 0.0158; // EUR/kWh, 22:00–08:00
-const TAR_DAY = 0.0835; // EUR/kWh, 08:00–22:00
-
-export async function fetchOmie(): Promise<string> {
-  try {
-    const response = await fetch(OMIE_API_URL);
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return await response.text();
-  } catch (error) {
-    logError("Error fetching/parsing OMIE:", error);
-    throw error;
-  }
+export interface PriceQuarter {
+  instant: Temporal.Instant;
+  price: number; // Portuguese wholesale price, EUR/MWh.
 }
 
-export function parseOmieResponse(
-  response: string,
-  startOfToday: Temporal.PlainDateTime,
-): OmieEntry[] {
-  const entries: OmieEntry[] = [];
-  const lines = response.split("\n");
+export type PriceFetch = (url: string, init?: RequestInit) => Promise<Response>;
 
-  for (const line of lines) {
-    const parsedLine = parseLine(line);
+export function dayQuarters(date: Temporal.PlainDate, timeZone: string) {
+  const start = date.toZonedDateTime(timeZone);
+  const end = start.add({ days: 1 });
+  const quarters: Temporal.ZonedDateTime[] = [];
+
+  for (
+    let time = start;
+    Temporal.ZonedDateTime.compare(time, end) < 0;
+    time = time.add({ minutes: 15 })
+  ) {
+    quarters.push(time);
+  }
+
+  return quarters;
+}
+
+/** Accept a complete market day atomically, including its DST-adjusted length. */
+export function parseOmieDay(
+  text: string,
+  date: Temporal.PlainDate,
+): PriceQuarter[] {
+  const lines = text
+    .trim()
+    .split(/\r?\n/)
+    .map((line) => line.trim());
+  const times = dayQuarters(date, "Europe/Madrid");
+  if (
+    lines[0] !== "MARGINALPDBC;" ||
+    lines.at(-1) !== "*" ||
+    lines.length !== times.length + 2
+  ) {
+    throw new Error(`Invalid or incomplete OMIE file for ${date}`);
+  }
+
+  return times.map((time, index) => {
+    const fields = lines[index + 1]?.split(";");
+    const price = fields?.[4]?.trim().replace(",", ".");
     if (
-      parsedLine &&
-      Temporal.PlainDateTime.compare(parsedLine.date, startOfToday) >= 0
+      fields?.length !== 7 ||
+      fields[6] !== "" ||
+      Number(fields[0]) !== date.year ||
+      Number(fields[1]) !== date.month ||
+      Number(fields[2]) !== date.day ||
+      Number(fields[3]) !== index + 1 ||
+      !price ||
+      !Number.isFinite(Number(price))
     ) {
-      entries.push(parsedLine);
+      throw new Error(`Invalid OMIE period ${index + 1} for ${date}`);
     }
+    return { instant: time.toInstant(), price: Number(price) };
+  });
+}
+
+function record(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** REN provides a Lisbon-day prefix; unpublished final hours may be absent. */
+export function parseRenDay(
+  value: unknown,
+  date: Temporal.PlainDate,
+): PriceQuarter[] {
+  if (!record(value)) throw new Error("Invalid REN response");
+  const { xAxis, series } = value;
+  if (!record(xAxis) || !Array.isArray(series))
+    throw new Error("Invalid REN response");
+  const { categories, max } = xAxis;
+  const pt: unknown = series.find((entry: unknown) => {
+    if (!record(entry)) return false;
+    const { name } = entry;
+    return name === "PT";
+  });
+  if (!record(pt)) throw new Error("Missing REN Portuguese prices");
+  const { data } = pt;
+  if (!Array.isArray(data) || !Array.isArray(categories))
+    throw new Error("Missing REN Portuguese prices");
+  const prices: unknown[] = data;
+  const times = dayQuarters(date, "Europe/Lisbon");
+  if (
+    !prices.length ||
+    prices.length % 4 !== 0 ||
+    prices.length > times.length ||
+    categories.length !== prices.length
+  ) {
+    throw new Error("Incomplete REN hourly prices");
   }
 
-  const averagedEntries = createAveragedEntries(entries);
-
-  averagedEntries.sort((a, b) =>
-    Temporal.PlainDateTime.compare(a.date, b.date),
-  );
-
-  const resultEntries = averagedEntries.map((entry) => {
-    const tar =
-      entry.date.hour >= 22 || entry.date.hour < 8 ? TAR_NIGHT : TAR_DAY;
-
-    // Convert OMIE from EUR/MWh to EUR/kWh before applying the formula.
-    const omie = entry.price / 1000;
-    const formulaResult = (omie * 1.16 + 0.0314 + tar) * 1.06;
-
-    // convert to cents per kWh
-    return { date: entry.date, price: Math.round(formulaResult * 100) };
-  });
-
-  return resultEntries;
-}
-
-function createAveragedEntries(entries: OmieEntry[]): OmieEntry[] {
-  const averagedEntries: OmieEntry[] = [];
-  const dateTimeGroups = new Map<string, OmieEntry[]>();
-
-  // Group entries by full PlainDateTime
-  entries.forEach((entry) => {
-    const dateTimeKey = entry.date.toString();
-    if (!dateTimeGroups.has(dateTimeKey)) {
-      dateTimeGroups.set(dateTimeKey, []);
+  const result = prices.map((price, index) => {
+    const time = times[index];
+    if (
+      !time ||
+      categories[index] !==
+        time.toPlainTime().toString({ smallestUnit: "minute" }) ||
+      typeof price !== "number" ||
+      !Number.isFinite(price)
+    ) {
+      throw new Error(`Invalid REN period ${index + 1}`);
     }
-    const group = dateTimeGroups.get(dateTimeKey) as OmieEntry[];
-    group.push(entry);
+    return { instant: time.toInstant(), price };
   });
-
-  // Calculate average price for each date-time group
-  dateTimeGroups.forEach((groupEntries) => {
-    const averagePrice =
-      groupEntries.reduce((sum, entry) => sum + entry.price, 0) /
-      groupEntries.length;
-    averagedEntries.push({
-      date: (groupEntries[0] as OmieEntry).date,
-      price: averagePrice,
-    });
-  });
-
-  return averagedEntries;
+  const last = times[prices.length - 1];
+  if (
+    !last ||
+    max !== last.toPlainDateTime().toString({ smallestUnit: "second" })
+  ) {
+    throw new Error("REN response date or coverage mismatch");
+  }
+  return result;
 }
 
-function parseDate(input: string): Temporal.PlainDate | undefined {
-  const parts: string[] = input.split("/");
+async function request(url: string, fetcher: PriceFetch) {
+  const response = await fetcher(url, { signal: AbortSignal.timeout(10_000) });
+  if (!response.ok)
+    throw new Error(`Price request failed: HTTP ${response.status}`);
+  return response;
+}
+
+/** Discover corrected file versions; direct version 1 remains usable if listing fails. */
+async function versions(fetcher: PriceFetch): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
   try {
-    if (parts.length === 3) {
-      return new Temporal.PlainDate(
-        parseInt(parts[2] as string, AUTO_DETECT_RADIX),
-        parseInt(parts[1] as string, AUTO_DETECT_RADIX),
-        parseInt(parts[0] as string, AUTO_DETECT_RADIX),
-      );
+    const response = await request(
+      "https://www.omie.es/es/file-access-list?realdir=marginalpdbc",
+      fetcher,
+    );
+    const text = await response.text();
+    for (const match of text.matchAll(/marginalpdbc_(\d{8})\.(\d+)/g)) {
+      const date = match[1];
+      const version = Number(match[2]);
+      if (
+        date &&
+        Number.isSafeInteger(version) &&
+        version > (result.get(date) ?? 0)
+      )
+        result.set(date, version);
     }
-  } catch (_ex) {
-    // ignore
+  } catch (error) {
+    logWarn(
+      "OMIE version listing unavailable; trying date files directly",
+      error,
+    );
   }
-  return undefined;
+  return result;
 }
 
-function parseLine(line: string): OmieEntry | undefined {
-  const parts: string[] = line.split(";");
-  if (parts.length < 4) return undefined;
+export async function fetchPriceQuarters(
+  today: Temporal.PlainDate,
+  fetcher: PriceFetch = fetch,
+): Promise<PriceQuarter[]> {
+  const dates = [today, today.add({ days: 1 })];
+  const availableVersions = await versions(fetcher);
+  const primary = await Promise.allSettled(
+    dates.map(async (date) => {
+      const key = date.toString().replaceAll("-", "");
+      const version = availableVersions.get(key) ?? 1;
+      const url = `https://www.omie.es/en/file-download?parents%5B0%5D=marginalpdbc&filename=marginalpdbc_${key}.${version}`;
+      const response = await request(url, fetcher);
+      const quarters = parseOmieDay(await response.text(), date);
+      logInfo(
+        `Electricity prices: OMIE ${date} version ${version}, ${quarters.length} quarters`,
+      );
+      return quarters;
+    }),
+  );
+  const omie: PriceQuarter[] = [];
+  for (const result of primary) {
+    if (result.status === "fulfilled") omie.push(...result.value);
+    else logWarn("OMIE date prices unavailable", result.reason);
+  }
+  if (primary.every((result) => result.status === "fulfilled")) return omie;
 
-  const date = parseDate(parts[0] as string);
-  if (!date) return undefined;
+  // REN uses Lisbon dates, so request both to recover cross-midnight coverage.
+  const fallback = await Promise.allSettled(
+    dates.map(async (date) => {
+      const url = `https://servicebus.ren.pt/datahubapi/electricity/ElectricityMarketPricesDaily?culture=pt-PT&date=${date}`;
+      const response = await request(url, fetcher);
+      const quarters = parseRenDay(await response.json(), date);
+      logInfo(`Electricity prices: REN ${date}, ${quarters.length} quarters`);
+      return quarters;
+    }),
+  );
+  const merged = new Map<string, PriceQuarter>();
+  for (const result of fallback) {
+    if (result.status === "fulfilled") {
+      for (const quarter of result.value)
+        merged.set(quarter.instant.toString(), quarter);
+    } else
+      logWarn(
+        "REN date prices unavailable; retaining previous prices",
+        result.reason,
+      );
+  }
 
-  const dateTime = date
-    .toPlainDateTime({
-      hour: Math.floor(
-        (parseInt(parts[1] as string, AUTO_DETECT_RADIX) - 1) / 4,
-      ),
-    })
-    // offset spain to portugal
-    .add({ hours: -1 });
+  // Prefer direct OMIE values when both sources cover the same instant.
+  for (const quarter of omie) merged.set(quarter.instant.toString(), quarter);
+  return [...merged.values()];
+}
 
-  return {
-    date: dateTime,
-    price: parseFloat((parts[3] as string).replace(",", ".")),
-  };
+/** The fixed 24-hour dashboard averages both occurrences of a repeated Lisbon hour. */
+export function hourlyPrices(
+  quarters: PriceQuarter[],
+  today: Temporal.PlainDate,
+): OmieEntry[] {
+  const prices = new Map(
+    quarters.map((quarter) => [quarter.instant.toString(), quarter.price]),
+  );
+  const entries: OmieEntry[] = [];
+  for (const date of [today, today.add({ days: 1 })]) {
+    const groups = new Map<number, Temporal.ZonedDateTime[]>();
+    for (const time of dayQuarters(date, "Europe/Lisbon")) {
+      const group = groups.get(time.hour) ?? [];
+      group.push(time);
+      groups.set(time.hour, group);
+    }
+
+    for (const [hour, times] of groups) {
+      const values = times.map((time) =>
+        prices.get(time.toInstant().toString()),
+      );
+      if (!values.every((price): price is number => price !== undefined))
+        continue;
+      const average =
+        values.reduce((sum, price) => sum + price, 0) / values.length;
+      const tariff = hour >= 22 || hour < 8 ? 0.0158 : 0.0835;
+      entries.push({
+        date: date.toPlainDateTime({ hour }),
+        price: Math.round(
+          ((average / 1000) * 1.16 + 0.0314 + tariff) * 1.06 * 100,
+        ),
+      });
+    }
+  }
+  return entries.sort((a, b) => Temporal.PlainDateTime.compare(a.date, b.date));
 }

@@ -64,6 +64,7 @@ export class TaskScheduler {
     name: string,
     duration: Temporal.Duration,
     handler: () => Promise<void> | void,
+    manualHandler?: () => Promise<void> | void,
   ): void {
     logInfo(
       `⏰ Scheduling task "${name}" every ${duration.total("seconds")} seconds`,
@@ -98,7 +99,7 @@ export class TaskScheduler {
       name,
       type: "interval",
       schedule: `Every ${duration.total("seconds")}s`,
-      handler: intervalHandler,
+      handler: manualHandler ?? intervalHandler,
       intervalId,
     });
   }

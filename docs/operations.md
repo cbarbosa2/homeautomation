@@ -270,6 +270,40 @@ Keep the host's current `.env` and BMW tokens; do not restore old rotating token
 When rolling back across the mode renumbering, manually reselect both wallbox
 modes under the old numbering too; saved numbers are not translated.
 
+## Electricity price sources and refreshes
+
+Electricity prices load on startup from OMIE's public date-specific
+`marginalpdbc_YYYYMMDD.v` files, using the Portuguese price column. The loader
+checks OMIE's directory for corrected versions and tries version 1 if the
+listing is unavailable. If either requested market date fails validation or
+fetching, it tries REN's documented `ElectricityMarketPricesDaily` JSON API
+for today and tomorrow in Lisbon time. Direct OMIE values take precedence
+where both sources provide the same quarter. Requests time out after ten
+seconds; failed requests retry on the next scheduled refresh, without overlapping
+startup, manual or scheduled price loads.
+
+The scheduler checks every five minutes. Network refreshes run hourly when
+expected coverage is complete, and every five minutes when current-day coverage
+within the published market horizon is missing or tomorrow's publication is
+still missing after noon in Madrid.
+Manual task runs always refresh. Valid prices remain in memory through source
+failures; the cache is not persisted across restarts. Logs identify the source,
+date, file version where applicable, and number of quarters accepted.
+
+Market periods are converted from Madrid midnight using elapsed quarter-hours,
+then grouped by Lisbon hour before applying the existing tariff formula. The
+fixed 24-hour dashboard averages both occurrences of the repeated autumn hour;
+the nonexistent spring hour is unavailable. Only hours with all their expected
+quarters are shown. Unpublished prices remain `null` in the API and `NaN` in
+`ess_omie_price` metrics, rather than becoming zero.
+
+Tomorrow's final Lisbon hour (23:00–24:00) belongs to the following Madrid market
+day and normally remains unavailable until the next auction. It does not cause
+continued five-minute polling once the expected published horizon is complete.
+The refresh policy improves detection and resilience; neither source guarantees
+publication earlier than the other. See the [OMIE file directory](https://www.omie.es/es/file-access-list?realdir=marginalpdbc)
+and [REN API documentation](https://datahub.ren.pt/pt/instrucoes-api/).
+
 ## Solar forecast comparison
 
 The Solar forecast panel compares Forecast.Solar and Victron for today and the
